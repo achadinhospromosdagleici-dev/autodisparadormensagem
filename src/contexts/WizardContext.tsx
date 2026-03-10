@@ -72,7 +72,7 @@ interface WizardContextType extends WizardState {
   updateRow: (id: string, updates: Partial<DataRow>) => void;
   deleteRow: (id: string) => void;
   deleteRows: (ids: string[]) => void;
-  addMessage: (content: string) => void;
+  addMessage: (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => void;
   updateMessage: (id: string, content: string) => void;
   deleteMessage: (id: string) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
