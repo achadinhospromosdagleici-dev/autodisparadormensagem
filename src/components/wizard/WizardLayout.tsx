@@ -49,8 +49,8 @@ const campaignSections = [
 
 export function WizardLayout() {
   const {
-    data, messages, selectedInstances, chatwootConnected,
-    setChatwootConnected, setChatwootInboxes, chatwootInboxes, selectedInboxId, setSelectedInboxId,
+    data, messages, selectedInstances, chatwootConnected, unoApiConnected,
+    setChatwootConnected, setUnoApiConnected, setChatwootInboxes, chatwootInboxes, selectedInboxId, setSelectedInboxId,
     followUpConfig, setFollowUpConfig, scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
     abTests, addABTest, removeABTest, metrics, getValidCount, addMessage, campaignHistory,
   } = useWizard();
