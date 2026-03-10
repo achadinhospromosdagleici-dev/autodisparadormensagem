@@ -182,6 +182,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     settings: defaultSettings,
     campaignHistory: sampleCampaignHistory,
     chatwootConnected: false,
+    unoApiConnected: false,
     chatwootInboxes: [],
     selectedInboxId: null,
     followUpConfig: defaultFollowUpConfig,
