@@ -220,6 +220,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
   // New functions
   const setChatwootConnected = (connected: boolean) => setState(prev => ({ ...prev, chatwootConnected: connected }));
+  const setUnoApiConnected = (connected: boolean) => setState(prev => ({ ...prev, unoApiConnected: connected }));
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
