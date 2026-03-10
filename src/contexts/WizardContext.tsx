@@ -50,6 +50,7 @@ interface WizardState {
   campaignHistory: Campaign[];
   // New features
   chatwootConnected: boolean;
+  unoApiConnected: boolean;
   chatwootInboxes: ChatwootInbox[];
   selectedInboxId: number | null;
   followUpConfig: FollowUpConfig;
