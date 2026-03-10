@@ -236,7 +236,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
       addMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
-      setChatwootConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
+      setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
     }}>
       {children}

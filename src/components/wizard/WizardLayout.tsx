@@ -102,7 +102,7 @@ export function WizardLayout() {
               <h1 className="text-2xl font-bold">Configurações</h1>
               <p className="text-sm text-muted-foreground">Chatwoot, WhatsApp, AI Gateway</p>
             </div>
-            <SettingsPage onInboxesLoaded={handleInboxesLoaded} onConnectionChange={setChatwootConnected} />
+            <SettingsPage onInboxesLoaded={handleInboxesLoaded} onConnectionChange={setChatwootConnected} onUnoApiConnectionChange={setUnoApiConnected} />
             {chatwootConnected && chatwootInboxes.length > 0 && (
               <div className="glass-card p-4 space-y-3">
                 <h4 className="text-sm font-medium">Caixa de Entrada para Disparos</h4>
