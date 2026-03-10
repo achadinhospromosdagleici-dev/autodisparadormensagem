@@ -18,6 +18,10 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document';
+  mediaUrl?: string;
+  mediaCaption?: string;
+  mediaFilename?: string;
 }
 
 export interface Instance {
@@ -50,6 +54,7 @@ interface WizardState {
   campaignHistory: Campaign[];
   // New features
   chatwootConnected: boolean;
+  unoApiConnected: boolean;
   chatwootInboxes: ChatwootInbox[];
   selectedInboxId: number | null;
   followUpConfig: FollowUpConfig;
@@ -67,7 +72,7 @@ interface WizardContextType extends WizardState {
   updateRow: (id: string, updates: Partial<DataRow>) => void;
   deleteRow: (id: string) => void;
   deleteRows: (ids: string[]) => void;
-  addMessage: (content: string) => void;
+  addMessage: (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => void;
   updateMessage: (id: string, content: string) => void;
   deleteMessage: (id: string) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
@@ -81,6 +86,7 @@ interface WizardContextType extends WizardState {
   reuseCampaign: (campaign: Campaign) => void;
   // New
   setChatwootConnected: (connected: boolean) => void;
+  setUnoApiConnected: (connected: boolean) => void;
   setChatwootInboxes: (inboxes: ChatwootInbox[]) => void;
   setSelectedInboxId: (id: number | null) => void;
   setFollowUpConfig: (config: FollowUpConfig) => void;
@@ -180,6 +186,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     settings: defaultSettings,
     campaignHistory: sampleCampaignHistory,
     chatwootConnected: false,
+    unoApiConnected: false,
     chatwootInboxes: [],
     selectedInboxId: null,
     followUpConfig: defaultFollowUpConfig,
@@ -197,8 +204,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const deleteRow = (id: string) => setState(prev => ({ ...prev, data: prev.data.filter(row => row.id !== id) }));
   const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: prev.data.filter(row => !ids.includes(row.id)) }));
 
-  const addMessage = (content: string) => {
-    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content }] }));
+  const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
@@ -217,6 +224,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
   // New functions
   const setChatwootConnected = (connected: boolean) => setState(prev => ({ ...prev, chatwootConnected: connected }));
+  const setUnoApiConnected = (connected: boolean) => setState(prev => ({ ...prev, unoApiConnected: connected }));
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
@@ -232,7 +240,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
       addMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
-      setChatwootConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
+      setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
     }}>
       {children}

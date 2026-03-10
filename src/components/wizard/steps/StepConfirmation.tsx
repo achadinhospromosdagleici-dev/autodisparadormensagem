@@ -1,22 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import { CampaignHistory, Campaign } from '../CampaignHistory';
-import { sendCampaign, SendProgress } from '@/services/campaignSender';
-import { loadChatwootCredentials } from '@/services/chatwoot';
+import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
+import { loadUnoApiCredentials } from '@/services/unoapi';
 import {
   Users,
   MessageSquare,
   Smartphone,
   Clock,
   Sparkles,
-  Shuffle,
   CheckCircle2,
   Send,
   Loader2,
-  AlertTriangle,
   History,
   StopCircle,
-  MessageCircle,
+  Zap,
   XCircle,
   Reply,
 } from 'lucide-react';
@@ -26,7 +24,7 @@ export function StepConfirmation() {
   const {
     data, messages, instances, selectedInstances, settings,
     getValidCount, campaignHistory, addCampaign, reuseCampaign,
-    chatwootConnected, selectedInboxId, followUpConfig, updateMetrics,
+    unoApiConnected, followUpConfig, updateMetrics,
   } = useWizard();
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
@@ -48,14 +46,14 @@ export function StepConfirmation() {
   };
 
   const handleStartSending = async () => {
-    if (!chatwootConnected || !selectedInboxId) {
-      toast.error('Configure a conexão com o Chatwoot primeiro!');
+    if (!unoApiConnected) {
+      toast.error('Configure a conexão com a UnoAPI primeiro!');
       return;
     }
 
-    const creds = loadChatwootCredentials();
+    const creds = loadUnoApiCredentials();
     if (!creds) {
-      toast.error('Credenciais do Chatwoot não encontradas');
+      toast.error('Credenciais da UnoAPI não encontradas');
       return;
     }
 
@@ -73,10 +71,17 @@ export function StepConfirmation() {
         return obj;
       });
 
+      const campaignMessages: CampaignMessage[] = messages.map(m => ({
+        content: m.content,
+        mediaType: (m as any).mediaType || 'text',
+        mediaUrl: (m as any).mediaUrl || undefined,
+        mediaCaption: (m as any).mediaCaption || undefined,
+        mediaFilename: (m as any).mediaFilename || undefined,
+      }));
+
       const result = await sendCampaign(
         contactsData,
-        messages.map(m => m.content),
-        selectedInboxId,
+        campaignMessages,
         settings,
         followUpConfig,
         (p) => setProgress({ ...p }),
@@ -107,7 +112,7 @@ export function StepConfirmation() {
         failRate: result.sent > 0 ? Math.round((result.failed / result.sent) * 1000) / 10 : 0,
       });
 
-      toast.success(`Campanha finalizada! ${result.sent} enviadas, ${result.replied} respostas.`);
+      toast.success(`Campanha finalizada! ${result.sent} enviadas.`);
     } catch (err: any) {
       toast.error(`Erro: ${err.message}`);
     } finally {
@@ -173,20 +178,15 @@ export function StepConfirmation() {
             ))}
           </div>
 
-          {/* Chatwoot Status */}
-          <div className={`glass-card p-4 flex items-center gap-3 ${chatwootConnected ? 'border-success/30' : 'border-destructive/30'}`}>
-            <MessageCircle className={`w-5 h-5 ${chatwootConnected ? 'text-success' : 'text-destructive'}`} />
+          {/* UnoAPI Status */}
+          <div className={`glass-card p-4 flex items-center gap-3 ${unoApiConnected ? 'border-success/30' : 'border-destructive/30'}`}>
+            <Zap className={`w-5 h-5 ${unoApiConnected ? 'text-success' : 'text-destructive'}`} />
             <div className="flex-1">
-              <p className="text-sm font-medium">{chatwootConnected ? 'Chatwoot conectado' : 'Chatwoot não conectado'}</p>
+              <p className="text-sm font-medium">{unoApiConnected ? 'UnoAPI conectada' : 'UnoAPI não conectada'}</p>
               <p className="text-xs text-muted-foreground">
-                {chatwootConnected ? `Inbox ID: ${selectedInboxId}` : 'Configure nas Configurações'}
+                {unoApiConnected ? 'Envio via WhatsApp Cloud API' : 'Configure nas Configurações'}
               </p>
             </div>
-            {followUpConfig.enabled && (
-              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md">
-                Follow-up: {followUpConfig.mode === 'greeting-then-all' ? 'Saudação → Tudo' : 'Um a um'}
-              </span>
-            )}
           </div>
 
           {/* Config Details */}
@@ -216,9 +216,14 @@ export function StepConfirmation() {
             <div className="space-y-3 max-h-48 overflow-y-auto scrollbar-thin">
               {messages.length > 0 ? messages.map((msg, i) => (
                 <div key={msg.id} className="p-3 rounded-lg bg-muted/50 border border-border/30">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {followUpConfig.enabled && i === (followUpConfig.greetingMessageIndex || 0) ? '👋 Saudação' : `Mensagem ${i + 1}`}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-xs text-muted-foreground">Mensagem {i + 1}</p>
+                    {(msg as any).mediaType && (msg as any).mediaType !== 'text' && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                        {(msg as any).mediaType === 'image' ? '🖼️' : (msg as any).mediaType === 'audio' ? '🎵' : (msg as any).mediaType === 'video' ? '📹' : '📄'} {(msg as any).mediaType}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm whitespace-pre-wrap line-clamp-3">{msg.content}</p>
                 </div>
               )) : <p className="text-sm text-muted-foreground">Nenhuma mensagem configurada</p>}
@@ -226,13 +231,13 @@ export function StepConfirmation() {
           </div>
 
           {/* Warning */}
-          {!chatwootConnected && (
+          {!unoApiConnected && (
             <div className="glass-card p-4 border-destructive/30 bg-destructive/5">
               <div className="flex items-start gap-3">
                 <XCircle className="w-5 h-5 text-destructive shrink-0" />
                 <div>
-                  <p className="font-medium text-destructive">Chatwoot não conectado</p>
-                  <p className="text-sm text-muted-foreground mt-1">Vá em Configurações e conecte o Chatwoot para habilitar o envio real.</p>
+                  <p className="font-medium text-destructive">UnoAPI não conectada</p>
+                  <p className="text-sm text-muted-foreground mt-1">Vá em Configurações e conecte a UnoAPI para habilitar o envio real.</p>
                 </div>
               </div>
             </div>
@@ -284,7 +289,7 @@ export function StepConfirmation() {
                 <CheckCircle2 className="w-8 h-8 text-success" />
                 <div>
                   <h3 className="font-semibold">Campanha Finalizada!</h3>
-                  <p className="text-sm text-muted-foreground">{progress.sent} enviadas, {progress.failed} falhas, {progress.replied} respostas</p>
+                  <p className="text-sm text-muted-foreground">{progress.sent} enviadas, {progress.failed} falhas</p>
                 </div>
               </div>
               {progress.errors.length > 0 && (
@@ -307,19 +312,19 @@ export function StepConfirmation() {
               </button>
             ) : (
               <button onClick={handleStartSending}
-                disabled={validContacts === 0 || messages.length === 0 || !chatwootConnected}
+                disabled={validContacts === 0 || messages.length === 0 || !unoApiConnected}
                 className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                  validContacts === 0 || messages.length === 0 || !chatwootConnected
+                  validContacts === 0 || messages.length === 0 || !unoApiConnected
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
                 }`}>
-                <Send className="w-5 h-5" /> Iniciar Envio Real
+                <Send className="w-5 h-5" /> Iniciar Envio via UnoAPI
               </button>
             )}
           </div>
 
-          {!chatwootConnected && (
-            <p className="text-center text-sm text-muted-foreground">Conecte o Chatwoot nas Configurações para habilitar o envio</p>
+          {!unoApiConnected && (
+            <p className="text-center text-sm text-muted-foreground">Conecte a UnoAPI nas Configurações para habilitar o envio</p>
           )}
         </>
       )}
