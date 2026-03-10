@@ -33,8 +33,8 @@ export function EvolutionConnection() {
   const [qrCode, setQrCode] = useState('');
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [timer, setTimer] = useState(30);
-  const timerRef = useRef<NodeJS.Timeout>();
-  const pollRef = useRef<NodeJS.Timeout>();
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const pollRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
     const creds = loadEvolutionCredentials();

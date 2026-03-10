@@ -1,29 +1,32 @@
 import React, { useState } from 'react';
-import { MessageCircle, Smartphone, Bot, Settings, ChevronRight } from 'lucide-react';
+import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap } from 'lucide-react';
 import { ChatwootSettings } from './ChatwootSettings';
 import { EvolutionConnection } from './EvolutionConnection';
+import { UnoApiSettings } from './UnoApiSettings';
 import { ChatwootInbox } from '@/services/chatwoot';
 
 interface SettingsPageProps {
   onInboxesLoaded: (inboxes: ChatwootInbox[]) => void;
   onConnectionChange: (connected: boolean) => void;
+  onUnoApiConnectionChange: (connected: boolean) => void;
 }
 
-type SettingsTab = 'chatwoot' | 'evolution' | 'ai-gateway';
+type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'ai-gateway';
 
 const tabs = [
+  { id: 'unoapi' as SettingsTab, label: 'UnoAPI', icon: Zap, desc: 'Envio via WhatsApp Cloud API (texto, mídia, docs)' },
   { id: 'chatwoot' as SettingsTab, label: 'Chatwoot', icon: MessageCircle, desc: 'Integração com Chatwoot para envio e monitoramento' },
   { id: 'evolution' as SettingsTab, label: 'WhatsApp / Evolution', icon: Smartphone, desc: 'Conectar número WhatsApp via Evolution API' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
 ];
 
-export function SettingsPage({ onInboxesLoaded, onConnectionChange }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('chatwoot');
+export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConnectionChange }: SettingsPageProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('unoapi');
 
   return (
     <div className="space-y-6">
       {/* Tab selector */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -50,6 +53,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange }: SettingsPa
 
       {/* Content */}
       <div className="animate-fade-in">
+        {activeTab === 'unoapi' && <UnoApiSettings onConnectionChange={onUnoApiConnectionChange} />}
         {activeTab === 'chatwoot' && (
           <ChatwootSettings onInboxesLoaded={onInboxesLoaded} onConnectionChange={onConnectionChange} />
         )}
@@ -68,7 +72,6 @@ function AIGatewaySettings() {
 
   const handleSave = () => {
     localStorage.setItem('ai_gateway_config', JSON.stringify({ provider, apiKey, model }));
-    // toast imported from parent would be needed
     import('sonner').then(({ toast }) => toast.success('Configuração salva!'));
   };
 
