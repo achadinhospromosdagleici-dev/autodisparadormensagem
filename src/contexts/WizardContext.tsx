@@ -204,8 +204,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const deleteRow = (id: string) => setState(prev => ({ ...prev, data: prev.data.filter(row => row.id !== id) }));
   const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: prev.data.filter(row => !ids.includes(row.id)) }));
 
-  const addMessage = (content: string) => {
-    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content }] }));
+  const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
