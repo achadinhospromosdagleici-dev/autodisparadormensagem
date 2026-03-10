@@ -82,6 +82,7 @@ interface WizardContextType extends WizardState {
   reuseCampaign: (campaign: Campaign) => void;
   // New
   setChatwootConnected: (connected: boolean) => void;
+  setUnoApiConnected: (connected: boolean) => void;
   setChatwootInboxes: (inboxes: ChatwootInbox[]) => void;
   setSelectedInboxId: (id: number | null) => void;
   setFollowUpConfig: (config: FollowUpConfig) => void;
