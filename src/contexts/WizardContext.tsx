@@ -18,6 +18,10 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document';
+  mediaUrl?: string;
+  mediaCaption?: string;
+  mediaFilename?: string;
 }
 
 export interface Instance {
