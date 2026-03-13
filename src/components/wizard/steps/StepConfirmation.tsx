@@ -83,6 +83,7 @@ export function StepConfirmation() {
         contactsData,
         campaignMessages,
         settings,
+        selectedInstances,
         followUpConfig,
         (p) => setProgress({ ...p }),
         abortRef.current.signal,
