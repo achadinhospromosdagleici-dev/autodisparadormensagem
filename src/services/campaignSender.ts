@@ -2,7 +2,6 @@
 // Real message sending via UnoAPI with progress tracking
 
 import {
-  UnoApiCredentials,
   loadUnoApiCredentials,
   sendUnoApiMessage,
   UnoApiMessage,
@@ -56,12 +55,14 @@ export async function sendCampaign(
     maxInterval: number;
     sendType: 'single' | 'multiple';
   },
+  selectedPhoneNumbers: string[],
   followUpConfig: FollowUpConfig,
   onProgress: ProgressCallback,
   abortSignal?: AbortSignal,
 ): Promise<SendProgress> {
   const creds = loadUnoApiCredentials();
   if (!creds) throw new Error('Credenciais da UnoAPI não configuradas');
+  if (selectedPhoneNumbers.length === 0) throw new Error('Nenhum número remetente selecionado');
 
   const progress: SendProgress = {
     current: 0,
@@ -82,6 +83,8 @@ export async function sendCampaign(
 
   addLog('🚀 Iniciando campanha via UnoAPI...', 'info');
 
+  let phoneIndex = 0;
+
   for (let i = 0; i < contacts.length; i++) {
     if (abortSignal?.aborted) {
       progress.status = 'paused';
@@ -92,14 +95,18 @@ export async function sendCampaign(
     const contact = contacts[i];
     const phoneNumber = contact.numero || contact.phone || '';
     const contactName = contact.nome || contact.name || phoneNumber;
+    
+    // Pick sender phone (round-robin across selected numbers)
+    const senderPhone = selectedPhoneNumbers[phoneIndex % selectedPhoneNumbers.length];
+    phoneIndex++;
+
     progress.current = i + 1;
     progress.percent = Math.round(((i + 1) / contacts.length) * 100);
     progress.currentContact = contactName;
 
-    addLog(`📤 Processando ${contactName} (${phoneNumber})...`);
+    addLog(`📤 Enviando para ${contactName} (${phoneNumber}) via ${senderPhone}...`);
 
     try {
-      // Determine which messages to send
       const messagesToSend = settings.sendType === 'single' ? [messages[0]] : messages;
 
       for (const msg of messagesToSend) {
@@ -119,7 +126,7 @@ export async function sendCampaign(
           };
         }
 
-        await sendUnoApiMessage(creds, phoneNumber, unoMsg);
+        await sendUnoApiMessage(creds, senderPhone, phoneNumber, unoMsg);
         progress.sent++;
 
         const mediaLabel = msg.mediaType && msg.mediaType !== 'text'
