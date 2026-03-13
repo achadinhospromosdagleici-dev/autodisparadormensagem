@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  MessageCircle,
   Link2,
   Unlink,
   CheckCircle2,
@@ -10,14 +9,17 @@ import {
   RefreshCw,
   Wifi,
   WifiOff,
+  Phone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   UnoApiCredentials,
+  UnoApiInstance,
   saveUnoApiCredentials,
   loadUnoApiCredentials,
   clearUnoApiCredentials,
   testConnection,
+  fetchInstances,
 } from '@/services/unoapi';
 
 interface UnoApiSettingsProps {
@@ -27,21 +29,22 @@ interface UnoApiSettingsProps {
 export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
   const [baseUrl, setBaseUrl] = useState('');
   const [token, setToken] = useState('');
-  const [phoneNumberId, setPhoneNumberId] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+  const [instances, setInstances] = useState<UnoApiInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
 
   useEffect(() => {
     const creds = loadUnoApiCredentials();
     if (creds) {
       setBaseUrl(creds.baseUrl);
       setToken(creds.token);
-      setPhoneNumberId(creds.phoneNumberId);
       setIsConnected(true);
       onConnectionChange(true);
       checkOnline(creds);
+      loadInstances(creds);
     }
   }, []);
 
@@ -50,9 +53,16 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     setIsOnline(online);
   };
 
+  const loadInstances = async (creds: UnoApiCredentials) => {
+    setLoadingInstances(true);
+    const result = await fetchInstances(creds);
+    setInstances(result);
+    setLoadingInstances(false);
+  };
+
   const handleConnect = async () => {
-    if (!baseUrl.trim() || !token.trim() || !phoneNumberId.trim()) {
-      toast.error('Preencha todos os campos');
+    if (!baseUrl.trim() || !token.trim()) {
+      toast.error('Preencha URL e Token');
       return;
     }
 
@@ -60,7 +70,6 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     const creds: UnoApiCredentials = {
       baseUrl: baseUrl.replace(/\/$/, ''),
       token: token.trim(),
-      phoneNumberId: phoneNumberId.trim(),
     };
 
     try {
@@ -69,7 +78,13 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       setIsConnected(true);
       setIsOnline(online);
       onConnectionChange(true);
-      toast.success(online ? 'Conectado à UnoAPI! ✅' : 'Credenciais salvas (servidor não respondeu ao ping)');
+      
+      if (online) {
+        await loadInstances(creds);
+        toast.success('Conectado à UnoAPI! ✅');
+      } else {
+        toast.success('Credenciais salvas (servidor não respondeu ao ping)');
+      }
     } catch (err: any) {
       toast.error(`Falha: ${err.message}`);
     } finally {
@@ -81,6 +96,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     clearUnoApiCredentials();
     setIsConnected(false);
     setIsOnline(false);
+    setInstances([]);
     onConnectionChange(false);
     toast.success('Desconectado da UnoAPI');
   };
@@ -91,6 +107,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     setIsLoading(true);
     const online = await testConnection(creds);
     setIsOnline(online);
+    if (online) await loadInstances(creds);
     toast[online ? 'success' : 'error'](online ? 'UnoAPI online!' : 'UnoAPI offline');
     setIsLoading(false);
   };
@@ -108,7 +125,9 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
               {isOnline ? 'UnoAPI Online' : isConnected ? 'UnoAPI Configurada' : 'UnoAPI Desconectada'}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isOnline ? `Pronto para enviar via ${phoneNumberId}` : isConnected ? 'Servidor pode estar offline' : 'Configure para enviar mensagens via WhatsApp'}
+              {isOnline
+                ? `${instances.length} número(s) conectado(s)`
+                : isConnected ? 'Servidor pode estar offline' : 'Configure para enviar mensagens via WhatsApp'}
             </p>
           </div>
         </div>
@@ -137,14 +156,6 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Número do WhatsApp (Remetente)</label>
-            <input type="text" value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)}
-              placeholder="5511999990001"
-              className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50" />
-            <p className="text-xs text-muted-foreground">Número completo com DDI + DDD, sem espaços ou símbolos</p>
-          </div>
-
-          <div className="space-y-2">
             <label className="text-sm text-muted-foreground">Token de Autorização</label>
             <div className="relative">
               <input type={showToken ? 'text' : 'password'} value={token} onChange={e => setToken(e.target.value)}
@@ -164,29 +175,73 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
 
           <div className="glass-card p-3 border-muted bg-muted/20">
             <p className="text-xs text-muted-foreground">
-              💡 A UnoAPI usa o formato da API oficial do WhatsApp Cloud. Suporta envio de texto, imagem, áudio, vídeo e documentos.
+              💡 Apenas URL e Token são necessários. Os números conectados serão buscados automaticamente da sua UnoAPI.
             </p>
           </div>
         </div>
       )}
 
-      {/* Connected info */}
-      {isConnected && isOnline && (
+      {/* Connected numbers list */}
+      {isConnected && (
         <div className="glass-card p-6 space-y-3 animate-fade-in border-success/30">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-8 h-8 text-success" />
-            <div>
-              <h3 className="font-semibold">UnoAPI Pronta!</h3>
-              <p className="text-sm text-muted-foreground">Envio de mensagens via WhatsApp habilitado.</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-6 h-6 text-success" />
+              <h3 className="font-semibold">Números Conectados</h3>
             </div>
+            <button onClick={() => { const c = loadUnoApiCredentials(); if (c) loadInstances(c); }}
+              disabled={loadingInstances}
+              className="text-xs text-primary hover:underline flex items-center gap-1">
+              <RefreshCw className={`w-3 h-3 ${loadingInstances ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+
+          {loadingInstances ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Buscando números...</span>
+            </div>
+          ) : instances.length > 0 ? (
+            <div className="space-y-2">
+              {instances.map((inst) => (
+                <div key={inst.phone} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/20">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    inst.status === 'connected' ? 'bg-success/10' : 'bg-destructive/10'
+                  }`}>
+                    <Phone className={`w-4 h-4 ${
+                      inst.status === 'connected' ? 'text-success' : 'text-destructive'
+                    }`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{inst.phone}</p>
+                    {inst.name && <p className="text-xs text-muted-foreground">{inst.name}</p>}
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    inst.status === 'connected'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {inst.status === 'connected' ? 'Conectado' : 'Desconectado'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              <Phone className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p>Nenhum número encontrado.</p>
+              <p className="text-xs mt-1">Conecte um número via <code className="bg-muted px-1 rounded">/session/NUMERO</code> na sua UnoAPI.</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 text-sm pt-2">
             {[
-              { label: '📝 Texto', desc: 'Mensagens de texto com variáveis' },
-              { label: '🖼️ Imagem', desc: 'Fotos e imagens com legenda' },
-              { label: '🎵 Áudio', desc: 'Mensagens de voz e áudio' },
+              { label: '📝 Texto', desc: 'Mensagens com variáveis' },
+              { label: '🖼️ Imagem', desc: 'Fotos com legenda' },
+              { label: '🎵 Áudio', desc: 'Mensagens de voz' },
               { label: '📹 Vídeo', desc: 'Vídeos com legenda' },
-              { label: '📄 Documento', desc: 'PDFs, planilhas e arquivos' },
+              { label: '📄 Documento', desc: 'PDFs e arquivos' },
               { label: '🔗 Contato', desc: 'Verificação de contatos' },
             ].map(item => (
               <div key={item.label} className="p-2 rounded-lg bg-muted/30 border border-border/20">

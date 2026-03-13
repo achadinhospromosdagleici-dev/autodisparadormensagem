@@ -5,22 +5,27 @@
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
-  phoneNumberId: string; // Your WhatsApp phone number (sender)
 }
 
 export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document';
 
 export interface MediaAttachment {
   type: MediaType;
-  url?: string;           // link for media
-  caption?: string;       // caption for image/video/document
-  filename?: string;      // filename for document
+  url?: string;
+  caption?: string;
+  filename?: string;
   mimeType?: string;
 }
 
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
+}
+
+export interface UnoApiInstance {
+  phone: string;
+  status: 'connected' | 'disconnected' | 'unknown';
+  name?: string;
 }
 
 const STORAGE_KEY = 'unoapi_credentials';
@@ -50,8 +55,8 @@ function getHeaders(token: string) {
   };
 }
 
-function buildApiUrl(creds: UnoApiCredentials): string {
-  return `${creds.baseUrl}/v15.0/${creds.phoneNumberId}/messages`;
+function buildApiUrl(baseUrl: string, phoneNumberId: string): string {
+  return `${baseUrl}/v15.0/${phoneNumberId}/messages`;
 }
 
 // Test connection by sending a ping
@@ -70,13 +75,48 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
   }
 }
 
+// Fetch connected instances/phone numbers
+export async function fetchInstances(creds: UnoApiCredentials): Promise<UnoApiInstance[]> {
+  try {
+    const res = await fetch(`${creds.baseUrl}/v15.0/phone_numbers`, {
+      headers: getHeaders(creds.token),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    
+    // UnoAPI returns phone numbers - adapt response format
+    if (Array.isArray(data)) {
+      return data.map((item: any) => ({
+        phone: item.phone || item.id || item.phoneNumber || String(item),
+        status: item.status === 'connected' || item.status === 'open' ? 'connected' : 
+                item.status === 'disconnected' || item.status === 'close' ? 'disconnected' : 'unknown',
+        name: item.name || item.pushName || undefined,
+      }));
+    }
+    
+    // If it returns an object with data array
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.map((item: any) => ({
+        phone: item.display_phone_number || item.id || String(item),
+        status: 'connected' as const,
+        name: item.verified_name || undefined,
+      }));
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 // Send text message
 export async function sendTextMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   body: string
 ): Promise<any> {
-  const res = await fetch(buildApiUrl(creds), {
+  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
     method: 'POST',
     headers: getHeaders(creds.token),
     body: JSON.stringify({
@@ -96,6 +136,7 @@ export async function sendTextMessage(
 // Send image message
 export async function sendImageMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   imageUrl: string,
   caption?: string
@@ -108,7 +149,7 @@ export async function sendImageMessage(
   };
   if (caption) payload.image.caption = caption;
 
-  const res = await fetch(buildApiUrl(creds), {
+  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
     method: 'POST',
     headers: getHeaders(creds.token),
     body: JSON.stringify(payload),
@@ -123,10 +164,11 @@ export async function sendImageMessage(
 // Send audio message
 export async function sendAudioMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   audioUrl: string
 ): Promise<any> {
-  const res = await fetch(buildApiUrl(creds), {
+  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
     method: 'POST',
     headers: getHeaders(creds.token),
     body: JSON.stringify({
@@ -146,6 +188,7 @@ export async function sendAudioMessage(
 // Send video message
 export async function sendVideoMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   videoUrl: string,
   caption?: string
@@ -158,7 +201,7 @@ export async function sendVideoMessage(
   };
   if (caption) payload.video.caption = caption;
 
-  const res = await fetch(buildApiUrl(creds), {
+  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
     method: 'POST',
     headers: getHeaders(creds.token),
     body: JSON.stringify(payload),
@@ -173,6 +216,7 @@ export async function sendVideoMessage(
 // Send document message
 export async function sendDocumentMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   documentUrl: string,
   filename?: string,
@@ -187,7 +231,7 @@ export async function sendDocumentMessage(
   if (filename) payload.document.filename = filename;
   if (caption) payload.document.caption = caption;
 
-  const res = await fetch(buildApiUrl(creds), {
+  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
     method: 'POST',
     headers: getHeaders(creds.token),
     body: JSON.stringify(payload),
@@ -202,56 +246,29 @@ export async function sendDocumentMessage(
 // Generic send based on media type
 export async function sendUnoApiMessage(
   creds: UnoApiCredentials,
+  phoneNumberId: string,
   to: string,
   message: UnoApiMessage
 ): Promise<any> {
   if (!message.media || message.media.type === 'text') {
-    return sendTextMessage(creds, to, message.content);
+    return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
 
   const { type, url, caption, filename } = message.media;
   if (!url) {
-    // If no media URL, fall back to text
-    return sendTextMessage(creds, to, message.content);
+    return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
 
   switch (type) {
     case 'image':
-      return sendImageMessage(creds, to, url, caption || message.content);
+      return sendImageMessage(creds, phoneNumberId, to, url, caption || message.content);
     case 'audio':
-      return sendAudioMessage(creds, to, url);
+      return sendAudioMessage(creds, phoneNumberId, to, url);
     case 'video':
-      return sendVideoMessage(creds, to, url, caption || message.content);
+      return sendVideoMessage(creds, phoneNumberId, to, url, caption || message.content);
     case 'document':
-      return sendDocumentMessage(creds, to, url, filename, caption || message.content);
+      return sendDocumentMessage(creds, phoneNumberId, to, url, filename, caption || message.content);
     default:
-      return sendTextMessage(creds, to, message.content);
-  }
-}
-
-// Verify if a contact has WhatsApp
-export async function verifyContact(
-  creds: UnoApiCredentials,
-  phoneNumber: string
-): Promise<{ valid: boolean; waId?: string }> {
-  try {
-    const res = await fetch(`${creds.baseUrl}/${creds.phoneNumberId}/contacts`, {
-      method: 'POST',
-      headers: getHeaders(creds.token),
-      body: JSON.stringify({
-        blocking: 'wait',
-        contacts: [phoneNumber],
-        force_check: true,
-      }),
-    });
-    if (!res.ok) return { valid: false };
-    const data = await res.json();
-    const contact = data.contacts?.[0];
-    return {
-      valid: contact?.status === 'valid',
-      waId: contact?.wa_id,
-    };
-  } catch {
-    return { valid: false };
+      return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
 }
