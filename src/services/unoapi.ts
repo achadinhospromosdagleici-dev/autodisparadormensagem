@@ -78,29 +78,59 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
 // Fetch connected instances/phone numbers
 export async function fetchInstances(creds: UnoApiCredentials): Promise<UnoApiInstance[]> {
   try {
-    const res = await fetch(`${creds.baseUrl}/v15.0/phone_numbers`, {
+    // Try /sessions endpoint first (UnoAPI native)
+    const res = await fetch(`${creds.baseUrl}/sessions`, {
       headers: getHeaders(creds.token),
     });
-    if (!res.ok) return [];
-    const data = await res.json();
-    
-    // UnoAPI returns phone numbers - adapt response format
-    if (Array.isArray(data)) {
-      return data.map((item: any) => ({
-        phone: item.phone || item.id || item.phoneNumber || String(item),
-        status: item.status === 'connected' || item.status === 'open' ? 'connected' : 
-                item.status === 'disconnected' || item.status === 'close' ? 'disconnected' : 'unknown',
-        name: item.name || item.pushName || undefined,
-      }));
+    if (res.ok) {
+      const data = await res.json();
+      
+      // /sessions returns an object with phone numbers as keys
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        return Object.entries(data).map(([phone, config]: [string, any]) => ({
+          phone,
+          status: (config?.status === 'connected' || config?.status === 'open' || config?.authToken) 
+            ? 'connected' as const 
+            : 'disconnected' as const,
+          name: config?.pushName || config?.name || undefined,
+        }));
+      }
+
+      // If it returns an array
+      if (Array.isArray(data)) {
+        return data.map((item: any) => {
+          const phone = typeof item === 'string' ? item : (item.phone || item.id || item.phoneNumber || String(item));
+          return {
+            phone,
+            status: (item?.status === 'connected' || item?.status === 'open' || item?.authToken)
+              ? 'connected' as const
+              : typeof item === 'string' ? 'connected' as const : 'disconnected' as const,
+            name: item?.pushName || item?.name || undefined,
+          };
+        });
+      }
     }
-    
-    // If it returns an object with data array
-    if (data.data && Array.isArray(data.data)) {
-      return data.data.map((item: any) => ({
-        phone: item.display_phone_number || item.id || String(item),
-        status: 'connected' as const,
-        name: item.verified_name || undefined,
-      }));
+
+    // Fallback: try /v15.0/phone_numbers
+    const res2 = await fetch(`${creds.baseUrl}/v15.0/phone_numbers`, {
+      headers: getHeaders(creds.token),
+    });
+    if (res2.ok) {
+      const data2 = await res2.json();
+      if (Array.isArray(data2)) {
+        return data2.map((item: any) => ({
+          phone: item.phone || item.id || item.phoneNumber || String(item),
+          status: 'connected' as const,
+          name: item.name || item.pushName || undefined,
+        }));
+      }
+      if (data2?.data && Array.isArray(data2.data)) {
+        return data2.data.map((item: any) => ({
+          phone: item.display_phone_number || item.id || String(item),
+          status: 'connected' as const,
+          name: item.verified_name || undefined,
+        }));
+      }
     }
 
     return [];
