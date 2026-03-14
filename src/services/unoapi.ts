@@ -85,24 +85,29 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
 // Fetch connected instances/phone numbers
 export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
   try {
-    // Try /sessions endpoint first (UnoAPI native)
-    const res = await fetch(`${creds.baseUrl}/sessions`, {
-      headers: getHeaders(creds.token),
-    });
-    if (res.ok) {
-      const data = await res.json();
+    const result = await proxyCall(creds, 'sessions');
+    
+    if (result.ok && result.data) {
+      const data = result.data;
       console.log('[UnoAPI] /sessions response:', data);
+
+      // Handle error response from proxy
+      if (data.error) {
+        return { instances: [], error: data.error };
+      }
       
       // /sessions returns an object with phone numbers as keys
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const instances = Object.entries(data).map(([phone, config]: [string, any]) => ({
-          phone,
-          status: (config?.status === 'connected' || config?.status === 'open' || config?.status === 'online' || config?.authToken) 
-            ? 'connected' as const 
-            : 'disconnected' as const,
-          name: config?.pushName || config?.name || undefined,
-        }));
-        return { instances };
+      if (data && typeof data === 'object' && !Array.isArray(data) && !data.text) {
+        const instances = Object.entries(data)
+          .filter(([key]) => key !== 'error' && key !== 'text')
+          .map(([phone, config]: [string, any]) => ({
+            phone,
+            status: (config?.status === 'connected' || config?.status === 'open' || config?.status === 'online' || config?.authToken) 
+              ? 'connected' as const 
+              : 'disconnected' as const,
+            name: config?.pushName || config?.name || undefined,
+          }));
+        if (instances.length > 0) return { instances };
       }
 
       // If it returns an array
@@ -121,37 +126,12 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instan
       }
     }
 
-    // Fallback: try /v15.0/phone_numbers
-    const res2 = await fetch(`${creds.baseUrl}/v15.0/phone_numbers`, {
-      headers: getHeaders(creds.token),
-    });
-    if (res2.ok) {
-      const data2 = await res2.json();
-      if (Array.isArray(data2)) {
-        return { instances: data2.map((item: any) => ({
-          phone: item.phone || item.id || item.phoneNumber || String(item),
-          status: 'connected' as const,
-          name: item.name || item.pushName || undefined,
-        })) };
-      }
-      if (data2?.data && Array.isArray(data2.data)) {
-        return { instances: data2.data.map((item: any) => ({
-          phone: item.display_phone_number || item.id || String(item),
-          status: 'connected' as const,
-          name: item.verified_name || undefined,
-        })) };
-      }
-    }
-
-    return { instances: [], error: 'Nenhum número encontrado na API' };
+    return { instances: [], error: 'Nenhum número encontrado na API. Verifique se a URL e token estão corretos.' };
   } catch (err: any) {
     console.error('[UnoAPI] Erro ao buscar instâncias:', err);
-    const isCors = err.message?.includes('Failed to fetch') || err.name === 'TypeError';
     return { 
       instances: [], 
-      error: isCors 
-        ? 'Erro de CORS: o servidor UnoAPI não permite requisições do navegador. Adicione os números manualmente abaixo.'
-        : `Erro: ${err.message}` 
+      error: `Erro: ${err.message}` 
     };
   }
 }
