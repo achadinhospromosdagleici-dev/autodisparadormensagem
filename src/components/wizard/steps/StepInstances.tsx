@@ -46,8 +46,8 @@ export function StepInstances() {
     const creds = loadUnoApiCredentials();
     if (!creds) return;
     setLoading(true);
-    const result = await fetchInstances(creds);
-    setUnoInstances(result);
+    const { instances: fetched } = await fetchInstances(creds);
+    setUnoInstances(fetched);
     setLoaded(true);
     setLoading(false);
   };
