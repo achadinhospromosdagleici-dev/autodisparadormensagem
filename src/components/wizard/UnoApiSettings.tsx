@@ -79,11 +79,13 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       setIsOnline(online);
       onConnectionChange(true);
       
+      // Always try to load instances regardless of ping
+      await loadInstances(creds);
+      
       if (online) {
-        await loadInstances(creds);
         toast.success('Conectado à UnoAPI! ✅');
       } else {
-        toast.success('Credenciais salvas (servidor não respondeu ao ping)');
+        toast.success('Credenciais salvas (tentando buscar números...)');
       }
     } catch (err: any) {
       toast.error(`Falha: ${err.message}`);
