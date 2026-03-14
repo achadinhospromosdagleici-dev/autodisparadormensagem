@@ -59,20 +59,27 @@ function buildApiUrl(baseUrl: string, phoneNumberId: string): string {
   return `${baseUrl}/v15.0/${phoneNumberId}/messages`;
 }
 
+// Proxy call via edge function (avoids CORS)
+async function proxyCall(creds: UnoApiCredentials, endpoint: string): Promise<{ ok: boolean; data: any }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('unoapi-proxy', {
+      body: { baseUrl: creds.baseUrl, token: creds.token, endpoint },
+    });
+    if (error) return { ok: false, data: null };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, data: null };
+  }
+}
+
 // Test connection by sending a ping
 export async function testConnection(creds: UnoApiCredentials): Promise<boolean> {
-  try {
-    const res = await fetch(`${creds.baseUrl}/ping`, {
-      headers: getHeaders(creds.token),
-    });
-    if (res.ok) {
-      const text = await res.text();
-      return text.includes('pong');
-    }
-    return false;
-  } catch {
-    return false;
+  const result = await proxyCall(creds, 'ping');
+  if (result.ok && result.data) {
+    const text = typeof result.data === 'string' ? result.data : (result.data.text || JSON.stringify(result.data));
+    return text.includes('pong');
   }
+  return false;
 }
 
 // Fetch connected instances/phone numbers
