@@ -1,7 +1,7 @@
 // UnoAPI Service
 // Sends WhatsApp messages (text, image, audio, document, video) via UnoAPI Cloud API
 // API follows WhatsApp Cloud API format: https://github.com/clairton/unoapi-cloud
-
+import { supabase } from '@/integrations/supabase/client';
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
