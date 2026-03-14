@@ -1,0 +1,4 @@
+project_id = "buuclhbchpysbcpnbsfb"
+
+[functions.unoapi-proxy]
+verify_jwt = false
