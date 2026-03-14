@@ -10,6 +10,9 @@ import {
   Wifi,
   WifiOff,
   Phone,
+  Plus,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -20,6 +23,9 @@ import {
   clearUnoApiCredentials,
   testConnection,
   fetchInstances,
+  saveManualInstances,
+  loadManualInstances,
+  clearManualInstances,
 } from '@/services/unoapi';
 
 interface UnoApiSettingsProps {
@@ -35,6 +41,8 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
   const [isOnline, setIsOnline] = useState(false);
   const [instances, setInstances] = useState<UnoApiInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [newPhone, setNewPhone] = useState('');
 
   useEffect(() => {
     const creds = loadUnoApiCredentials();
@@ -44,7 +52,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       setIsConnected(true);
       onConnectionChange(true);
       checkOnline(creds);
-      loadInstances(creds);
+      loadInstancesFromApi(creds);
     }
   }, []);
 
@@ -53,11 +61,45 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     setIsOnline(online);
   };
 
-  const loadInstances = async (creds: UnoApiCredentials) => {
+  const loadInstancesFromApi = async (creds: UnoApiCredentials) => {
     setLoadingInstances(true);
-    const result = await fetchInstances(creds);
-    setInstances(result);
+    setFetchError(null);
+    const { instances: fetched, error } = await fetchInstances(creds);
+    
+    if (fetched.length > 0) {
+      setInstances(fetched);
+      saveManualInstances(fetched);
+    } else {
+      // Load manual/cached instances as fallback
+      const manual = loadManualInstances();
+      setInstances(manual);
+      if (error) setFetchError(error);
+    }
     setLoadingInstances(false);
+  };
+
+  const handleAddManualPhone = () => {
+    const phone = newPhone.replace(/\D/g, '').trim();
+    if (!phone || phone.length < 10) {
+      toast.error('Número inválido. Use formato: 5531992127204');
+      return;
+    }
+    if (instances.some(i => i.phone === phone)) {
+      toast.error('Número já adicionado');
+      return;
+    }
+    const updated = [...instances, { phone, status: 'connected' as const }];
+    setInstances(updated);
+    saveManualInstances(updated);
+    setNewPhone('');
+    toast.success(`Número ${phone} adicionado`);
+  };
+
+  const handleRemovePhone = (phone: string) => {
+    const updated = instances.filter(i => i.phone !== phone);
+    setInstances(updated);
+    saveManualInstances(updated);
+    toast.success(`Número ${phone} removido`);
   };
 
   const handleConnect = async () => {
@@ -79,8 +121,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       setIsOnline(online);
       onConnectionChange(true);
       
-      // Always try to load instances regardless of ping
-      await loadInstances(creds);
+      await loadInstancesFromApi(creds);
       
       if (online) {
         toast.success('Conectado à UnoAPI! ✅');
@@ -96,9 +137,11 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
 
   const handleDisconnect = () => {
     clearUnoApiCredentials();
+    clearManualInstances();
     setIsConnected(false);
     setIsOnline(false);
     setInstances([]);
+    setFetchError(null);
     onConnectionChange(false);
     toast.success('Desconectado da UnoAPI');
   };
@@ -109,7 +152,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     setIsLoading(true);
     const online = await testConnection(creds);
     setIsOnline(online);
-    if (online) await loadInstances(creds);
+    await loadInstancesFromApi(creds);
     toast[online ? 'success' : 'error'](online ? 'UnoAPI online!' : 'UnoAPI offline');
     setIsLoading(false);
   };
@@ -128,7 +171,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
             </p>
             <p className="text-xs text-muted-foreground">
               {isOnline
-                ? `${instances.length} número(s) conectado(s)`
+                ? `${instances.length} número(s) configurado(s)`
                 : isConnected ? 'Servidor pode estar offline' : 'Configure para enviar mensagens via WhatsApp'}
             </p>
           </div>
@@ -191,7 +234,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
               <CheckCircle2 className="w-6 h-6 text-success" />
               <h3 className="font-semibold">Números Conectados</h3>
             </div>
-            <button onClick={() => { const c = loadUnoApiCredentials(); if (c) loadInstances(c); }}
+            <button onClick={() => { const c = loadUnoApiCredentials(); if (c) loadInstancesFromApi(c); }}
               disabled={loadingInstances}
               className="text-xs text-primary hover:underline flex items-center gap-1">
               <RefreshCw className={`w-3 h-3 ${loadingInstances ? 'animate-spin' : ''}`} />
@@ -199,42 +242,101 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
             </button>
           </div>
 
+          {/* CORS/Error warning */}
+          {fetchError && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+              <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-warning font-medium">{fetchError}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Adicione os números manualmente abaixo. Eles serão usados para envio de campanhas.
+                </p>
+              </div>
+            </div>
+          )}
+
           {loadingInstances ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">Buscando números...</span>
             </div>
-          ) : instances.length > 0 ? (
-            <div className="space-y-2">
-              {instances.map((inst) => (
-                <div key={inst.phone} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/20">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    inst.status === 'connected' ? 'bg-success/10' : 'bg-destructive/10'
-                  }`}>
-                    <Phone className={`w-4 h-4 ${
-                      inst.status === 'connected' ? 'text-success' : 'text-destructive'
-                    }`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{inst.phone}</p>
-                    {inst.name && <p className="text-xs text-muted-foreground">{inst.name}</p>}
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    inst.status === 'connected'
-                      ? 'bg-success/10 text-success'
-                      : 'bg-destructive/10 text-destructive'
-                  }`}>
-                    {inst.status === 'connected' ? 'Conectado' : 'Desconectado'}
-                  </span>
-                </div>
-              ))}
-            </div>
           ) : (
-            <div className="text-center py-6 text-sm text-muted-foreground">
-              <Phone className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p>Nenhum número encontrado.</p>
-              <p className="text-xs mt-1">Conecte um número via <code className="bg-muted px-1 rounded">/session/NUMERO</code> na sua UnoAPI.</p>
-            </div>
+            <>
+              {/* Numbers table */}
+              {instances.length > 0 ? (
+                <div className="rounded-lg border border-border/30 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/40 border-b border-border/30">
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Número</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Status</th>
+                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Nome</th>
+                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {instances.map((inst) => (
+                        <tr key={inst.phone} className="border-b border-border/10 last:border-0 hover:bg-muted/20 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-mono font-medium">{inst.phone}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${
+                              inst.status === 'connected'
+                                ? 'bg-success/10 text-success'
+                                : 'bg-destructive/10 text-destructive'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                inst.status === 'connected' ? 'bg-success' : 'bg-destructive'
+                              }`} />
+                              {inst.status === 'connected' ? 'online' : 'offline'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground text-xs">
+                            {inst.name || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button onClick={() => handleRemovePhone(inst.phone)}
+                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  <Phone className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p>Nenhum número encontrado.</p>
+                  <p className="text-xs mt-1">Adicione manualmente abaixo ou verifique sua UnoAPI.</p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Exibindo {instances.length} número(s)
+              </p>
+
+              {/* Manual add */}
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="text"
+                  value={newPhone}
+                  onChange={e => setNewPhone(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddManualPhone()}
+                  placeholder="Ex: 5531992127204"
+                  className="flex-1 px-3 py-2 text-sm rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                <button onClick={handleAddManualPhone}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors">
+                  <Plus className="w-4 h-4" /> Adicionar
+                </button>
+              </div>
+            </>
           )}
 
           <div className="grid grid-cols-2 gap-3 text-sm pt-2">

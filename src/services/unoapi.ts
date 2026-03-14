@@ -76,7 +76,7 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
 }
 
 // Fetch connected instances/phone numbers
-export async function fetchInstances(creds: UnoApiCredentials): Promise<UnoApiInstance[]> {
+export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
   try {
     // Try /sessions endpoint first (UnoAPI native)
     const res = await fetch(`${creds.baseUrl}/sessions`, {
@@ -84,30 +84,33 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<UnoApiIn
     });
     if (res.ok) {
       const data = await res.json();
+      console.log('[UnoAPI] /sessions response:', data);
       
       // /sessions returns an object with phone numbers as keys
       if (data && typeof data === 'object' && !Array.isArray(data)) {
-        return Object.entries(data).map(([phone, config]: [string, any]) => ({
+        const instances = Object.entries(data).map(([phone, config]: [string, any]) => ({
           phone,
-          status: (config?.status === 'connected' || config?.status === 'open' || config?.authToken) 
+          status: (config?.status === 'connected' || config?.status === 'open' || config?.status === 'online' || config?.authToken) 
             ? 'connected' as const 
             : 'disconnected' as const,
           name: config?.pushName || config?.name || undefined,
         }));
+        return { instances };
       }
 
       // If it returns an array
       if (Array.isArray(data)) {
-        return data.map((item: any) => {
-          const phone = typeof item === 'string' ? item : (item.phone || item.id || item.phoneNumber || String(item));
+        const instances = data.map((item: any) => {
+          const phone = typeof item === 'string' ? item : (item.phone || item.id || item.phoneNumber || item.number || String(item));
           return {
             phone,
-            status: (item?.status === 'connected' || item?.status === 'open' || item?.authToken)
+            status: (item?.status === 'connected' || item?.status === 'open' || item?.status === 'online' || item?.authToken)
               ? 'connected' as const
               : typeof item === 'string' ? 'connected' as const : 'disconnected' as const,
             name: item?.pushName || item?.name || undefined,
           };
         });
+        return { instances };
       }
     }
 
@@ -118,25 +121,49 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<UnoApiIn
     if (res2.ok) {
       const data2 = await res2.json();
       if (Array.isArray(data2)) {
-        return data2.map((item: any) => ({
+        return { instances: data2.map((item: any) => ({
           phone: item.phone || item.id || item.phoneNumber || String(item),
           status: 'connected' as const,
           name: item.name || item.pushName || undefined,
-        }));
+        })) };
       }
       if (data2?.data && Array.isArray(data2.data)) {
-        return data2.data.map((item: any) => ({
+        return { instances: data2.data.map((item: any) => ({
           phone: item.display_phone_number || item.id || String(item),
           status: 'connected' as const,
           name: item.verified_name || undefined,
-        }));
+        })) };
       }
     }
 
-    return [];
-  } catch {
-    return [];
+    return { instances: [], error: 'Nenhum número encontrado na API' };
+  } catch (err: any) {
+    console.error('[UnoAPI] Erro ao buscar instâncias:', err);
+    const isCors = err.message?.includes('Failed to fetch') || err.name === 'TypeError';
+    return { 
+      instances: [], 
+      error: isCors 
+        ? 'Erro de CORS: o servidor UnoAPI não permite requisições do navegador. Adicione os números manualmente abaixo.'
+        : `Erro: ${err.message}` 
+    };
   }
+}
+
+// Manual instances storage
+const MANUAL_INSTANCES_KEY = 'unoapi_manual_instances';
+
+export function saveManualInstances(instances: UnoApiInstance[]): void {
+  localStorage.setItem(MANUAL_INSTANCES_KEY, JSON.stringify(instances));
+}
+
+export function loadManualInstances(): UnoApiInstance[] {
+  const stored = localStorage.getItem(MANUAL_INSTANCES_KEY);
+  if (!stored) return [];
+  try { return JSON.parse(stored); } catch { return []; }
+}
+
+export function clearManualInstances(): void {
+  localStorage.removeItem(MANUAL_INSTANCES_KEY);
 }
 
 // Send text message
