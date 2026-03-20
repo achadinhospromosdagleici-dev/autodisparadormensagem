@@ -43,11 +43,33 @@ export function StepDataReview() {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {
-    // Initialize mapping from existing columns
     const mapping: Record<number, string> = {};
     columns.forEach((col, i) => {
       const found = MAPPING_OPTIONS.find(o => o.value === col);
-      mapping[i] = found ? col : (col === 'numero' ? 'numero' : '_skip');
+      if (found) {
+        mapping[i] = col;
+      } else if (col === 'numero') {
+        mapping[i] = 'numero';
+      } else {
+        // Auto-detect phone-like columns
+        const colValues = data.map(row => String(row[col] || ''));
+        if (columnLooksLikePhone(colValues)) {
+          mapping[i] = 'numero'; // Only first one as primary
+        } else {
+          mapping[i] = '_skip';
+        }
+      }
+    });
+    // Ensure only one 'numero' primary — mark extras as custom phone cols
+    let foundPrimary = false;
+    Object.keys(mapping).forEach(key => {
+      if (mapping[Number(key)] === 'numero') {
+        if (foundPrimary) {
+          // Keep it detected but mark as custom for now
+          mapping[Number(key)] = 'custom';
+        }
+        foundPrimary = true;
+      }
     });
     return mapping;
   });
