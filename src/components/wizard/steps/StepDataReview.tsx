@@ -94,39 +94,61 @@ export function StepDataReview() {
   };
 
   const applyMapping = () => {
-    const newColumns = originalColumns.map((col, i) => {
+    // Build old→new column name map
+    const colRenameMap: Record<string, string> = {};
+    const newColumns: string[] = [];
+    
+    originalColumns.forEach((col, i) => {
       const mapped = columnMapping[i] || '_skip';
-      return mapped === '_skip' ? col : mapped;
+      const newName = mapped === '_skip' ? col : mapped;
+      colRenameMap[col] = newName;
+      newColumns.push(newName);
     });
-    setColumns(newColumns);
 
-    // Clean phone characters on all columns mapped as numero or detected as phone
-    const phoneColIndices = Object.entries(columnMapping)
-      .filter(([, v]) => v === 'numero' || v === 'custom')
-      .map(([k]) => Number(k));
+    // Identify all columns mapped as phone-related
+    const phoneOriginalCols: string[] = [];
+    originalColumns.forEach((col, i) => {
+      const mapped = columnMapping[i];
+      if (mapped === 'numero' || mapped === 'custom') {
+        phoneOriginalCols.push(col);
+      }
+    });
 
-    // Also auto-detect phone-like columns not explicitly mapped
-    columns.forEach((col, i) => {
-      if (!phoneColIndices.includes(i) && columnMapping[i] !== '_skip') {
+    // Also auto-detect phone-like columns
+    originalColumns.forEach((col, i) => {
+      if (!phoneOriginalCols.includes(col) && columnMapping[i] !== '_skip') {
         const colValues = data.map(row => String(row[col] || ''));
         if (columnLooksLikePhone(colValues)) {
-          phoneColIndices.push(i);
+          phoneOriginalCols.push(col);
         }
       }
     });
 
-    const updatedData = data.map(row => {
-      const newRow = { ...row };
+    // Find which original column is the primary numero
+    const primaryNumeroOrigCol = originalColumns.find((col, i) => columnMapping[i] === 'numero');
 
-      // Clean all phone-like columns
-      phoneColIndices.forEach(colIdx => {
-        const colName = columns[colIdx];
-        if (colName && newRow[colName]) {
-          newRow[colName] = cleanPhoneValue(String(newRow[colName]));
+    // Remap data: rename keys + clean phones + add DDI
+    const updatedData = data.map(row => {
+      const newRow: Record<string, string | boolean | undefined> = {
+        id: row.id,
+        numero: '',
+        isValid: false,
+      };
+
+      // Copy values with new column names
+      originalColumns.forEach(col => {
+        const newKey = colRenameMap[col];
+        let value = String(row[col] || '');
+
+        // Clean phone characters on phone columns
+        if (phoneOriginalCols.includes(col) && value) {
+          value = cleanPhoneValue(value);
         }
+
+        newRow[newKey] = value;
       });
 
-      // Handle primary numero column: add DDI + validate
+      // Handle primary numero: add DDI + validate
       let phone = String(newRow.numero || '');
       phone = cleanPhoneValue(phone);
       if (addDDI && phone && !phone.startsWith('55')) {
@@ -137,10 +159,11 @@ export function StepDataReview() {
       newRow.isValid = validation.isValid;
       newRow.errorMessage = validation.errorMessage;
 
-      return newRow;
+      return newRow as typeof row;
     });
-    setData(updatedData);
 
+    setColumns(newColumns);
+    setData(updatedData);
     toast.success('Mapeamento aplicado e telefones limpos');
   };
 
