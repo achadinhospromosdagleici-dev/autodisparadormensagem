@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
-import { validatePhoneNumber } from '@/utils/phoneValidation';
+import { validatePhoneNumber, cleanPhoneValue, columnLooksLikePhone } from '@/utils/phoneValidation';
 import {
   Search,
   Filter,
@@ -43,11 +43,33 @@ export function StepDataReview() {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {
-    // Initialize mapping from existing columns
     const mapping: Record<number, string> = {};
     columns.forEach((col, i) => {
       const found = MAPPING_OPTIONS.find(o => o.value === col);
-      mapping[i] = found ? col : (col === 'numero' ? 'numero' : '_skip');
+      if (found) {
+        mapping[i] = col;
+      } else if (col === 'numero') {
+        mapping[i] = 'numero';
+      } else {
+        // Auto-detect phone-like columns
+        const colValues = data.map(row => String(row[col] || ''));
+        if (columnLooksLikePhone(colValues)) {
+          mapping[i] = 'numero'; // Only first one as primary
+        } else {
+          mapping[i] = '_skip';
+        }
+      }
+    });
+    // Ensure only one 'numero' primary — mark extras as custom phone cols
+    let foundPrimary = false;
+    Object.keys(mapping).forEach(key => {
+      if (mapping[Number(key)] === 'numero') {
+        if (foundPrimary) {
+          // Keep it detected but mark as custom for now
+          mapping[Number(key)] = 'custom';
+        }
+        foundPrimary = true;
+      }
     });
     return mapping;
   });
@@ -78,23 +100,48 @@ export function StepDataReview() {
     });
     setColumns(newColumns);
 
-    // Re-validate phone numbers with DDI option
-    if (addDDI) {
-      const numCol = Object.entries(columnMapping).find(([, v]) => v === 'numero');
-      if (numCol) {
-        const updatedData = data.map(row => {
-          let phone = row.numero as string;
-          if (phone && !phone.startsWith('55') && !phone.startsWith('+55')) {
-            phone = '55' + phone.replace(/\D/g, '');
-          }
-          const validation = validatePhoneNumber(phone);
-          return { ...row, numero: validation.formatted, isValid: validation.isValid, errorMessage: validation.errorMessage };
-        });
-        setData(updatedData);
-      }
-    }
+    // Clean phone characters on all columns mapped as numero or detected as phone
+    const phoneColIndices = Object.entries(columnMapping)
+      .filter(([, v]) => v === 'numero' || v === 'custom')
+      .map(([k]) => Number(k));
 
-    toast.success('Mapeamento aplicado com sucesso');
+    // Also auto-detect phone-like columns not explicitly mapped
+    columns.forEach((col, i) => {
+      if (!phoneColIndices.includes(i) && columnMapping[i] !== '_skip') {
+        const colValues = data.map(row => String(row[col] || ''));
+        if (columnLooksLikePhone(colValues)) {
+          phoneColIndices.push(i);
+        }
+      }
+    });
+
+    const updatedData = data.map(row => {
+      const newRow = { ...row };
+
+      // Clean all phone-like columns
+      phoneColIndices.forEach(colIdx => {
+        const colName = columns[colIdx];
+        if (colName && newRow[colName]) {
+          newRow[colName] = cleanPhoneValue(String(newRow[colName]));
+        }
+      });
+
+      // Handle primary numero column: add DDI + validate
+      let phone = String(newRow.numero || '');
+      phone = cleanPhoneValue(phone);
+      if (addDDI && phone && !phone.startsWith('55')) {
+        phone = '55' + phone;
+      }
+      const validation = validatePhoneNumber(phone);
+      newRow.numero = validation.formatted;
+      newRow.isValid = validation.isValid;
+      newRow.errorMessage = validation.errorMessage;
+
+      return newRow;
+    });
+    setData(updatedData);
+
+    toast.success('Mapeamento aplicado e telefones limpos');
   };
 
   const getMappingLabel = (colIndex: number) => {
