@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
-import { validatePhoneNumber } from '@/utils/phoneValidation';
+import { validatePhoneNumber, cleanPhoneValue, columnLooksLikePhone } from '@/utils/phoneValidation';
 import {
   Search,
   Filter,
