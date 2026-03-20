@@ -124,6 +124,38 @@ function formatLocalNumber(number: string, countryCode: string): string {
   return number;
 }
 
+/**
+ * Remove special characters from a phone value, keeping only digits.
+ */
+export function cleanPhoneValue(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+/**
+ * Checks if a string looks like a phone number (has digits mixed with common separators).
+ */
+export function looksLikePhone(value: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const digits = value.replace(/\D/g, '');
+  // At least 8 digits and mostly digits (>50% of non-whitespace chars)
+  const nonSpace = value.replace(/\s/g, '');
+  if (digits.length < 8) return false;
+  if (digits.length / nonSpace.length < 0.5) return false;
+  // Contains typical phone separators
+  return /[\d\s\-().+/]/.test(value);
+}
+
+/**
+ * Checks if a column of values looks like it contains phone numbers.
+ * Returns true if >50% of non-empty values look like phone numbers.
+ */
+export function columnLooksLikePhone(values: string[]): boolean {
+  const nonEmpty = values.filter(v => v && v.trim());
+  if (nonEmpty.length === 0) return false;
+  const phoneCount = nonEmpty.filter(v => looksLikePhone(v)).length;
+  return phoneCount / nonEmpty.length > 0.5;
+}
+
 export function parseCSVLine(line: string, delimiter: string = ','): string[] {
   const result: string[] = [];
   let current = '';
