@@ -526,6 +526,9 @@ export function StepDataReview() {
                         {isSkipped ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       </button>
                     </td>
+                    <td className="py-3 px-2 text-center text-xs text-muted-foreground font-mono">
+                      {rowIndex + 1}
+                    </td>
                     {columns.map((col, colIndex) => {
                       const rawValue = (row[col] as string) || '';
                       const isNumeroCol = columnMapping[colIndex] === 'numero';
