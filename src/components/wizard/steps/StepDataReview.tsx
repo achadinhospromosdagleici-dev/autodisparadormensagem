@@ -146,8 +146,16 @@ export function StepDataReview() {
       }
     });
 
-    // Remove skipped rows
-    const activeData = data.filter(row => !skippedRows.has(row.id));
+    // Remove skipped rows and empty rows
+    const activeData = data.filter(row => {
+      if (skippedRows.has(row.id)) return false;
+      // Check if row has any non-empty value in mapped columns
+      return originalColumns.some((col, i) => {
+        if (columnMapping[i] === '_skip') return false;
+        const val = String(row[col] || '').trim();
+        return val !== '';
+      });
+    });
 
     // Remap data
     const updatedData = activeData.map(row => {
@@ -428,6 +436,7 @@ export function StepDataReview() {
               <tr className="border-b border-border/50 bg-card/95 backdrop-blur-sm">
                 <th className="py-3 px-4 w-10" />
                 <th className="py-3 px-2 w-12" />
+                <th className="py-3 px-2 w-14 text-xs text-muted-foreground text-center font-medium">#</th>
                 {columns.map((col, colIndex) => {
                   const option = getMappingOption(colIndex);
                   const isAutoMatched = autoMatchedCols.has(colIndex);
@@ -478,6 +487,7 @@ export function StepDataReview() {
                 <th className="py-2 px-2 text-xs text-muted-foreground">
                   <EyeOff className="w-3.5 h-3.5 mx-auto opacity-50" />
                 </th>
+                <th className="py-2 px-2 w-14 text-xs text-muted-foreground text-center">ID</th>
                 {columns.map((col, colIndex) => (
                   <th key={col} className="text-left py-2 px-4 font-mono text-xs text-muted-foreground uppercase">
                     <span className="flex items-center gap-1.5">
@@ -492,7 +502,7 @@ export function StepDataReview() {
               </tr>
             </thead>
             <tbody>
-              {filteredData.map(row => {
+              {filteredData.map((row, rowIndex) => {
                 const isSkipped = skippedRows.has(row.id);
                 return (
                   <tr
@@ -523,6 +533,9 @@ export function StepDataReview() {
                       >
                         {isSkipped ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       </button>
+                    </td>
+                    <td className="py-3 px-2 text-center text-xs text-muted-foreground font-mono">
+                      {rowIndex + 1}
                     </td>
                     {columns.map((col, colIndex) => {
                       const rawValue = (row[col] as string) || '';

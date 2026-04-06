@@ -52,27 +52,33 @@ export function StepDataEntry() {
       return;
     }
     
-    const rows: DataRow[] = dataLines.map((line, index) => {
-      const values = parseCSVLine(line, delimiter);
-      const row: DataRow = {
-        id: crypto.randomUUID(),
-        numero: '',
-        isValid: false,
-      };
+    const rows: DataRow[] = dataLines
+      .filter(line => {
+        // Skip empty lines or lines where all cells are empty
+        const values = parseCSVLine(line, delimiter);
+        return values.some(v => v.trim() !== '');
+      })
+      .map((line, index) => {
+        const values = parseCSVLine(line, delimiter);
+        const row: DataRow = {
+          id: crypto.randomUUID(),
+          numero: '',
+          isValid: false,
+        };
 
-      cols.forEach((col, i) => {
-        row[col] = values[i] || '';
+        cols.forEach((col, i) => {
+          row[col] = values[i] || '';
+        });
+
+        // Validate phone number
+        const phoneValue = row.numero as string;
+        const validation = validatePhoneNumber(phoneValue);
+        row.isValid = validation.isValid;
+        row.numero = validation.formatted;
+        row.errorMessage = validation.errorMessage;
+
+        return row;
       });
-
-      // Validate phone number
-      const phoneValue = row.numero as string;
-      const validation = validatePhoneNumber(phoneValue);
-      row.isValid = validation.isValid;
-      row.numero = validation.formatted;
-      row.errorMessage = validation.errorMessage;
-
-      return row;
-    });
 
     setData(rows);
     const validCount = rows.filter(r => r.isValid).length;
