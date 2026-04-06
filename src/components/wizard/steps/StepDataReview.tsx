@@ -428,6 +428,7 @@ export function StepDataReview() {
               <tr className="border-b border-border/50 bg-card/95 backdrop-blur-sm">
                 <th className="py-3 px-4 w-10" />
                 <th className="py-3 px-2 w-12" />
+                <th className="py-3 px-2 w-14 text-xs text-muted-foreground text-center font-medium">#</th>
                 {columns.map((col, colIndex) => {
                   const option = getMappingOption(colIndex);
                   const isAutoMatched = autoMatchedCols.has(colIndex);
