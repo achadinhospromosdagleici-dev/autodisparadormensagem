@@ -1,103 +1,129 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import { validatePhoneNumber, cleanPhoneValue, columnLooksLikePhone } from '@/utils/phoneValidation';
+import { autoMatchColumn, saveMappingHistory } from '@/utils/mappingStorage';
 import {
-  Search,
-  Filter,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
-  Edit3,
-  Check,
-  X,
-  ChevronDown,
-  MoreHorizontal,
+  Search, Filter, Trash2, CheckCircle2, AlertCircle, Edit3, Check, X,
+  ChevronDown, MoreHorizontal, Phone, Sparkles, EyeOff, Eye, ArrowRight,
+  Zap, RotateCcw, Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 type FilterType = 'all' | 'valid' | 'invalid';
 
 const MAPPING_OPTIONS = [
-  { value: 'numero', label: 'Número *', color: 'text-primary' },
-  { value: 'nome', label: 'Nome Completo', color: 'text-blue-400' },
-  { value: 'email', label: 'Email', color: 'text-purple-400' },
-  { value: 'cpf', label: 'CPF', color: 'text-amber-400' },
-  { value: 'empresa', label: 'Empresa', color: 'text-emerald-400' },
-  { value: 'cidade', label: 'Cidade', color: 'text-cyan-400' },
-  { value: 'custom', label: 'Campo Personalizado', color: 'text-foreground' },
-  { value: '_skip', label: 'Não Carregar', color: 'text-muted-foreground' },
+  { value: 'numero', label: 'Telefone *', icon: '📱', description: 'Número principal (obrigatório)' },
+  { value: 'nome', label: 'Nome', icon: '👤', description: 'Nome do contato' },
+  { value: 'email', label: 'Email', icon: '📧', description: 'Endereço de email' },
+  { value: 'cpf', label: 'CPF', icon: '🪪', description: 'Documento CPF' },
+  { value: 'empresa', label: 'Empresa', icon: '🏢', description: 'Nome da empresa' },
+  { value: 'cidade', label: 'Cidade', icon: '📍', description: 'Cidade/localidade' },
+  { value: 'custom', label: 'Campo Personalizado', icon: '🏷️', description: 'Atributo customizado' },
+  { value: '_skip', label: 'Não importar', icon: '⛔', description: 'Ignorar esta coluna' },
 ] as const;
+
+function getMappingStyle(value: string) {
+  const styles: Record<string, string> = {
+    numero: 'bg-primary/15 border-primary/40 text-primary',
+    nome: 'bg-blue-500/15 border-blue-500/40 text-blue-400',
+    email: 'bg-purple-500/15 border-purple-500/40 text-purple-400',
+    cpf: 'bg-amber-500/15 border-amber-500/40 text-amber-400',
+    empresa: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400',
+    cidade: 'bg-cyan-500/15 border-cyan-500/40 text-cyan-400',
+    custom: 'bg-foreground/10 border-foreground/20 text-foreground',
+    _skip: 'bg-muted/50 border-muted-foreground/20 text-muted-foreground opacity-60',
+  };
+  return styles[value] || styles._skip;
+}
 
 export function StepDataReview() {
   const { data, columns, setColumns, setData, updateRow, deleteRow, deleteRows, settings, setSettings } = useWizard();
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [skippedRows, setSkippedRows] = useState<Set<string>>(new Set());
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {
-    const mapping: Record<number, string> = {};
-    columns.forEach((col, i) => {
-      const found = MAPPING_OPTIONS.find(o => o.value === col);
-      if (found) {
-        mapping[i] = col;
-      } else if (col === 'numero') {
-        mapping[i] = 'numero';
-      } else {
-        // Auto-detect phone-like columns
-        const colValues = data.map(row => String(row[col] || ''));
-        if (columnLooksLikePhone(colValues)) {
-          mapping[i] = 'numero'; // Only first one as primary
-        } else {
-          mapping[i] = '_skip';
-        }
-      }
-    });
-    // Ensure only one 'numero' primary — mark extras as custom phone cols
-    let foundPrimary = false;
-    Object.keys(mapping).forEach(key => {
-      if (mapping[Number(key)] === 'numero') {
-        if (foundPrimary) {
-          // Keep it detected but mark as custom for now
-          mapping[Number(key)] = 'custom';
-        }
-        foundPrimary = true;
-      }
-    });
-    return mapping;
-  });
+  const [mappingApplied, setMappingApplied] = useState(false);
   const [addDDI, setAddDDI] = useState(false);
 
+  // Auto-match columns on mount
+  const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {
+    const mapping: Record<number, string> = {};
+    let hasNumero = false;
+
+    // First pass: auto-match by name (localStorage + rules)
+    columns.forEach((col, i) => {
+      const autoMatch = autoMatchColumn(col);
+      if (autoMatch) {
+        if (autoMatch === 'numero' && hasNumero) {
+          mapping[i] = 'custom';
+        } else {
+          mapping[i] = autoMatch;
+          if (autoMatch === 'numero') hasNumero = true;
+        }
+      } else {
+        mapping[i] = '_skip';
+      }
+    });
+
+    // Second pass: if no numero found, detect by data content
+    if (!hasNumero) {
+      columns.forEach((col, i) => {
+        if (mapping[i] !== '_skip') return;
+        const colValues = data.map(row => String(row[col] || ''));
+        if (columnLooksLikePhone(colValues)) {
+          mapping[i] = 'numero';
+          hasNumero = true;
+        }
+      });
+    }
+
+    return mapping;
+  });
+
+  const [autoMatchedCols, setAutoMatchedCols] = useState<Set<number>>(() => {
+    const matched = new Set<number>();
+    columns.forEach((col, i) => {
+      if (autoMatchColumn(col)) matched.add(i);
+    });
+    return matched;
+  });
+
   const originalColumns = columns;
+
+  const hasNumeroMapped = Object.values(columnMapping).includes('numero');
 
   const handleMappingChange = (colIndex: number, value: string) => {
     setColumnMapping(prev => {
       const newMapping = { ...prev };
-      // If selecting numero, remove it from other columns
       if (value === 'numero') {
         Object.keys(newMapping).forEach(key => {
-          if (newMapping[Number(key)] === 'numero') {
-            newMapping[Number(key)] = '_skip';
-          }
+          if (newMapping[Number(key)] === 'numero') newMapping[Number(key)] = '_skip';
         });
       }
       newMapping[colIndex] = value;
       return newMapping;
     });
+    setMappingApplied(false);
   };
 
   const applyMapping = () => {
-    // Build old→new column name map
+    // Save mapping history to localStorage
+    const historyEntries: Record<string, string> = {};
+    originalColumns.forEach((col, i) => {
+      historyEntries[col] = columnMapping[i] || '_skip';
+    });
+    saveMappingHistory(historyEntries);
+
+    // Build rename map
     const colRenameMap: Record<string, string> = {};
     const newColumns: string[] = [];
-    
     originalColumns.forEach((col, i) => {
       const mapped = columnMapping[i] || '_skip';
       const newName = mapped === '_skip' ? col : mapped;
@@ -105,7 +131,7 @@ export function StepDataReview() {
       newColumns.push(newName);
     });
 
-    // Identify all columns mapped as phone-related
+    // Identify phone columns
     const phoneOriginalCols: string[] = [];
     originalColumns.forEach((col, i) => {
       const mapped = columnMapping[i];
@@ -113,47 +139,32 @@ export function StepDataReview() {
         phoneOriginalCols.push(col);
       }
     });
-
-    // Also auto-detect phone-like columns
     originalColumns.forEach((col, i) => {
       if (!phoneOriginalCols.includes(col) && columnMapping[i] !== '_skip') {
         const colValues = data.map(row => String(row[col] || ''));
-        if (columnLooksLikePhone(colValues)) {
-          phoneOriginalCols.push(col);
-        }
+        if (columnLooksLikePhone(colValues)) phoneOriginalCols.push(col);
       }
     });
 
-    // Find which original column is the primary numero
-    const primaryNumeroOrigCol = originalColumns.find((col, i) => columnMapping[i] === 'numero');
+    // Remove skipped rows
+    const activeData = data.filter(row => !skippedRows.has(row.id));
 
-    // Remap data: rename keys + clean phones + add DDI
-    const updatedData = data.map(row => {
+    // Remap data
+    const updatedData = activeData.map(row => {
       const newRow: Record<string, string | boolean | undefined> = {
-        id: row.id,
-        numero: '',
-        isValid: false,
+        id: row.id, numero: '', isValid: false,
       };
 
-      // Copy values with new column names
       originalColumns.forEach(col => {
         const newKey = colRenameMap[col];
         let value = String(row[col] || '');
-
-        // Clean phone characters on phone columns
-        if (phoneOriginalCols.includes(col) && value) {
-          value = cleanPhoneValue(value);
-        }
-
+        if (phoneOriginalCols.includes(col) && value) value = cleanPhoneValue(value);
         newRow[newKey] = value;
       });
 
-      // Handle primary numero: add DDI + validate
       let phone = String(newRow.numero || '');
       phone = cleanPhoneValue(phone);
-      if (addDDI && phone && !phone.startsWith('55')) {
-        phone = '55' + phone;
-      }
+      if (addDDI && phone && !phone.startsWith('55')) phone = '55' + phone;
       const validation = validatePhoneNumber(phone);
       newRow.numero = validation.formatted;
       newRow.isValid = validation.isValid;
@@ -164,27 +175,33 @@ export function StepDataReview() {
 
     setColumns(newColumns);
     setData(updatedData);
-    toast.success('Mapeamento aplicado e telefones limpos');
+    setMappingApplied(true);
+    setSkippedRows(new Set());
+    toast.success(`Mapeamento aplicado! ${updatedData.length} contatos processados.`);
   };
 
-  const getMappingLabel = (colIndex: number) => {
+  const getMappingOption = (colIndex: number) => {
     const value = columnMapping[colIndex] || '_skip';
     return MAPPING_OPTIONS.find(o => o.value === value) || MAPPING_OPTIONS[MAPPING_OPTIONS.length - 1];
   };
 
-  const getMappingColor = (colIndex: number) => {
-    const option = getMappingLabel(colIndex);
-    return option.color;
+  // Preview what a phone value will look like after cleaning
+  const previewPhoneClean = (value: string, colIndex: number) => {
+    if (columnMapping[colIndex] !== 'numero') return value;
+    if (!value) return value;
+    let cleaned = cleanPhoneValue(value);
+    if (addDDI && cleaned && !cleaned.startsWith('55')) cleaned = '55' + cleaned;
+    return cleaned;
   };
 
   const filteredData = useMemo(() => {
     let result = data;
-    if (filter === 'valid') result = result.filter((row) => row.isValid);
-    else if (filter === 'invalid') result = result.filter((row) => !row.isValid);
+    if (filter === 'valid') result = result.filter(row => row.isValid);
+    else if (filter === 'invalid') result = result.filter(row => !row.isValid);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter((row) =>
-        columns.some((col) => {
+      result = result.filter(row =>
+        columns.some(col => {
           const value = row[col];
           return typeof value === 'string' && value.toLowerCase().includes(query);
         })
@@ -193,15 +210,12 @@ export function StepDataReview() {
     return result;
   }, [data, filter, searchQuery, columns]);
 
-  const validCount = data.filter((r) => r.isValid).length;
-  const invalidCount = data.filter((r) => !r.isValid).length;
+  const validCount = data.filter(r => r.isValid).length;
+  const invalidCount = data.filter(r => !r.isValid).length;
 
   const handleSelectAll = () => {
-    if (selectedRows.size === filteredData.length) {
-      setSelectedRows(new Set());
-    } else {
-      setSelectedRows(new Set(filteredData.map((row) => row.id)));
-    }
+    if (selectedRows.size === filteredData.length) setSelectedRows(new Set());
+    else setSelectedRows(new Set(filteredData.map(row => row.id)));
   };
 
   const handleSelectRow = (id: string) => {
@@ -209,6 +223,13 @@ export function StepDataReview() {
     if (newSelected.has(id)) newSelected.delete(id);
     else newSelected.add(id);
     setSelectedRows(newSelected);
+  };
+
+  const toggleSkipRow = (id: string) => {
+    const newSkipped = new Set(skippedRows);
+    if (newSkipped.has(id)) newSkipped.delete(id);
+    else newSkipped.add(id);
+    setSkippedRows(newSkipped);
   };
 
   const handleDeleteSelected = () => {
@@ -219,7 +240,7 @@ export function StepDataReview() {
   };
 
   const handleDeleteInvalid = () => {
-    const invalidIds = data.filter((row) => !row.isValid).map((row) => row.id);
+    const invalidIds = data.filter(row => !row.isValid).map(row => row.id);
     deleteRows(invalidIds);
     toast.success(`${invalidIds.length} registros inválidos removidos`);
   };
@@ -228,13 +249,14 @@ export function StepDataReview() {
     setData([]);
     setColumns(['numero']);
     setSelectedRows(new Set());
+    setSkippedRows(new Set());
     toast.success('Dados limpos');
   };
 
   const startEditing = (row: typeof data[0]) => {
     setEditingRow(row.id);
     const values: Record<string, string> = {};
-    columns.forEach((col) => { values[col] = (row[col] as string) || ''; });
+    columns.forEach(col => { values[col] = (row[col] as string) || ''; });
     setEditValues(values);
   };
 
@@ -261,23 +283,68 @@ export function StepDataReview() {
     <div className="max-w-7xl mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Planilha de Importação</h2>
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={addDDI}
-              onCheckedChange={(checked) => setAddDDI(checked === true)}
-            />
-            <span className="text-muted-foreground">Inserir DDI 55</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={settings.hasHeader}
-              onCheckedChange={(checked) => setSettings({ hasHeader: checked === true })}
-            />
-            <span className="text-muted-foreground">1ª linha é cabeçalho</span>
-          </label>
+        <div>
+          <h2 className="text-lg font-semibold">Mapeamento de Colunas</h2>
+          <p className="text-sm text-muted-foreground">
+            Selecione o campo correspondente para cada coluna da planilha
+          </p>
         </div>
+        <div className="flex items-center gap-3">
+          {autoMatchedCols.size > 0 && (
+            <Badge variant="outline" className="gap-1 border-primary/30 text-primary text-xs">
+              <Sparkles className="w-3 h-3" />
+              {autoMatchedCols.size} auto-detectadas
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Mapping Controls Bar */}
+      <div className="glass-card p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={addDDI} onCheckedChange={checked => { setAddDDI(checked === true); setMappingApplied(false); }} />
+              <span className="text-muted-foreground">Inserir DDI 55</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={settings.hasHeader}
+                onCheckedChange={checked => setSettings({ hasHeader: checked === true })}
+              />
+              <span className="text-muted-foreground">1ª linha é cabeçalho</span>
+            </label>
+          </div>
+
+          {/* Prominent Apply Button */}
+          <button
+            onClick={applyMapping}
+            disabled={!hasNumeroMapped}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ${
+              hasNumeroMapped
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
+                : 'bg-muted text-muted-foreground cursor-not-allowed'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Aplicar Mapeamento
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!hasNumeroMapped && (
+          <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
+            <AlertCircle className="w-3.5 h-3.5" />
+            Selecione qual coluna contém o número de telefone (campo obrigatório)
+          </div>
+        )}
+
+        {skippedRows.size > 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">
+            <EyeOff className="w-3.5 h-3.5" />
+            {skippedRows.size} linhas marcadas para ignorar
+          </div>
+        )}
       </div>
 
       {/* Stats + Actions Bar */}
@@ -299,28 +366,24 @@ export function StepDataReview() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Buscar..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 pr-4 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 w-48"
               />
             </div>
 
-            {/* Filter */}
             <div className="flex bg-muted/50 rounded-lg p-1">
-              {(['all', 'valid', 'invalid'] as FilterType[]).map((f) => (
+              {(['all', 'valid', 'invalid'] as FilterType[]).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    filter === f
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
+                    filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {f === 'all' ? 'Todos' : f === 'valid' ? 'Válidos' : 'Inválidos'}
@@ -328,10 +391,9 @@ export function StepDataReview() {
               ))}
             </div>
 
-            {/* Actions Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm hover:bg-muted transition-colors">
-                Ações em Massa
+                Ações
                 <ChevronDown className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -347,20 +409,12 @@ export function StepDataReview() {
                     Remover Inválidos ({invalidCount})
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={applyMapping}>
-                  <Check className="w-4 h-4 mr-2" />
-                  Aplicar Mapeamento
+                <DropdownMenuItem onClick={handleClearData} className="text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Limpar Tudo
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <button
-              onClick={handleClearData}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Limpar Dados
-            </button>
           </div>
         </div>
       </div>
@@ -370,31 +424,48 @@ export function StepDataReview() {
         <div className="overflow-x-auto scrollbar-thin max-h-[500px]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
-              {/* Mapping Row - Dropdowns */}
+              {/* Mapping Row */}
               <tr className="border-b border-border/50 bg-card/95 backdrop-blur-sm">
-                <th className="py-2 px-4 w-10" />
-                {columns.map((col, colIndex) => (
-                  <th key={`mapping-${colIndex}`} className="py-2 px-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className={`flex items-center gap-1 px-3 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-xs font-medium w-full justify-between hover:bg-muted transition-colors ${getMappingColor(colIndex)}`}>
-                        <span className="truncate">{getMappingLabel(colIndex).label}</span>
-                        <ChevronDown className="w-3 h-3 flex-shrink-0" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        {MAPPING_OPTIONS.map((option) => (
-                          <DropdownMenuItem
-                            key={option.value}
-                            onClick={() => handleMappingChange(colIndex, option.value)}
-                            className={`text-xs ${option.color} ${columnMapping[colIndex] === option.value ? 'bg-primary/10' : ''}`}
-                          >
-                            {option.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </th>
-                ))}
-                <th className="py-2 px-4 w-16" />
+                <th className="py-3 px-4 w-10" />
+                <th className="py-3 px-2 w-12" />
+                {columns.map((col, colIndex) => {
+                  const option = getMappingOption(colIndex);
+                  const isAutoMatched = autoMatchedCols.has(colIndex);
+                  return (
+                    <th key={`mapping-${colIndex}`} className="py-3 px-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium w-full justify-between transition-all duration-200 hover:scale-[1.02] ${getMappingStyle(option.value)}`}
+                        >
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span>{option.icon}</span>
+                            <span className="truncate">{option.label}</span>
+                            {isAutoMatched && (
+                              <Sparkles className="w-3 h-3 text-primary flex-shrink-0" />
+                            )}
+                          </span>
+                          <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-60" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-56">
+                          {MAPPING_OPTIONS.map(opt => (
+                            <DropdownMenuItem
+                              key={opt.value}
+                              onClick={() => handleMappingChange(colIndex, opt.value)}
+                              className={`flex flex-col items-start gap-0.5 ${columnMapping[colIndex] === opt.value ? 'bg-primary/10' : ''}`}
+                            >
+                              <span className="flex items-center gap-2 text-sm">
+                                <span>{opt.icon}</span>
+                                {opt.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground pl-6">{opt.description}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </th>
+                  );
+                })}
+                <th className="py-3 px-4 w-16" />
               </tr>
               {/* Original Column Names Row */}
               <tr className="border-b border-border/50 bg-muted/30">
@@ -404,100 +475,126 @@ export function StepDataReview() {
                     onCheckedChange={handleSelectAll}
                   />
                 </th>
+                <th className="py-2 px-2 text-xs text-muted-foreground">
+                  <EyeOff className="w-3.5 h-3.5 mx-auto opacity-50" />
+                </th>
                 {columns.map((col, colIndex) => (
-                  <th
-                    key={col}
-                    className="text-left py-2 px-4 font-mono text-xs text-muted-foreground uppercase"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                  <th key={col} className="text-left py-2 px-4 font-mono text-xs text-muted-foreground uppercase">
+                    <span className="flex items-center gap-1.5">
+                      {columnMapping[colIndex] === 'numero' && (
+                        <Phone className="w-3 h-3 text-primary" />
+                      )}
                       {col}
                     </span>
                   </th>
                 ))}
-                <th className="text-right py-2 px-4 text-xs text-muted-foreground">
-                  Ações
-                </th>
+                <th className="text-right py-2 px-4 text-xs text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {filteredData.map((row) => (
-                <tr
-                  key={row.id}
-                  className={`border-b border-border/30 transition-colors ${
-                    !row.isValid
-                      ? 'bg-destructive/5 hover:bg-destructive/10'
-                      : 'hover:bg-muted/30'
-                  } ${selectedRows.has(row.id) ? 'bg-primary/5' : ''}`}
-                >
-                  <td className="py-3 px-4">
-                    <Checkbox
-                      checked={selectedRows.has(row.id)}
-                      onCheckedChange={() => handleSelectRow(row.id)}
-                    />
-                  </td>
-                  {columns.map((col) => (
-                    <td key={col} className="py-3 px-4">
+              {filteredData.map(row => {
+                const isSkipped = skippedRows.has(row.id);
+                return (
+                  <tr
+                    key={row.id}
+                    className={`border-b border-border/30 transition-colors ${
+                      isSkipped
+                        ? 'opacity-40 bg-muted/20 line-through'
+                        : !row.isValid
+                          ? 'bg-destructive/5 hover:bg-destructive/10'
+                          : 'hover:bg-muted/30'
+                    } ${selectedRows.has(row.id) ? 'bg-primary/5' : ''}`}
+                  >
+                    <td className="py-3 px-4">
+                      <Checkbox
+                        checked={selectedRows.has(row.id)}
+                        onCheckedChange={() => handleSelectRow(row.id)}
+                      />
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <button
+                        onClick={() => toggleSkipRow(row.id)}
+                        className={`p-1 rounded transition-colors ${
+                          isSkipped
+                            ? 'text-muted-foreground hover:text-foreground'
+                            : 'text-muted-foreground/40 hover:text-muted-foreground'
+                        }`}
+                        title={isSkipped ? 'Incluir linha' : 'Ignorar linha'}
+                      >
+                        {isSkipped ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                      </button>
+                    </td>
+                    {columns.map((col, colIndex) => {
+                      const rawValue = (row[col] as string) || '';
+                      const isNumeroCol = columnMapping[colIndex] === 'numero';
+                      const displayValue = !mappingApplied && isNumeroCol
+                        ? previewPhoneClean(rawValue, colIndex)
+                        : rawValue;
+
+                      return (
+                        <td key={col} className="py-3 px-4">
+                          {editingRow === row.id ? (
+                            <input
+                              type="text"
+                              value={editValues[col] || ''}
+                              onChange={e => setEditValues({ ...editValues, [col]: e.target.value })}
+                              className={`w-full px-2 py-1 rounded bg-muted border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                                isNumeroCol ? 'font-mono' : ''
+                              }`}
+                            />
+                          ) : isNumeroCol ? (
+                            <span className="font-mono text-primary">
+                              {displayValue}
+                              {!mappingApplied && rawValue !== displayValue && (
+                                <span className="ml-1.5 text-xs text-muted-foreground line-through">{rawValue}</span>
+                              )}
+                            </span>
+                          ) : columnMapping[colIndex] === '_skip' ? (
+                            <span className="text-muted-foreground/50">{rawValue || '-'}</span>
+                          ) : (
+                            <span className="text-foreground/80">{rawValue || '-'}</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="py-3 px-4 text-right">
                       {editingRow === row.id ? (
-                        <input
-                          type="text"
-                          value={editValues[col] || ''}
-                          onChange={(e) =>
-                            setEditValues({ ...editValues, [col]: e.target.value })
-                          }
-                          className={`w-full px-2 py-1 rounded bg-muted border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                            col === 'numero' ? 'font-mono' : ''
-                          }`}
-                        />
-                      ) : col === 'numero' ? (
-                        <span className="font-mono text-primary">{row[col] as string}</span>
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={saveEditing} className="p-1.5 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={cancelEditing} className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       ) : (
-                        <span className="text-foreground/80">{(row[col] as string) || '-'}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => startEditing(row)}>
+                              <Edit3 className="w-4 h-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toggleSkipRow(row.id)}>
+                              {isSkipped ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
+                              {isSkipped ? 'Incluir' : 'Ignorar'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => { deleteRow(row.id); toast.success('Registro removido'); }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </td>
-                  ))}
-                  <td className="py-3 px-4 text-right">
-                    {editingRow === row.id ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={saveEditing}
-                          className="p-1.5 rounded-md bg-success/10 text-success hover:bg-success/20 transition-colors"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={cancelEditing}
-                          className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => startEditing(row)}>
-                            <Edit3 className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              deleteRow(row.id);
-                              toast.success('Registro removido');
-                            }}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
