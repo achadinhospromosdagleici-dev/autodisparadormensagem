@@ -146,8 +146,16 @@ export function StepDataReview() {
       }
     });
 
-    // Remove skipped rows
-    const activeData = data.filter(row => !skippedRows.has(row.id));
+    // Remove skipped rows and empty rows
+    const activeData = data.filter(row => {
+      if (skippedRows.has(row.id)) return false;
+      // Check if row has any non-empty value in mapped columns
+      return originalColumns.some((col, i) => {
+        if (columnMapping[i] === '_skip') return false;
+        const val = String(row[col] || '').trim();
+        return val !== '';
+      });
+    });
 
     // Remap data
     const updatedData = activeData.map(row => {
