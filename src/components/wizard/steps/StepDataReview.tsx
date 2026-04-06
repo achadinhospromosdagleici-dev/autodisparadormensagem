@@ -479,6 +479,7 @@ export function StepDataReview() {
                 <th className="py-2 px-2 text-xs text-muted-foreground">
                   <EyeOff className="w-3.5 h-3.5 mx-auto opacity-50" />
                 </th>
+                <th className="py-2 px-2 w-14 text-xs text-muted-foreground text-center">ID</th>
                 {columns.map((col, colIndex) => (
                   <th key={col} className="text-left py-2 px-4 font-mono text-xs text-muted-foreground uppercase">
                     <span className="flex items-center gap-1.5">
