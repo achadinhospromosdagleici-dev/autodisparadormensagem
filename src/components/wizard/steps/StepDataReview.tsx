@@ -494,7 +494,7 @@ export function StepDataReview() {
               </tr>
             </thead>
             <tbody>
-              {filteredData.map(row => {
+              {filteredData.map((row, rowIndex) => {
                 const isSkipped = skippedRows.has(row.id);
                 return (
                   <tr
