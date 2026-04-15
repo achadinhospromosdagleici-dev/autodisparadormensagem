@@ -11,27 +11,40 @@ import {
   CheckCircle2,
   Wifi,
   WifiOff,
+  Plus,
+  List,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   EvolutionCredentials,
+  EvolutionInstance,
   saveEvolutionCredentials,
   loadEvolutionCredentials,
   clearEvolutionCredentials,
+  fetchInstances,
+  findOrCreateInstance,
   getQRCode,
   getInstanceStatus,
-  createInstance,
+  logoutInstance,
 } from '@/services/evolution';
 
-export function EvolutionConnection() {
+interface EvolutionConnectionProps {
+  onInstancesLoaded?: (instances: EvolutionInstance[]) => void;
+}
+
+export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionProps) {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [instanceName, setInstanceName] = useState('');
+  const [newInstanceName, setNewInstanceName] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [instances, setInstances] = useState<EvolutionInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+
+  // QR flow
+  const [activeInstance, setActiveInstance] = useState('');
   const [qrCode, setQrCode] = useState('');
-  const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [timer, setTimer] = useState(30);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
   const pollRef = useRef<ReturnType<typeof setInterval>>();
@@ -41,9 +54,8 @@ export function EvolutionConnection() {
     if (creds) {
       setBaseUrl(creds.baseUrl);
       setApiKey(creds.apiKey);
-      setInstanceName(creds.instanceName);
       setIsConnected(true);
-      checkStatus(creds);
+      handleFetchInstances(creds);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -51,39 +63,40 @@ export function EvolutionConnection() {
     };
   }, []);
 
-  const checkStatus = async (creds: EvolutionCredentials) => {
+  const getCreds = (): EvolutionCredentials => ({
+    baseUrl: baseUrl.replace(/\/$/, ''),
+    apiKey: apiKey.trim(),
+  });
+
+  // ── Fetch all instances ──
+  const handleFetchInstances = async (creds?: EvolutionCredentials) => {
+    const c = creds || getCreds();
+    setLoadingInstances(true);
     try {
-      const status = await getInstanceStatus(creds);
-      const state = status?.instance?.state || status?.state || '';
-      setWhatsappConnected(state === 'open' || state === 'connected');
-    } catch {
-      setWhatsappConnected(false);
+      const list = await fetchInstances(c);
+      setInstances(list);
+      onInstancesLoaded?.(list);
+    } catch (err: any) {
+      toast.error(`Erro ao buscar instâncias: ${err.message}`);
+    } finally {
+      setLoadingInstances(false);
     }
   };
 
+  // ── Connect API (save creds + fetch) ──
   const handleConnect = async () => {
-    if (!baseUrl.trim() || !apiKey.trim() || !instanceName.trim()) {
-      toast.error('Preencha todos os campos');
+    if (!baseUrl.trim() || !apiKey.trim()) {
+      toast.error('Preencha URL e API Key');
       return;
     }
     setIsLoading(true);
-    const creds: EvolutionCredentials = {
-      baseUrl: baseUrl.replace(/\/$/, ''),
-      apiKey: apiKey.trim(),
-      instanceName: instanceName.trim(),
-    };
-
+    const creds = getCreds();
     try {
-      // Try to get status first, if fails try to create
-      try {
-        await getInstanceStatus(creds);
-      } catch {
-        await createInstance(creds);
-      }
+      await fetchInstances(creds); // test connection
       saveEvolutionCredentials(creds);
       setIsConnected(true);
       toast.success('Conectado à Evolution API!');
-      await generateQR(creds);
+      await handleFetchInstances(creds);
     } catch (err: any) {
       toast.error(`Falha: ${err.message}`);
     } finally {
@@ -94,50 +107,51 @@ export function EvolutionConnection() {
   const handleDisconnect = () => {
     clearEvolutionCredentials();
     setIsConnected(false);
+    setInstances([]);
     setQrCode('');
-    setWhatsappConnected(false);
+    setActiveInstance('');
     if (timerRef.current) clearInterval(timerRef.current);
     if (pollRef.current) clearInterval(pollRef.current);
+    onInstancesLoaded?.([]);
     toast.success('Desconectado');
   };
 
-  const generateQR = async (creds?: EvolutionCredentials) => {
-    const c = creds || loadEvolutionCredentials();
-    if (!c) return;
+  // ── Create new instance (anti-duplication) ──
+  const handleCreateInstance = async () => {
+    if (!newInstanceName.trim()) {
+      toast.error('Digite um nome para a instância');
+      return;
+    }
     setIsLoading(true);
     try {
-      const qr = await getQRCode(c);
-      setQrCode(qr);
-      setTimer(30);
-      
-      // Start countdown
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current!);
-            setQrCode('');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      const result = await findOrCreateInstance(getCreds(), newInstanceName.trim());
+      if (result.action === 'existing') {
+        toast.info(`Instância "${result.instanceName}" já existe — reutilizando.`);
+      } else {
+        toast.success(`Instância "${result.instanceName}" criada!`);
+      }
+      if (result.qrcode) {
+        setActiveInstance(result.instanceName);
+        setQrCode(result.qrcode);
+        startQrTimer(result.instanceName);
+      }
+      setNewInstanceName('');
+      await handleFetchInstances();
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      // Poll for connection
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(async () => {
-        try {
-          const status = await getInstanceStatus(c);
-          const state = status?.instance?.state || status?.state || '';
-          if (state === 'open' || state === 'connected') {
-            setWhatsappConnected(true);
-            setQrCode('');
-            clearInterval(pollRef.current!);
-            clearInterval(timerRef.current!);
-            toast.success('WhatsApp conectado com sucesso! 🎉');
-          }
-        } catch {}
-      }, 5000);
+  // ── Generate QR for an instance ──
+  const handleGenerateQR = async (instName: string) => {
+    setIsLoading(true);
+    setActiveInstance(instName);
+    try {
+      const data = await getQRCode(getCreds(), instName);
+      setQrCode(data.qrcode || '');
+      startQrTimer(instName);
     } catch (err: any) {
       toast.error(`Erro ao gerar QR: ${err.message}`);
     } finally {
@@ -145,27 +159,64 @@ export function EvolutionConnection() {
     }
   };
 
+  const startQrTimer = (instName: string) => {
+    setTimer(30);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          setQrCode('');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const status = await getInstanceStatus(getCreds(), instName);
+        if (status.connected) {
+          setQrCode('');
+          clearInterval(pollRef.current!);
+          clearInterval(timerRef.current!);
+          toast.success(`WhatsApp conectado na instância "${instName}"! 🎉`);
+          await handleFetchInstances();
+        }
+      } catch {}
+    }, 5000);
+  };
+
+  const openInstances = instances.filter(i => i.status === 'open' || i.status === 'connected');
+  const closedInstances = instances.filter(i => i.status !== 'open' && i.status !== 'connected');
+
   return (
     <div className="space-y-4">
-      {/* Status */}
-      <div className={`glass-card p-4 flex items-center justify-between ${whatsappConnected ? 'border-success/30' : isConnected ? 'border-warning/30' : 'border-border/50'}`}>
+      {/* Status bar */}
+      <div className={`glass-card p-4 flex items-center justify-between ${isConnected ? 'border-success/30' : 'border-border/50'}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${whatsappConnected ? 'bg-success/10' : 'bg-warning/10'}`}>
-            {whatsappConnected ? <Wifi className="w-5 h-5 text-success" /> : <WifiOff className="w-5 h-5 text-warning" />}
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isConnected ? 'bg-success/10' : 'bg-warning/10'}`}>
+            {isConnected ? <Wifi className="w-5 h-5 text-success" /> : <WifiOff className="w-5 h-5 text-warning" />}
           </div>
           <div>
-            <p className="font-medium">
-              {whatsappConnected ? 'WhatsApp Conectado' : isConnected ? 'Evolution API Conectada' : 'WhatsApp Desconectado'}
-            </p>
+            <p className="font-medium">{isConnected ? 'Evolution API Conectada' : 'Evolution API Desconectada'}</p>
             <p className="text-xs text-muted-foreground">
-              {whatsappConnected ? 'Número vinculado e pronto para uso' : isConnected ? 'Escaneie o QR Code para conectar' : 'Configure a Evolution API'}
+              {isConnected ? `${openInstances.length} instância(s) ativa(s) de ${instances.length}` : 'Configure URL e API Key'}
             </p>
           </div>
         </div>
         {isConnected && (
-          <button onClick={handleDisconnect} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm hover:bg-destructive/20 transition-colors">
-            <Unlink className="w-4 h-4" /> Desconectar
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => handleFetchInstances()} disabled={loadingInstances}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-secondary/80 transition-colors">
+              <RefreshCw className={`w-4 h-4 ${loadingInstances ? 'animate-spin' : ''}`} /> Atualizar
+            </button>
+            <button onClick={handleDisconnect}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm hover:bg-destructive/20 transition-colors">
+              <Unlink className="w-4 h-4" /> Desconectar
+            </button>
+          </div>
         )}
       </div>
 
@@ -175,11 +226,6 @@ export function EvolutionConnection() {
           <div className="space-y-2">
             <label className="text-sm text-muted-foreground">URL da Evolution API</label>
             <input type="url" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://sua-evolution-api.com"
-              className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">Nome da Instância</label>
-            <input type="text" value={instanceName} onChange={e => setInstanceName(e.target.value)} placeholder="minha-instancia"
               className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50" />
           </div>
           <div className="space-y-2">
@@ -199,67 +245,107 @@ export function EvolutionConnection() {
         </div>
       )}
 
-      {/* QR Code Display */}
-      {isConnected && !whatsappConnected && (
-        <div className="glass-card p-6 space-y-4 animate-fade-in">
-          <h3 className="font-medium text-center flex items-center justify-center gap-2">
-            <QrCode className="w-5 h-5 text-primary" /> Escaneie o QR Code
-          </h3>
-
-          {qrCode ? (
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-64 h-64 bg-white rounded-xl p-3 mx-auto">
-                <img src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code" className="w-full h-full object-contain" />
-              </div>
-              <p className="text-sm text-primary font-medium">Expira em {timer} segundos</p>
-              <button onClick={() => generateQR()} disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 text-muted-foreground hover:bg-muted transition-colors text-sm">
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Gerar Novamente
+      {/* Connected: Instances + Create */}
+      {isConnected && (
+        <>
+          {/* Create new instance */}
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Plus className="w-5 h-5 text-primary" />
+              <p className="font-medium">Criar Nova Instância</p>
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={newInstanceName} onChange={e => setNewInstanceName(e.target.value)}
+                placeholder="Nome da instância" onKeyDown={e => e.key === 'Enter' && handleCreateInstance()}
+                className="flex-1 px-4 py-2 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" />
+              <button onClick={handleCreateInstance} disabled={isLoading || !newInstanceName.trim()}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50">
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Criar
               </button>
             </div>
-          ) : (
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">Clique para gerar um novo QR Code</p>
-              <button onClick={() => generateQR()} disabled={isLoading}
-                className="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 mx-auto">
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-                Gerar QR Code
-              </button>
+            <p className="text-xs text-muted-foreground mt-2">
+              O sistema verifica automaticamente se já existe uma instância com este nome antes de criar.
+            </p>
+          </div>
+
+          {/* QR Code display */}
+          {qrCode && activeInstance && (
+            <div className="glass-card p-6 space-y-4 animate-fade-in border-primary/30">
+              <h3 className="font-medium text-center flex items-center justify-center gap-2">
+                <QrCode className="w-5 h-5 text-primary" /> QR Code — {activeInstance}
+              </h3>
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-64 h-64 bg-white rounded-xl p-3 mx-auto">
+                  <img src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
+                    alt="QR Code" className="w-full h-full object-contain" />
+                </div>
+                <p className="text-sm text-primary font-medium">Expira em {timer}s</p>
+                <button onClick={() => handleGenerateQR(activeInstance)} disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 text-muted-foreground hover:bg-muted transition-colors text-sm">
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} /> Novo QR
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Instructions */}
-          <div className="space-y-3 pt-4 border-t border-border/30">
-            <h4 className="text-sm font-medium text-primary">Como conectar</h4>
-            {[
-              { step: '1', title: 'Abra o WhatsApp', desc: 'No seu celular, abra o aplicativo WhatsApp.' },
-              { step: '2', title: 'Configurações', desc: 'Toque em Configurações → Dispositivos conectados.' },
-              { step: '3', title: 'Conectar dispositivo', desc: 'Toque em "Conectar um dispositivo" e escaneie o QR Code.' },
-              { step: '4', title: 'Aguarde', desc: 'Após escanear, aguarde a confirmação da conexão.' },
-            ].map(item => (
-              <div key={item.step} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">{item.step}</div>
-                <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
-                </div>
+          {/* Instances list */}
+          {loadingInstances ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground text-sm">Buscando instâncias...</span>
+            </div>
+          ) : instances.length === 0 ? (
+            <div className="glass-card p-6 text-center">
+              <List className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma instância encontrada. Crie uma acima.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <List className="w-4 h-4" /> {instances.length} instância(s)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {instances.map(inst => {
+                  const isOpen = inst.status === 'open' || inst.status === 'connected';
+                  return (
+                    <div key={inst.instanceName}
+                      className={`glass-card p-4 ${isOpen ? 'border-success/30' : 'border-border/50'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Smartphone className={`w-4 h-4 ${isOpen ? 'text-success' : 'text-muted-foreground'}`} />
+                          <span className="font-medium text-sm">{inst.instanceName}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${isOpen ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {isOpen ? 'Conectado' : 'Desconectado'}
+                        </span>
+                      </div>
+                      {inst.phone && (
+                        <p className="text-xs text-muted-foreground mb-2">{inst.phone}</p>
+                      )}
+                      {inst.profileName && (
+                        <p className="text-xs text-muted-foreground mb-2">👤 {inst.profileName}</p>
+                      )}
+                      {!isOpen && (
+                        <button onClick={() => handleGenerateQR(inst.instanceName)}
+                          disabled={isLoading}
+                          className="w-full mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors flex items-center justify-center gap-1">
+                          <QrCode className="w-3 h-3" /> Conectar
+                        </button>
+                      )}
+                      {isOpen && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <CheckCircle2 className="w-3 h-3 text-success" />
+                          <span className="text-xs text-success">Pronto para envio</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Connected success */}
-      {whatsappConnected && (
-        <div className="glass-card p-6 text-center space-y-3 animate-fade-in border-success/30">
-          <CheckCircle2 className="w-12 h-12 text-success mx-auto" />
-          <h3 className="font-semibold text-lg">WhatsApp Conectado!</h3>
-          <p className="text-sm text-muted-foreground">Seu número está vinculado e pronto para enviar mensagens.</p>
-          <button onClick={() => checkStatus(loadEvolutionCredentials()!)}
-            className="text-sm text-primary hover:underline flex items-center gap-1 mx-auto">
-            <RefreshCw className="w-3 h-3" /> Verificar status
-          </button>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
