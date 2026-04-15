@@ -1,17 +1,20 @@
 // Evolution API Service
-// Manages WhatsApp connection via Evolution API
+// Manages WhatsApp connection via Evolution API with edge function proxy
+
+import { supabase } from '@/integrations/supabase/client';
 
 export interface EvolutionCredentials {
   baseUrl: string;
   apiKey: string;
-  instanceName: string;
+  instanceName?: string;
 }
 
 export interface EvolutionInstance {
   instanceName: string;
   status: string;
-  qrcode?: string;
-  pairingCode?: string;
+  phone: string;
+  profileName?: string;
+  profilePictureUrl?: string;
 }
 
 const STORAGE_KEY = 'evolution_credentials';
@@ -30,78 +33,93 @@ export function clearEvolutionCredentials(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-function getHeaders(apiKey: string) {
-  return {
-    'Content-Type': 'application/json',
-    apikey: apiKey,
-  };
-}
-
-export async function createInstance(creds: EvolutionCredentials): Promise<any> {
-  const res = await fetch(`${creds.baseUrl}/instance/create`, {
-    method: 'POST',
-    headers: getHeaders(creds.apiKey),
-    body: JSON.stringify({
-      instanceName: creds.instanceName,
-      integration: 'WHATSAPP-BAILEYS',
-      qrcode: true,
-    }),
+// ── Generic proxy call ──
+async function evolutionCall(payload: Record<string, any>): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('evolution-proxy', {
+    body: payload,
   });
-  if (!res.ok) throw new Error(`Erro ao criar instância: ${res.status}`);
-  return res.json();
+  if (error) throw new Error(error.message || 'Erro na chamada Evolution');
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
-export async function getInstanceStatus(creds: EvolutionCredentials): Promise<any> {
-  const res = await fetch(
-    `${creds.baseUrl}/instance/connectionState/${creds.instanceName}`,
-    { headers: getHeaders(creds.apiKey) }
-  );
-  if (!res.ok) throw new Error(`Erro ao verificar status: ${res.status}`);
-  return res.json();
+// ── ETAPA 1: Listar instâncias ──
+export async function fetchInstances(creds: EvolutionCredentials): Promise<EvolutionInstance[]> {
+  const data = await evolutionCall({
+    action: 'fetchInstances',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+  });
+  return data.instances || [];
 }
 
-export async function getQRCode(creds: EvolutionCredentials): Promise<string> {
-  const res = await fetch(
-    `${creds.baseUrl}/instance/connect/${creds.instanceName}`,
-    { headers: getHeaders(creds.apiKey) }
-  );
-  if (!res.ok) throw new Error(`Erro ao gerar QR Code: ${res.status}`);
-  const data = await res.json();
-  return data.base64 || data.qrcode?.base64 || '';
-}
-
-export async function getPairingCode(creds: EvolutionCredentials, phoneNumber: string): Promise<string> {
-  const res = await fetch(
-    `${creds.baseUrl}/instance/connect/${creds.instanceName}`,
-    {
-      method: 'POST',
-      headers: getHeaders(creds.apiKey),
-      body: JSON.stringify({ number: phoneNumber }),
-    }
-  );
-  if (!res.ok) throw new Error(`Erro ao gerar código: ${res.status}`);
-  const data = await res.json();
-  return data.pairingCode || data.code || '';
-}
-
-export async function logoutInstance(creds: EvolutionCredentials): Promise<void> {
-  await fetch(`${creds.baseUrl}/instance/logout/${creds.instanceName}`, {
-    method: 'DELETE',
-    headers: getHeaders(creds.apiKey),
+// ── ETAPA 1: Encontrar ou criar instância (anti-duplicação) ──
+export async function findOrCreateInstance(
+  creds: EvolutionCredentials,
+  instanceName: string
+): Promise<{ action: 'existing' | 'created'; instanceName: string; status: string; qrcode?: string; phone?: string }> {
+  return evolutionCall({
+    action: 'findOrCreate',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
   });
 }
 
-export async function deleteInstance(creds: EvolutionCredentials): Promise<void> {
-  await fetch(`${creds.baseUrl}/instance/delete/${creds.instanceName}`, {
-    method: 'DELETE',
-    headers: getHeaders(creds.apiKey),
+// ── ETAPA 2: Gerar QR Code ──
+export async function getQRCode(creds: EvolutionCredentials, instanceName: string): Promise<{ qrcode: string; pairingCode: string }> {
+  return evolutionCall({
+    action: 'connect',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
   });
 }
 
-export async function fetchInstances(creds: EvolutionCredentials): Promise<any[]> {
-  const res = await fetch(`${creds.baseUrl}/instance/fetchInstances`, {
-    headers: getHeaders(creds.apiKey),
+// ── ETAPA 2: Verificar status da conexão ──
+export async function getInstanceStatus(
+  creds: EvolutionCredentials,
+  instanceName: string
+): Promise<{ instanceName: string; status: string; connected: boolean }> {
+  return evolutionCall({
+    action: 'connectionState',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
   });
-  if (!res.ok) throw new Error(`Erro ao buscar instâncias: ${res.status}`);
-  return res.json();
+}
+
+// ── ETAPA 2: Logout ──
+export async function logoutInstance(creds: EvolutionCredentials, instanceName: string): Promise<void> {
+  await evolutionCall({
+    action: 'logout',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
+  });
+}
+
+// ── ETAPA 3: Enviar mensagem com validação de status ──
+export interface EvolutionMessage {
+  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  content: string;
+  mediaUrl?: string;
+  caption?: string;
+  filename?: string;
+}
+
+export async function sendMessage(
+  creds: EvolutionCredentials,
+  instanceName: string,
+  to: string,
+  message: EvolutionMessage
+): Promise<any> {
+  return evolutionCall({
+    action: 'sendMessage',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
+    to,
+    message,
+  });
 }
