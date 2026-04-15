@@ -11,13 +11,19 @@ import {
   RefreshCw,
   WifiOff,
   Phone,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadUnoApiCredentials,
-  fetchInstances,
+  fetchInstances as fetchUnoInstances,
   UnoApiInstance,
 } from '@/services/unoapi';
+import {
+  loadEvolutionCredentials,
+  fetchInstances as fetchEvoInstances,
+  EvolutionInstance,
+} from '@/services/evolution';
 
 export function StepInstances() {
   const {
@@ -32,65 +38,93 @@ export function StepInstances() {
   } = useWizard();
 
   const [unoInstances, setUnoInstances] = useState<UnoApiInstance[]>([]);
+  const [evoInstances, setEvoInstances] = useState<EvolutionInstance[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
-  // Fetch UnoAPI instances on mount
   useEffect(() => {
-    if (unoApiConnected) {
-      loadUnoInstances();
-    }
+    loadAllInstances();
   }, [unoApiConnected]);
 
-  const loadUnoInstances = async () => {
-    const creds = loadUnoApiCredentials();
-    if (!creds) return;
+  const loadAllInstances = async () => {
     setLoading(true);
-    const { instances: fetched } = await fetchInstances(creds);
-    setUnoInstances(fetched);
-    setLoaded(true);
+    const promises: Promise<void>[] = [];
+
+    // UnoAPI
+    if (unoApiConnected) {
+      const creds = loadUnoApiCredentials();
+      if (creds) {
+        promises.push(
+          fetchUnoInstances(creds).then(({ instances: fetched }) => setUnoInstances(fetched)).catch(() => {})
+        );
+      }
+    }
+
+    // Evolution
+    const evoCreds = loadEvolutionCredentials();
+    if (evoCreds) {
+      promises.push(
+        fetchEvoInstances(evoCreds).then(setEvoInstances).catch(() => {})
+      );
+    }
+
+    await Promise.all(promises);
     setLoading(false);
   };
 
-  // Merge UnoAPI instances into wizard instances
-  const mergedInstances: Instance[] = unoApiConnected && unoInstances.length > 0
-    ? unoInstances.map((ui) => ({
-        id: ui.phone,
-        name: ui.name || ui.phone,
-        status: ui.status === 'connected' ? 'active' as const : 'inactive' as const,
-        phoneNumber: ui.phone,
-      }))
-    : instances;
+  // Merge all sources into unified Instance[]
+  const mergedInstances: Instance[] = [
+    ...evoInstances.map((ei) => ({
+      id: `evo_${ei.instanceName}`,
+      name: ei.profileName || ei.instanceName,
+      status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
+      phoneNumber: ei.phone || undefined,
+      source: 'evolution' as const,
+    })),
+    ...(unoApiConnected && unoInstances.length > 0
+      ? unoInstances.map((ui) => ({
+          id: `uno_${ui.phone}`,
+          name: ui.name || ui.phone,
+          status: (ui.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
+          phoneNumber: ui.phone,
+          source: 'unoapi' as const,
+        }))
+      : []),
+    // Default instances only if no API instances
+  ];
 
-  const activeInstances = mergedInstances.filter((i) => i.status === 'active');
+  const displayInstances = mergedInstances.length > 0 ? mergedInstances : instances.map(i => ({ ...i, source: 'default' as const }));
+  const activeInstances = displayInstances.filter((i) => i.status === 'active');
 
   const getStatusIcon = (status: Instance['status']) => {
     switch (status) {
-      case 'active':
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case 'inactive':
-        return <XCircle className="w-4 h-4 text-destructive" />;
-      case 'pending':
-        return <Clock className="w-4 h-4 text-warning" />;
+      case 'active': return <CheckCircle2 className="w-4 h-4 text-success" />;
+      case 'inactive': return <XCircle className="w-4 h-4 text-destructive" />;
+      case 'pending': return <Clock className="w-4 h-4 text-warning" />;
     }
   };
 
   const getStatusLabel = (status: Instance['status']) => {
     switch (status) {
-      case 'active':
-        return 'Conectado';
-      case 'inactive':
-        return 'Desconectado';
-      case 'pending':
-        return 'Pendente';
+      case 'active': return 'Conectado';
+      case 'inactive': return 'Desconectado';
+      case 'pending': return 'Pendente';
     }
   };
+
+  const getSourceBadge = (source: string) => {
+    if (source === 'evolution') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Evolution</span>;
+    if (source === 'unoapi') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">UnoAPI</span>;
+    return null;
+  };
+
+  const hasEvolution = !!loadEvolutionCredentials();
+  const hasAnyApi = unoApiConnected || hasEvolution;
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
 
-      {/* UnoAPI info banner */}
-      {unoApiConnected && (
+      {/* Sources info */}
+      {hasAnyApi && (
         <div className="glass-card p-4 border-primary/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -98,13 +132,20 @@ export function StepInstances() {
                 <Phone className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="font-medium">Números da UnoAPI</p>
+                <p className="font-medium">Números Disponíveis</p>
                 <p className="text-sm text-muted-foreground">
-                  {loading ? 'Buscando números...' : `${unoInstances.length} número(s) encontrado(s)`}
+                  {loading ? 'Buscando...' : (
+                    <>
+                      {evoInstances.length > 0 && <span>{evoInstances.length} Evolution</span>}
+                      {evoInstances.length > 0 && unoInstances.length > 0 && ' · '}
+                      {unoInstances.length > 0 && <span>{unoInstances.length} UnoAPI</span>}
+                      {evoInstances.length === 0 && unoInstances.length === 0 && 'Nenhum número encontrado'}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
-            <button onClick={loadUnoInstances} disabled={loading}
+            <button onClick={loadAllInstances} disabled={loading}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-secondary/80 transition-colors">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Atualizar
@@ -113,15 +154,15 @@ export function StepInstances() {
         </div>
       )}
 
-      {/* Not connected warning */}
-      {!unoApiConnected && (
+      {/* No API warning */}
+      {!hasAnyApi && (
         <div className="glass-card p-4 border-warning/30 bg-warning/5">
           <div className="flex items-start gap-3">
             <WifiOff className="w-5 h-5 text-warning shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-warning">UnoAPI não conectada</p>
+              <p className="font-medium text-warning">Nenhuma API conectada</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Vá em Configurações → UnoAPI para conectar e buscar seus números automaticamente.
+                Vá em Configurações → Evolution API ou UnoAPI para conectar e buscar seus números.
               </p>
             </div>
           </div>
@@ -137,9 +178,7 @@ export function StepInstances() {
             </div>
             <div>
               <p className="font-medium">Randomização de Instâncias</p>
-              <p className="text-sm text-muted-foreground">
-                Alternar automaticamente entre os números selecionados
-              </p>
+              <p className="text-sm text-muted-foreground">Alternar automaticamente entre os números selecionados</p>
             </div>
           </div>
           <button
@@ -155,7 +194,7 @@ export function StepInstances() {
         </div>
       </div>
 
-      {/* Actions Bar */}
+      {/* Actions */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <button onClick={selectAllInstances}
@@ -169,20 +208,21 @@ export function StepInstances() {
         </div>
       </div>
 
-      {/* Loading state */}
+      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <span className="ml-3 text-muted-foreground">Buscando números da UnoAPI...</span>
+          <span className="ml-3 text-muted-foreground">Buscando números...</span>
         </div>
       )}
 
-      {/* Instances Grid */}
+      {/* Grid */}
       {!loading && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mergedInstances.map((instance) => {
+          {displayInstances.map((instance) => {
             const isSelected = selectedInstances.includes(instance.id);
             const isActive = instance.status === 'active';
+            const source = (instance as any).source || 'default';
 
             return (
               <div
@@ -202,10 +242,11 @@ export function StepInstances() {
                       }`} />
                     </div>
                     <div>
-                      <p className="font-medium">{instance.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {instance.phoneNumber || 'Sem número'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{instance.name}</p>
+                        {getSourceBadge(source)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{instance.phoneNumber || 'Sem número'}</p>
                     </div>
                   </div>
                   {isSelected && isActive && (
@@ -214,7 +255,6 @@ export function StepInstances() {
                     </div>
                   )}
                 </div>
-
                 <div className="flex items-center gap-1.5">
                   {getStatusIcon(instance.status)}
                   <span className={`text-sm ${
@@ -230,27 +270,24 @@ export function StepInstances() {
         </div>
       )}
 
-      {/* Selection Summary */}
+      {/* Selection summary */}
       {selectedInstances.length > 0 && (
         <div className="glass-card p-4 border-primary/30 animate-fade-in">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-primary" />
-              <span>
-                <strong>{selectedInstances.length}</strong> número(s) selecionado(s)
-              </span>
+              <span><strong>{selectedInstances.length}</strong> número(s) selecionado(s)</span>
             </div>
             {settings.instanceRandomization && selectedInstances.length > 1 && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <Shuffle className="w-4 h-4" />
-                Randomização ativa
+                <Shuffle className="w-4 h-4" /> Randomização ativa
               </span>
             )}
           </div>
         </div>
       )}
 
-      {/* Warning for no active instances */}
+      {/* No active warning */}
       {!loading && activeInstances.length === 0 && (
         <div className="glass-card p-4 border-warning/30 bg-warning/5">
           <div className="flex items-start gap-3">
@@ -258,9 +295,7 @@ export function StepInstances() {
             <div>
               <p className="font-medium text-warning">Nenhum número ativo</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {unoApiConnected
-                  ? 'Conecte um número na sua UnoAPI para poder enviar mensagens.'
-                  : 'Configure a UnoAPI nas Configurações para buscar seus números.'}
+                Conecte um número na Evolution API ou UnoAPI para enviar mensagens.
               </p>
             </div>
           </div>
