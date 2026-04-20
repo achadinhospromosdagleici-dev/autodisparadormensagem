@@ -72,8 +72,50 @@ async function proxyCall(creds: UnoApiCredentials, endpoint: string): Promise<{ 
   }
 }
 
+// Auto-detect Evolution API by trying its fetchInstances endpoint
+async function detectEvolutionApi(creds: UnoApiCredentials): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('evolution-proxy', {
+      body: { action: 'fetchInstances', baseUrl: creds.baseUrl, apiKey: creds.token },
+    });
+    if (error) return false;
+    return data && Array.isArray(data.instances);
+  } catch {
+    return false;
+  }
+}
+
+// Fetch instances via Evolution API proxy
+async function fetchEvolutionInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke('evolution-proxy', {
+      body: { action: 'fetchInstances', baseUrl: creds.baseUrl, apiKey: creds.token },
+    });
+    if (error) return { instances: [], error: error.message };
+    if (data?.instances && Array.isArray(data.instances)) {
+      const instances: UnoApiInstance[] = data.instances.map((inst: any) => ({
+        phone: inst.phone || inst.instanceName || '',
+        status: (inst.status === 'open' || inst.status === 'connected') ? 'connected' as const : 'disconnected' as const,
+        name: inst.profileName || inst.instanceName || undefined,
+      }));
+      return { instances };
+    }
+    return { instances: [], error: 'Nenhuma instância encontrada na Evolution API.' };
+  } catch (err: any) {
+    return { instances: [], error: err.message };
+  }
+}
+
 // Test connection by sending a ping
 export async function testConnection(creds: UnoApiCredentials): Promise<boolean> {
+  // Try Evolution API first
+  const isEvolution = await detectEvolutionApi(creds);
+  if (isEvolution) {
+    // Save detection result
+    localStorage.setItem('api_type_detected', 'evolution');
+    return true;
+  }
+  localStorage.setItem('api_type_detected', 'unoapi');
   const result = await proxyCall(creds, 'ping');
   if (result.ok && result.data) {
     const text = typeof result.data === 'string' ? result.data : (result.data.text || JSON.stringify(result.data));
@@ -84,6 +126,19 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
 
 // Fetch connected instances/phone numbers
 export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
+  // Check if this is an Evolution API
+  const detectedType = localStorage.getItem('api_type_detected');
+  if (detectedType === 'evolution') {
+    return fetchEvolutionInstances(creds);
+  }
+
+  // Try Evolution API detection as fallback
+  const isEvolution = await detectEvolutionApi(creds);
+  if (isEvolution) {
+    localStorage.setItem('api_type_detected', 'evolution');
+    return fetchEvolutionInstances(creds);
+  }
+
   try {
     const result = await proxyCall(creds, 'sessions');
     
