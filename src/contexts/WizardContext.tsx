@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Campaign } from '@/components/wizard/CampaignHistory';
+import { ActiveCampaign } from '@/components/wizard/ActiveCampaigns';
 import { ScheduledCampaign } from '@/components/wizard/CampaignScheduler';
 import { ABTest } from '@/components/wizard/ABTesting';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
@@ -61,6 +62,7 @@ interface WizardState {
   scheduledCampaigns: ScheduledCampaign[];
   abTests: ABTest[];
   metrics: CampaignMetrics;
+  activeCampaigns: ActiveCampaign[];
 }
 
 interface WizardContextType extends WizardState {
@@ -95,6 +97,9 @@ interface WizardContextType extends WizardState {
   addABTest: (test: ABTest) => void;
   removeABTest: (id: string) => void;
   updateMetrics: (metrics: Partial<CampaignMetrics>) => void;
+  addActiveCampaign: (campaign: ActiveCampaign) => void;
+  updateActiveCampaign: (id: string, updates: Partial<ActiveCampaign>) => void;
+  removeActiveCampaign: (id: string) => void;
 }
 
 const defaultSettings: WizardSettings = {
@@ -193,6 +198,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     scheduledCampaigns: [],
     abTests: [],
     metrics: defaultMetrics,
+    activeCampaigns: [],
   });
 
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
@@ -233,6 +239,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));
   const removeABTest = (id: string) => setState(prev => ({ ...prev, abTests: prev.abTests.filter(t => t.id !== id) }));
   const updateMetrics = (metrics: Partial<CampaignMetrics>) => setState(prev => ({ ...prev, metrics: { ...prev.metrics, ...metrics } }));
+  const addActiveCampaign = (campaign: ActiveCampaign) => setState(prev => ({ ...prev, activeCampaigns: [campaign, ...prev.activeCampaigns] }));
+  const updateActiveCampaign = (id: string, updates: Partial<ActiveCampaign>) => setState(prev => ({ ...prev, activeCampaigns: prev.activeCampaigns.map(c => c.id === id ? { ...c, ...updates } : c) }));
+  const removeActiveCampaign = (id: string) => setState(prev => ({ ...prev, activeCampaigns: prev.activeCampaigns.filter(c => c.id !== id) }));
 
   return (
     <WizardContext.Provider value={{
@@ -242,6 +251,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
+      addActiveCampaign, updateActiveCampaign, removeActiveCampaign,
     }}>
       {children}
     </WizardContext.Provider>
