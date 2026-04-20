@@ -27,6 +27,11 @@ export function StepMessages() {
   const [mediaFilename, setMediaFilename] = useState('');
 
   const variables = columns.map((col) => `{{${col}}}`);
+  // Add dynamic {{primeiro_nome}} variable if 'nome' column exists
+  const hasNome = columns.some((col) => col.toLowerCase() === 'nome');
+  if (hasNome && !variables.includes('{{primeiro_nome}}')) {
+    variables.push('{{primeiro_nome}}');
+  }
 
   const insertVariable = (variable: string) => {
     setNewMessage((prev) => prev + variable);
@@ -64,6 +69,14 @@ export function StepMessages() {
       const regex = new RegExp(`\\{\\{${col}\\}\\}`, 'gi');
       result = result.replace(regex, (row[col] as string) || `[${col}]`);
     });
+
+    // Handle {{primeiro_nome}} - extract first name from 'nome' column
+    const nomeKey = columns.find((col) => col.toLowerCase() === 'nome');
+    if (nomeKey) {
+      const nomeValue = (row[nomeKey] as string) || '';
+      const primeiroNome = nomeValue.trim().split(/\s+/)[0] || '[primeiro_nome]';
+      result = result.replace(/\{\{primeiro_nome\}\}/gi, primeiroNome);
+    }
 
     return result;
   };
