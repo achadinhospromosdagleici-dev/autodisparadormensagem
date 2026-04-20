@@ -15,6 +15,7 @@ import { MessageTemplates } from './MessageTemplates';
 import { ABTesting } from './ABTesting';
 import { AppSidebar, AppView } from '@/components/AppSidebar';
 import { CampaignHistory } from './CampaignHistory';
+import { ActiveCampaigns } from './ActiveCampaigns';
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -53,6 +54,7 @@ export function WizardLayout() {
     setChatwootConnected, setUnoApiConnected, setChatwootInboxes, chatwootInboxes, selectedInboxId, setSelectedInboxId,
     followUpConfig, setFollowUpConfig, scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
     abTests, addABTest, removeABTest, metrics, getValidCount, addMessage, campaignHistory,
+    activeCampaigns, updateActiveCampaign, removeActiveCampaign,
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [currentView, setCurrentView] = useState<AppView>('campaign');
@@ -87,10 +89,14 @@ export function WizardLayout() {
       case 'dashboard':
         return (
           <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold">Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Métricas e estatísticas em tempo real</p>
-            </div>
+            <ActiveCampaigns
+              campaigns={activeCampaigns}
+              onPause={(id) => updateActiveCampaign(id, { status: 'paused' })}
+              onResume={(id) => updateActiveCampaign(id, { status: 'running' })}
+              onCancel={(id) => updateActiveCampaign(id, { status: 'cancelled' })}
+              onResend={(id) => updateActiveCampaign(id, { status: 'running', sentCount: 0, failedCount: 0 })}
+              onNewCampaign={() => setCurrentView('campaign')}
+            />
             <Dashboard metrics={metrics} />
           </div>
         );
