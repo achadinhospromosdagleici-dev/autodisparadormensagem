@@ -3,6 +3,7 @@ import { useWizard } from '@/contexts/WizardContext';
 import { CampaignHistory, Campaign } from '../CampaignHistory';
 import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
 import { loadUnoApiCredentials } from '@/services/unoapi';
+import { loadEvolutionCredentials } from '@/services/evolution';
 import {
   Users,
   MessageSquare,
@@ -35,6 +36,17 @@ export function StepConfirmation() {
   const validData = data.filter(r => r.isValid);
   const selectedInstancesData = instances.filter(i => selectedInstances.includes(i.id));
 
+  // Detect API source from selected instances (evo_ → Evolution, uno_ → UnoAPI)
+  const usesEvolution = selectedInstances.some(id => id.startsWith('evo_'));
+  const usesUnoApi = selectedInstances.some(id => id.startsWith('uno_'));
+  const evoCreds = loadEvolutionCredentials();
+  const unoCreds = loadUnoApiCredentials();
+  const hasRequiredCreds =
+    (usesEvolution && !!evoCreds) ||
+    (usesUnoApi && !!unoCreds) ||
+    (!usesEvolution && !usesUnoApi && (unoApiConnected || !!evoCreds));
+  const apiLabel = usesEvolution ? 'Evolution API' : usesUnoApi ? 'UnoAPI' : 'WhatsApp API';
+
   const calculateTotalTime = () => {
     const messageCount = settings.sendType === 'multiple' ? messages.length : 1;
     const totalMessages = validContacts * messageCount;
@@ -46,14 +58,16 @@ export function StepConfirmation() {
   };
 
   const handleStartSending = async () => {
-    if (!unoApiConnected) {
-      toast.error('Configure a conexão com a UnoAPI primeiro!');
+    if (selectedInstances.length === 0) {
+      toast.error('Selecione ao menos um número remetente!');
       return;
     }
-
-    const creds = loadUnoApiCredentials();
-    if (!creds) {
-      toast.error('Credenciais da UnoAPI não encontradas');
+    if (usesEvolution && !evoCreds) {
+      toast.error('Credenciais da Evolution API não configuradas');
+      return;
+    }
+    if (usesUnoApi && !unoCreds) {
+      toast.error('Credenciais da UnoAPI não configuradas');
       return;
     }
 
@@ -179,13 +193,19 @@ export function StepConfirmation() {
             ))}
           </div>
 
-          {/* UnoAPI Status */}
-          <div className={`glass-card p-4 flex items-center gap-3 ${unoApiConnected ? 'border-success/30' : 'border-destructive/30'}`}>
-            <Zap className={`w-5 h-5 ${unoApiConnected ? 'text-success' : 'text-destructive'}`} />
+          {/* API Status */}
+          <div className={`glass-card p-4 flex items-center gap-3 ${hasRequiredCreds ? 'border-success/30' : 'border-destructive/30'}`}>
+            <Zap className={`w-5 h-5 ${hasRequiredCreds ? 'text-success' : 'text-destructive'}`} />
             <div className="flex-1">
-              <p className="text-sm font-medium">{unoApiConnected ? 'UnoAPI conectada' : 'UnoAPI não conectada'}</p>
+              <p className="text-sm font-medium">
+                {hasRequiredCreds
+                  ? `${apiLabel} pronta para envio`
+                  : 'Nenhuma API configurada'}
+              </p>
               <p className="text-xs text-muted-foreground">
-                {unoApiConnected ? 'Envio via WhatsApp Cloud API' : 'Configure nas Configurações'}
+                {selectedInstances.length > 0
+                  ? `${selectedInstances.length} número(s) selecionado(s) — envio via ${apiLabel}`
+                  : 'Selecione um número remetente na etapa anterior'}
               </p>
             </div>
           </div>
@@ -232,13 +252,15 @@ export function StepConfirmation() {
           </div>
 
           {/* Warning */}
-          {!unoApiConnected && (
+          {!hasRequiredCreds && (
             <div className="glass-card p-4 border-destructive/30 bg-destructive/5">
               <div className="flex items-start gap-3">
                 <XCircle className="w-5 h-5 text-destructive shrink-0" />
                 <div>
-                  <p className="font-medium text-destructive">UnoAPI não conectada</p>
-                  <p className="text-sm text-muted-foreground mt-1">Vá em Configurações e conecte a UnoAPI para habilitar o envio real.</p>
+                  <p className="font-medium text-destructive">API não configurada</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Vá em Configurações e conecte a Evolution API ou UnoAPI para habilitar o envio.
+                  </p>
                 </div>
               </div>
             </div>
@@ -313,19 +335,22 @@ export function StepConfirmation() {
               </button>
             ) : (
               <button onClick={handleStartSending}
-                disabled={validContacts === 0 || messages.length === 0 || !unoApiConnected}
+                disabled={validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0}
                 className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                  validContacts === 0 || messages.length === 0 || !unoApiConnected
+                  validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0
                     ? 'bg-muted text-muted-foreground cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
                 }`}>
-                <Send className="w-5 h-5" /> Iniciar Envio via UnoAPI
+                <Send className="w-5 h-5" /> Iniciar Envio via {apiLabel}
               </button>
             )}
           </div>
 
-          {!unoApiConnected && (
-            <p className="text-center text-sm text-muted-foreground">Conecte a UnoAPI nas Configurações para habilitar o envio</p>
+          {!hasRequiredCreds && (
+            <p className="text-center text-sm text-muted-foreground">Conecte a Evolution API ou UnoAPI nas Configurações para habilitar o envio</p>
+          )}
+          {hasRequiredCreds && selectedInstances.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground">Volte e selecione ao menos um número remetente</p>
           )}
         </>
       )}
