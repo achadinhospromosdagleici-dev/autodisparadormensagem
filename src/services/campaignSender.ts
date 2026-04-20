@@ -39,6 +39,12 @@ function getRandomInterval(min: number, max: number): number {
 
 function replaceVariables(template: string, contact: Record<string, any>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    // Handle special {{primeiro_nome}} variable - extract first name from 'nome'
+    if (key.toLowerCase() === 'primeiro_nome') {
+      const nome = contact.nome || contact.Nome || contact.NOME || '';
+      const primeiro = String(nome).trim().split(/\s+/)[0];
+      return primeiro || `{{${key}}}`;
+    }
     return contact[key] || contact[key.toLowerCase()] || `{{${key}}}`;
   });
 }
