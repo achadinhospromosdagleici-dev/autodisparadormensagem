@@ -49,7 +49,27 @@ Deno.serve(async (req) => {
           profilePictureUrl: inst.instance?.profilePictureUrl || inst.profilePictureUrl || '',
         }));
 
-        return jsonResponse({ instances: normalized });
+       // Enrich each instance with real connectionState
+       const enriched = await Promise.all(
+         normalized.map(async (inst: any) => {
+           if (!inst.instanceName) return inst;
+           try {
+             const stateRes = await fetch(`${base}/instance/connectionState/${inst.instanceName}`, { headers });
+             if (stateRes.ok) {
+               const stateData = await stateRes.json();
+               const state = stateData?.instance?.state || stateData?.state || inst.status;
+               return {
+                 ...inst,
+                 status: state === 'open' || state === 'connected' ? 'open' : state,
+                 phone: inst.phone || stateData?.instance?.owner || '',
+               };
+             }
+           } catch {}
+           return inst;
+         })
+       );
+
+       return jsonResponse({ instances: enriched });
       }
 
       // ── ETAPA 1: Verificar duplicação antes de criar ──
