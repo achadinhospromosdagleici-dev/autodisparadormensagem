@@ -124,11 +124,13 @@ export function StepMessages() {
   };
 
   const mediaTypeConfig = [
-    { type: 'text' as MediaType, icon: MessageSquare, label: 'Texto' },
-    { type: 'image' as MediaType, icon: Image, label: 'Imagem' },
-    { type: 'audio' as MediaType, icon: FileAudio, label: 'Áudio' },
-    { type: 'video' as MediaType, icon: Video, label: 'Vídeo' },
-    { type: 'document' as MediaType, icon: FileText, label: 'Documento' },
+    { type: 'text' as EditorMediaType, icon: MessageSquare, label: 'Texto' },
+    { type: 'image' as EditorMediaType, icon: Image, label: 'Imagem' },
+    { type: 'audio' as EditorMediaType, icon: FileAudio, label: 'Áudio' },
+    { type: 'video' as EditorMediaType, icon: Video, label: 'Vídeo' },
+    { type: 'document' as EditorMediaType, icon: FileText, label: 'Documento' },
+    { type: 'link' as EditorMediaType, icon: ExternalLink, label: 'Link' },
+    { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
   ];
 
   const mediaIcon = (type?: string) => {
