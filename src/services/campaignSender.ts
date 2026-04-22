@@ -208,11 +208,22 @@ export async function sendCampaign(
             mediaUrl: msg.mediaUrl,
             caption: personalizedCaption || personalizedContent,
             filename: msg.mediaFilename,
+            title: msg.title,
+            footer: msg.footer,
+            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            linkUrl: msg.linkUrl,
           };
           const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
           console.log('[campaignSender] Evolution send result:', result);
         } else if (source === 'unoapi' && unoCreds) {
           // UnoAPI sending
+          if (msg.mediaType === 'buttons' || msg.mediaType === 'link') {
+            // UnoAPI não suporta botões interativos no momento — fallback para texto + URL
+            const fallbackText = msg.linkUrl
+              ? `${personalizedContent}\n\n${msg.linkUrl}`
+              : personalizedContent;
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: fallbackText });
+          } else {
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             unoMsg.media = {
@@ -223,6 +234,7 @@ export async function sendCampaign(
             };
           }
           await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+          }
         } else {
           throw new Error(`Nenhuma API disponível para a instância "${senderName}"`);
         }
