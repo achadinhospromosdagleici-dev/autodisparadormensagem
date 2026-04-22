@@ -225,6 +225,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
     setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
+  const addRichMessage = (msg: Omit<Message, 'id'>) => {
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), ...msg }] }));
+  };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
   const setSettings = (settings: Partial<WizardSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }));
@@ -259,7 +262,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     <WizardContext.Provider value={{
       ...state,
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
-      addMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
+      addMessage, addRichMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
