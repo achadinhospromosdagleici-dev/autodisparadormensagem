@@ -114,23 +114,26 @@ export async function sendCampaign(
 
   addLog(`🚀 Iniciando campanha via ${source === 'evolution' ? 'Evolution API' : 'UnoAPI'}...`, 'info');
 
-  // For Evolution: validate all instances are connected before starting
+  // For Evolution: validate all instances (non-blocking — warn but continue)
   if (source === 'evolution' && evoCreds) {
+    let anyConnected = false;
     for (const instId of selectedPhoneNumbers) {
       const instName = getInstanceName(instId);
       try {
         const status = await getInstanceStatus(evoCreds, instName);
-        if (!status.connected) {
-          addLog(`⚠️ Instância "${instName}" não está conectada. Reconecte antes de enviar.`, 'warning');
-          progress.status = 'error';
-          onProgress({ ...progress });
-          throw new Error(`Instância "${instName}" offline. Reconecte antes de disparar.`);
+        if (status.connected) {
+          anyConnected = true;
+          addLog(`✅ Instância "${instName}" conectada (status: ${status.status})`, 'success');
+        } else {
+          addLog(`⚠️ Instância "${instName}" status: ${status.status} — tentaremos enviar mesmo assim`, 'warning');
         }
-        addLog(`✅ Instância "${instName}" validada — conectada`, 'success');
       } catch (err: any) {
-        if (err.message.includes('offline')) throw err;
-        addLog(`⚠️ Erro ao validar "${instName}": ${err.message}`, 'warning');
+        addLog(`⚠️ Não foi possível validar "${instName}": ${err.message}`, 'warning');
+        anyConnected = true; // assume ok if validation itself failed
       }
+    }
+    if (!anyConnected) {
+      addLog('⚠️ Nenhuma instância confirmada como conectada. Continuando, mas envios podem falhar.', 'warning');
     }
   }
 
