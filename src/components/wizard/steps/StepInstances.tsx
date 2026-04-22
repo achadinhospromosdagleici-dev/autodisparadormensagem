@@ -45,6 +45,18 @@ export function StepInstances() {
     loadAllInstances();
   }, [unoApiConnected]);
 
+  // Cleanup orphaned selections (instances no longer available)
+  useEffect(() => {
+    if (loading) return;
+    const validIds = new Set(mergedInstances.map(i => i.id));
+    if (mergedInstances.length === 0) return; // no real instances loaded yet, keep defaults
+    const orphans = selectedInstances.filter(id => !validIds.has(id));
+    if (orphans.length > 0) {
+      orphans.forEach(id => toggleInstanceSelection(id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evoInstances, unoInstances, loading]);
+
   const loadAllInstances = async () => {
     setLoading(true);
     const promises: Promise<void>[] = [];
