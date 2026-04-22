@@ -139,6 +139,8 @@ export function StepMessages() {
       case 'audio': return '🎵';
       case 'video': return '📹';
       case 'document': return '📄';
+      case 'buttons': return '🔘';
+      case 'link': return '🔗';
       default: return '📝';
     }
   };
