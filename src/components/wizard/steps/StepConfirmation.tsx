@@ -58,6 +58,16 @@ export function StepConfirmation() {
   };
 
   const handleStartSending = async () => {
+    console.log('[StepConfirmation] handleStartSending clicked', {
+      selectedInstances,
+      validContacts,
+      messagesCount: messages.length,
+      usesEvolution,
+      usesUnoApi,
+      hasEvoCreds: !!evoCreds,
+      hasUnoCreds: !!unoCreds,
+      hasRequiredCreds,
+    });
     if (selectedInstances.length === 0) {
       toast.error('Selecione ao menos um número remetente!');
       return;
@@ -68,6 +78,14 @@ export function StepConfirmation() {
     }
     if (usesUnoApi && !unoCreds) {
       toast.error('Credenciais da UnoAPI não configuradas');
+      return;
+    }
+    if (validContacts === 0) {
+      toast.error('Nenhum contato válido para envio');
+      return;
+    }
+    if (messages.length === 0) {
+      toast.error('Configure ao menos uma mensagem');
       return;
     }
 
