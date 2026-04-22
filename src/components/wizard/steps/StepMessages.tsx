@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useWizard } from '@/contexts/WizardContext';
+import { useWizard, MessageButton } from '@/contexts/WizardContext';
 import {
   MessageSquare,
   Plus,
@@ -13,9 +13,14 @@ import {
   Video,
   FileText,
   Link,
+  MousePointerClick,
+  Phone,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { MediaType } from '@/services/unoapi';
+
+type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
   const { messages, columns, addMessage, updateMessage, deleteMessage, settings, data } =
