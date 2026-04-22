@@ -51,10 +51,16 @@ function replaceVariables(template: string, contact: Record<string, any>): strin
 
 export interface CampaignMessage {
   content: string;
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
+  // Para tipo 'buttons'
+  title?: string;
+  footer?: string;
+  buttons?: { id: string; type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  // Para tipo 'link'
+  linkUrl?: string;
 }
 
 // Detect which API to use based on selected instance ID prefix
