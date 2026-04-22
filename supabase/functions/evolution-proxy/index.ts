@@ -248,6 +248,35 @@ Deno.serve(async (req) => {
               fileName: message.filename || 'document',
             };
             break;
+          case 'buttons': {
+            // Evolution v2 sendButtons — botões interativos (URL, telefone, resposta)
+            endpoint = `${base}/message/sendButtons/${instanceName}`;
+            const btns = Array.isArray(message.buttons) ? message.buttons : [];
+            body = {
+              number: to,
+              title: message.title || '',
+              description: message.content || '',
+              footer: message.footer || '',
+              buttons: btns.map((b: any, idx: number) => {
+                if (b.type === 'url') {
+                  return { type: 'url', displayText: b.label, url: b.value };
+                }
+                if (b.type === 'phone') {
+                  return { type: 'call', displayText: b.label, phoneNumber: b.value };
+                }
+                return { type: 'reply', displayText: b.label, id: b.value || `btn_${idx}` };
+              }),
+            };
+            break;
+          }
+          case 'link': {
+            // Texto com link clicável (preview automático do WhatsApp)
+            const linkText = message.linkUrl
+              ? `${message.content}\n\n${message.linkUrl}`
+              : message.content;
+            body = { number: to, text: linkText, linkPreview: true };
+            break;
+          }
           default:
             body = { number: to, text: message.content };
         }
