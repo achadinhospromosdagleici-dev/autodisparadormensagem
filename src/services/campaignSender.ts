@@ -87,6 +87,23 @@ export async function sendCampaign(
 ): Promise<SendProgress> {
   if (selectedPhoneNumbers.length === 0) throw new Error('Nenhum número remetente selecionado');
 
+  const unoCredsEarly = loadUnoApiCredentials();
+  const evoCredsEarly = loadEvolutionCredentials();
+
+  // Filter out instances that have no matching API credentials.
+  // Instances without prefix ('default') are kept ONLY if creds for the resolved API exist.
+  const validInstances = selectedPhoneNumbers.filter(id => {
+    const src = getInstanceSource(id);
+    if (src === 'evolution') return !!evoCredsEarly;
+    if (src === 'unoapi') return !!unoCredsEarly;
+    // default → use whichever API is configured
+    return !!evoCredsEarly || !!unoCredsEarly;
+  });
+
+  if (validInstances.length === 0) {
+    throw new Error('Nenhuma instância válida com credenciais de API configuradas');
+  }
+
   const progress: SendProgress = {
     current: 0,
     total: contacts.length,
@@ -104,20 +121,29 @@ export async function sendCampaign(
     onProgress({ ...progress });
   };
 
-  // Determine API source from first selected instance
-  const source = getInstanceSource(selectedPhoneNumbers[0]);
-  const unoCreds = loadUnoApiCredentials();
-  const evoCreds = loadEvolutionCredentials();
+  const unoCreds = unoCredsEarly;
+  const evoCreds = evoCredsEarly;
 
-  if (source === 'unoapi' && !unoCreds) throw new Error('Credenciais da UnoAPI não configuradas');
-  if (source === 'evolution' && !evoCreds) throw new Error('Credenciais da Evolution API não configuradas');
+  // Resolve API source per-instance (default → evolution if available, else unoapi)
+  const resolveSource = (id: string): 'evolution' | 'unoapi' => {
+    const s = getInstanceSource(id);
+    if (s === 'evolution') return 'evolution';
+    if (s === 'unoapi') return 'unoapi';
+    return evoCreds ? 'evolution' : 'unoapi';
+  };
 
-  addLog(`🚀 Iniciando campanha via ${source === 'evolution' ? 'Evolution API' : 'UnoAPI'}...`, 'info');
+  if (validInstances.length < selectedPhoneNumbers.length) {
+    addLog(`⚠️ ${selectedPhoneNumbers.length - validInstances.length} instância(s) ignorada(s) (sem credenciais)`, 'warning');
+  }
+
+  const primarySource = resolveSource(validInstances[0]);
+  addLog(`🚀 Iniciando campanha via ${primarySource === 'evolution' ? 'Evolution API' : 'UnoAPI'}...`, 'info');
 
   // For Evolution: validate all instances (non-blocking — warn but continue)
-  if (source === 'evolution' && evoCreds) {
+  if (evoCreds) {
     let anyConnected = false;
-    for (const instId of selectedPhoneNumbers) {
+    const evoInstances = validInstances.filter(id => resolveSource(id) === 'evolution');
+    for (const instId of evoInstances) {
       const instName = getInstanceName(instId);
       try {
         const status = await getInstanceStatus(evoCreds, instName);
@@ -132,7 +158,7 @@ export async function sendCampaign(
         anyConnected = true; // assume ok if validation itself failed
       }
     }
-    if (!anyConnected) {
+    if (evoInstances.length > 0 && !anyConnected) {
       addLog('⚠️ Nenhuma instância confirmada como conectada. Continuando, mas envios podem falhar.', 'warning');
     }
   }
@@ -150,15 +176,16 @@ export async function sendCampaign(
     const phoneNumber = contact.numero || contact.phone || '';
     const contactName = contact.nome || contact.name || phoneNumber;
 
-    const senderInstId = selectedPhoneNumbers[phoneIndex % selectedPhoneNumbers.length];
+    const senderInstId = validInstances[phoneIndex % validInstances.length];
     const senderName = getInstanceName(senderInstId);
+    const source = resolveSource(senderInstId);
     phoneIndex++;
 
     progress.current = i + 1;
     progress.percent = Math.round(((i + 1) / contacts.length) * 100);
     progress.currentContact = contactName;
 
-    addLog(`📤 Enviando para ${contactName} (${phoneNumber}) via ${senderName}...`);
+    addLog(`📤 Enviando para ${contactName} (${phoneNumber}) via ${senderName} [${source}]...`);
 
     try {
       const messagesToSend = settings.sendType === 'single' ? [messages[0]] : messages;
@@ -176,8 +203,9 @@ export async function sendCampaign(
             caption: personalizedCaption || personalizedContent,
             filename: msg.mediaFilename,
           };
-          await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
-        } else if (unoCreds) {
+          const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
+          console.log('[campaignSender] Evolution send result:', result);
+        } else if (source === 'unoapi' && unoCreds) {
           // UnoAPI sending
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
@@ -189,6 +217,8 @@ export async function sendCampaign(
             };
           }
           await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+        } else {
+          throw new Error(`Nenhuma API disponível para a instância "${senderName}"`);
         }
 
         progress.sent++;
