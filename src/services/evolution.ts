@@ -101,11 +101,17 @@ export async function logoutInstance(creds: EvolutionCredentials, instanceName: 
 
 // ── ETAPA 3: Enviar mensagem com validação de status ──
 export interface EvolutionMessage {
-  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
   content: string;
   mediaUrl?: string;
   caption?: string;
   filename?: string;
+  // Para buttons:
+  title?: string;
+  footer?: string;
+  buttons?: { type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  // Para link:
+  linkUrl?: string;
 }
 
 export async function sendMessage(
