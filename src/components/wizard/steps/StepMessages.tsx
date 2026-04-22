@@ -23,13 +23,19 @@ import { toast } from 'sonner';
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
-  const { messages, columns, addMessage, updateMessage, deleteMessage, settings, data } =
+  const { messages, columns, addMessage, addRichMessage, updateMessage, deleteMessage, settings, data } =
     useWizard();
   const [newMessage, setNewMessage] = useState('');
   const [previewIndex, setPreviewIndex] = useState(0);
-  const [mediaType, setMediaType] = useState<MediaType>('text');
+  const [mediaType, setMediaType] = useState<EditorMediaType>('text');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFilename, setMediaFilename] = useState('');
+  // Buttons editor state
+  const [btnTitle, setBtnTitle] = useState('');
+  const [btnFooter, setBtnFooter] = useState('');
+  const [buttons, setButtons] = useState<MessageButton[]>([]);
+  // Link editor state
+  const [linkUrl, setLinkUrl] = useState('');
 
   const variables = columns.map((col) => `{{${col}}}`);
   // Add dynamic {{primeiro_nome}} variable if 'nome' column exists
@@ -43,24 +49,55 @@ export function StepMessages() {
   };
 
   const handleAddMessage = () => {
-    if (!newMessage.trim() && mediaType === 'text') {
+    // Validações por tipo
+    if (mediaType === 'text' && !newMessage.trim()) {
       toast.error('Digite uma mensagem');
       return;
     }
-    if (mediaType !== 'text' && !mediaUrl.trim()) {
+    if (['image', 'audio', 'video', 'document'].includes(mediaType) && !mediaUrl.trim()) {
       toast.error('Informe a URL da mídia');
       return;
     }
+    if (mediaType === 'buttons') {
+      if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
+      if (buttons.length === 0) { toast.error('Adicione pelo menos um botão'); return; }
+      const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
+      if (invalid) { toast.error('Preencha o texto e o valor de todos os botões'); return; }
+    }
+    if (mediaType === 'link') {
+      if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
+      if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
+    }
 
-    addMessage(newMessage.trim(), {
-      mediaType,
-      mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
-      mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
-      mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
-    });
+    if (mediaType === 'buttons') {
+      addRichMessage({
+        content: newMessage.trim(),
+        mediaType: 'buttons',
+        buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
+        mediaCaption: btnTitle.trim() || undefined,
+        mediaFilename: btnFooter.trim() || undefined,
+      });
+    } else if (mediaType === 'link') {
+      addRichMessage({
+        content: newMessage.trim(),
+        mediaType: 'link',
+        linkUrl: linkUrl.trim(),
+      });
+    } else {
+      addMessage(newMessage.trim(), {
+        mediaType,
+        mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
+        mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
+        mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+      });
+    }
     setNewMessage('');
     setMediaUrl('');
     setMediaFilename('');
+    setBtnTitle('');
+    setBtnFooter('');
+    setButtons([]);
+    setLinkUrl('');
     setMediaType('text');
     toast.success('Mensagem adicionada');
   };
