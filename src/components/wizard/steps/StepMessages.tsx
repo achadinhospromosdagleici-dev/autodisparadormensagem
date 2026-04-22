@@ -482,14 +482,35 @@ export function StepMessages() {
                     <p className="text-xs text-primary mb-2 font-medium">
                       Nova mensagem (prévia) {mediaType !== 'text' && `• ${mediaIcon(mediaType)} ${mediaType}`}
                     </p>
-                    {mediaType !== 'text' && mediaUrl && (
+                    {['image','audio','video','document'].includes(mediaType) && mediaUrl && (
                       <div className="mb-2 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground flex items-center gap-1">
                         <Link className="w-3 h-3" /> {mediaUrl}
                       </div>
                     )}
+                    {mediaType === 'buttons' && btnTitle && (
+                      <p className="text-xs font-bold uppercase tracking-wide mb-1">{btnTitle}</p>
+                    )}
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(newMessage, previewIndex)}
                     </p>
+                    {mediaType === 'link' && linkUrl && (
+                      <a href={linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">
+                        {linkUrl}
+                      </a>
+                    )}
+                    {mediaType === 'buttons' && buttons.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
+                        {buttons.map((b) => (
+                          <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
+                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
+                            {b.type === 'phone' && <Phone className="w-3 h-3" />}
+                            {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
+                            {b.label || `Botão ${b.type}`}
+                          </div>
+                        ))}
+                        {btnFooter && <p className="text-[10px] text-muted-foreground text-center mt-2">{btnFooter}</p>}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -507,9 +528,30 @@ export function StepMessages() {
                         <Link className="w-3 h-3 shrink-0" /> {msg.mediaUrl}
                       </div>
                     )}
+                    {msg.mediaType === 'buttons' && msg.mediaCaption && (
+                      <p className="text-xs font-bold uppercase tracking-wide mb-1">{msg.mediaCaption}</p>
+                    )}
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(msg.content, previewIndex)}
                     </p>
+                    {msg.mediaType === 'link' && msg.linkUrl && (
+                      <a href={msg.linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">
+                        {msg.linkUrl}
+                      </a>
+                    )}
+                    {msg.mediaType === 'buttons' && msg.buttons && msg.buttons.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
+                        {msg.buttons.map((b) => (
+                          <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
+                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
+                            {b.type === 'phone' && <Phone className="w-3 h-3" />}
+                            {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
+                            {b.label}
+                          </div>
+                        ))}
+                        {msg.mediaFilename && <p className="text-[10px] text-muted-foreground text-center mt-2">{msg.mediaFilename}</p>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </>
