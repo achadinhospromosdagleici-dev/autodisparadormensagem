@@ -19,10 +19,21 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
+  // Botões interativos (Evolution sendButtons) ou link "mascarado" no texto
+  buttons?: MessageButton[];
+  // Para tipo 'link': URL clicável anexada ao texto
+  linkUrl?: string;
+}
+
+export interface MessageButton {
+  id: string;
+  type: 'url' | 'phone' | 'reply';
+  label: string;          // Texto do botão (max 20 chars recomendado)
+  value: string;          // URL, telefone (com DDI) ou ID de resposta
 }
 
 export interface Instance {
@@ -75,6 +86,7 @@ interface WizardContextType extends WizardState {
   deleteRow: (id: string) => void;
   deleteRows: (ids: string[]) => void;
   addMessage: (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => void;
+  addRichMessage: (msg: Omit<Message, 'id'>) => void;
   updateMessage: (id: string, content: string) => void;
   deleteMessage: (id: string) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
@@ -213,6 +225,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
     setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
+  const addRichMessage = (msg: Omit<Message, 'id'>) => {
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), ...msg }] }));
+  };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
   const setSettings = (settings: Partial<WizardSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }));
@@ -247,7 +262,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     <WizardContext.Provider value={{
       ...state,
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
-      addMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
+      addMessage, addRichMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,

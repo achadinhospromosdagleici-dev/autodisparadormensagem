@@ -109,6 +109,12 @@ export function StepConfirmation() {
         mediaUrl: (m as any).mediaUrl || undefined,
         mediaCaption: (m as any).mediaCaption || undefined,
         mediaFilename: (m as any).mediaFilename || undefined,
+        // Para tipo "buttons": title vem em mediaCaption, footer em mediaFilename
+        title: (m as any).mediaType === 'buttons' ? (m as any).mediaCaption : undefined,
+        footer: (m as any).mediaType === 'buttons' ? (m as any).mediaFilename : undefined,
+        buttons: (m as any).buttons || undefined,
+        // Para tipo "link"
+        linkUrl: (m as any).linkUrl || undefined,
       }));
 
       const result = await sendCampaign(
