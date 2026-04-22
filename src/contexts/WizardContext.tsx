@@ -86,6 +86,7 @@ interface WizardContextType extends WizardState {
   deleteRow: (id: string) => void;
   deleteRows: (ids: string[]) => void;
   addMessage: (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => void;
+  addRichMessage: (msg: Omit<Message, 'id'>) => void;
   updateMessage: (id: string, content: string) => void;
   deleteMessage: (id: string) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
