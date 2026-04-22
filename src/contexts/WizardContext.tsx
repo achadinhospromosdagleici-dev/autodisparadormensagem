@@ -19,10 +19,21 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
+  // Botões interativos (Evolution sendButtons) ou link "mascarado" no texto
+  buttons?: MessageButton[];
+  // Para tipo 'link': URL clicável anexada ao texto
+  linkUrl?: string;
+}
+
+export interface MessageButton {
+  id: string;
+  type: 'url' | 'phone' | 'reply';
+  label: string;          // Texto do botão (max 20 chars recomendado)
+  value: string;          // URL, telefone (com DDI) ou ID de resposta
 }
 
 export interface Instance {
