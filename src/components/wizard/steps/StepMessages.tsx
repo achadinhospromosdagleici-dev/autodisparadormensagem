@@ -177,12 +177,12 @@ export function StepMessages() {
             {/* Media Type Selector */}
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground font-medium">Tipo de mensagem</label>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {mediaTypeConfig.map(({ type, icon: Icon, label }) => (
                   <button
                     key={type}
                     onClick={() => setMediaType(type)}
-                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 min-w-[80px] py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                       mediaType === type
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted/50 text-muted-foreground hover:bg-muted'
@@ -195,8 +195,8 @@ export function StepMessages() {
               </div>
             </div>
 
-            {/* Media URL Input */}
-            {mediaType !== 'text' && (
+            {/* Media URL Input — only for image/audio/video/document */}
+            {['image', 'audio', 'video', 'document'].includes(mediaType) && (
               <div className="space-y-3 animate-fade-in">
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
@@ -226,12 +226,144 @@ export function StepMessages() {
               </div>
             )}
 
+            {/* Link editor */}
+            {mediaType === 'link' && (
+              <div className="space-y-1.5 animate-fade-in">
+                <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  URL do link (será adicionada ao final da mensagem)
+                </label>
+                <input
+                  type="url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://seusite.com/oferta"
+                  className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  💡 O WhatsApp gera automaticamente uma prévia clicável da página.
+                </p>
+              </div>
+            )}
+
+            {/* Buttons editor */}
+            {mediaType === 'buttons' && (
+              <div className="space-y-3 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Título (opcional)</label>
+                    <input
+                      type="text"
+                      value={btnTitle}
+                      onChange={(e) => setBtnTitle(e.target.value)}
+                      placeholder="Ex: INÍCIO DE FLUXO"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Rodapé (opcional)</label>
+                    <input
+                      type="text"
+                      value={btnFooter}
+                      onChange={(e) => setBtnFooter(e.target.value)}
+                      placeholder="Ex: Oferta válida hoje"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground font-medium">
+                      Botões ({buttons.length}/3)
+                    </label>
+                    {buttons.length < 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                        className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Adicionar botão
+                      </button>
+                    )}
+                  </div>
+
+                  {buttons.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/50 rounded-lg">
+                      Adicione até 3 botões (URL, telefone ou resposta rápida)
+                    </p>
+                  )}
+
+                  {buttons.map((btn, idx) => (
+                    <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={btn.type}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, type: e.target.value as MessageButton['type'], value: '' };
+                            setButtons(next);
+                          }}
+                          className="px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
+                        >
+                          <option value="url">🔗 URL</option>
+                          <option value="phone">📞 Telefone</option>
+                          <option value="reply">💬 Resposta</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={btn.label}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, label: e.target.value };
+                            setButtons(next);
+                          }}
+                          placeholder="Texto do botão"
+                          maxLength={20}
+                          className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setButtons(buttons.filter((_, i) => i !== idx))}
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {btn.type !== 'reply' && (
+                        <input
+                          type={btn.type === 'phone' ? 'tel' : 'url'}
+                          value={btn.value}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, value: e.target.value };
+                            setButtons(next);
+                          }}
+                          placeholder={btn.type === 'url' ? 'https://seusite.com/...' : '+5511999999999'}
+                          className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground bg-warning/5 border border-warning/20 rounded-md p-2">
+                  ⚠️ Botões interativos funcionam melhor em contas WhatsApp Business API. Em contas comuns (Baileys), podem aparecer como texto simples em alguns dispositivos.
+                </p>
+              </div>
+            )}
+
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder={mediaType === 'text'
-                ? `Olá {{nome}}! \n\nTemos uma oferta especial do {{produto}} para você.\n\nEntre em contato para saber mais!`
-                : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? '' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
+              placeholder={
+                mediaType === 'text'
+                  ? `Olá {{nome}}! \n\nTemos uma oferta especial do {{produto}} para você.\n\nEntre em contato para saber mais!`
+                  : mediaType === 'buttons'
+                    ? `Olá {{primeiro_nome}}, escolha uma opção abaixo:`
+                    : mediaType === 'link'
+                      ? `Olá {{primeiro_nome}}! Clique no link abaixo e finalize sua compra com 10% OFF 👇`
+                      : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
               }
               className="w-full h-36 p-4 rounded-xl bg-muted/50 border border-border/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 scrollbar-thin"
             />
