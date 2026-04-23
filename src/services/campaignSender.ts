@@ -220,11 +220,8 @@ export async function sendCampaign(
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           
           if (msg.mediaType === 'buttons') {
-            // UnoAPI interactive buttons
-            const buttonsToSend = msg.buttons?.map(b => ({
-              id: b.id,
-              title: b.label,
-            })) || [];
+            // UnoAPI interactive buttons (texto puro com botões)
+            const buttonsToSend = msg.buttons?.map(b => ({ id: b.id, title: b.label })) || [];
             unoMsg.buttons = buttonsToSend;
             if (msg.title) unoMsg.header = msg.title;
             if (msg.footer) unoMsg.footer = msg.footer;
@@ -236,15 +233,32 @@ export async function sendCampaign(
               : personalizedContent;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
-            // Media messages (image, audio, video, document) — exclude buttons/link
             const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
-            unoMsg.media = {
-              type: mt,
-              url: msg.mediaUrl,
-              caption: personalizedCaption || personalizedContent,
-              filename: msg.mediaFilename,
-            };
-            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            const hasButtons = msg.buttons && msg.buttons.length > 0;
+
+            if (hasButtons && (mt === 'image' || mt === 'video' || mt === 'document')) {
+              // Mídia + botões → interactive com header de mídia
+              const { sendInteractiveButtons } = await import('./unoapi');
+              await sendInteractiveButtons(
+                unoCreds,
+                senderName,
+                phoneNumber,
+                personalizedCaption || personalizedContent,
+                msg.buttons!.map(b => ({ id: b.id, title: b.label })),
+                undefined,
+                msg.footer,
+                { type: mt, url: msg.mediaUrl, filename: msg.mediaFilename },
+              );
+            } else {
+              // Mídia simples (sem botões) ou áudio
+              unoMsg.media = {
+                type: mt,
+                url: msg.mediaUrl,
+                caption: personalizedCaption || personalizedContent,
+                filename: msg.mediaFilename,
+              };
+              await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            }
           } else {
             // Text only
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
