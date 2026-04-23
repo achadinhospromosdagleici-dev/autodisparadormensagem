@@ -13,6 +13,7 @@ import {
   Plus,
   X,
   AlertTriangle,
+  HardDrive,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,6 +27,7 @@ import {
   saveManualInstances,
   loadManualInstances,
   clearManualInstances,
+  DEFAULT_S3_CONFIG,
 } from '@/services/unoapi';
 
 interface UnoApiSettingsProps {
@@ -43,6 +45,15 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
   const [loadingInstances, setLoadingInstances] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [newPhone, setNewPhone] = useState('');
+  
+  // S3 Configuration
+  const [s3Enabled, setS3Enabled] = useState(false);
+  const [s3Endpoint, setS3Endpoint] = useState(DEFAULT_S3_CONFIG.endpoint);
+  const [s3AccessKey, setS3AccessKey] = useState(DEFAULT_S3_CONFIG.accessKey);
+  const [s3SecretKey, setS3SecretKey] = useState(DEFAULT_S3_CONFIG.secretKey);
+  const [s3Bucket, setS3Bucket] = useState(DEFAULT_S3_CONFIG.bucket);
+  const [s3Region, setS3Region] = useState(DEFAULT_S3_CONFIG.region);
+  const [showS3Secret, setShowS3Secret] = useState(false);
 
   useEffect(() => {
     const creds = loadUnoApiCredentials();
@@ -53,6 +64,16 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       onConnectionChange(true);
       checkOnline(creds);
       loadInstancesFromApi(creds);
+      
+      // Load S3 config if saved
+      if (creds.s3Enabled) {
+        setS3Enabled(true);
+        setS3Endpoint(creds.s3Endpoint || DEFAULT_S3_CONFIG.endpoint);
+        setS3AccessKey(creds.s3AccessKey || DEFAULT_S3_CONFIG.accessKey);
+        setS3SecretKey(creds.s3SecretKey || DEFAULT_S3_CONFIG.secretKey);
+        setS3Bucket(creds.s3Bucket || DEFAULT_S3_CONFIG.bucket);
+        setS3Region(creds.s3Region || DEFAULT_S3_CONFIG.region);
+      }
     }
   }, []);
 
@@ -116,6 +137,12 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     const creds: UnoApiCredentials = {
       baseUrl: baseUrl.replace(/\/$/, ''),
       token: token.trim(),
+      s3Enabled,
+      s3Endpoint: s3Enabled ? s3Endpoint : undefined,
+      s3AccessKey: s3Enabled ? s3AccessKey : undefined,
+      s3SecretKey: s3Enabled ? s3SecretKey : undefined,
+      s3Bucket: s3Enabled ? s3Bucket : undefined,
+      s3Region: s3Enabled ? s3Region : undefined,
     };
 
     try {
@@ -216,6 +243,100 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
                 {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+
+          {/* S3 Configuration */}
+          <div className="border-t border-border/30 pt-4">
+            <button
+              type="button"
+              onClick={() => setS3Enabled(!s3Enabled)}
+              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <HardDrive className="w-5 h-5 text-primary" />
+                <div className="text-left">
+                  <p className="text-sm font-medium">Armazenamento S3 (MinIO)</p>
+                  <p className="text-xs text-muted-foreground">Para enviar mídias via UnoAPI</p>
+                </div>
+              </div>
+              <div className={`relative w-11 h-6 rounded-full transition-colors ${s3Enabled ? 'bg-primary' : 'bg-muted'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${s3Enabled ? 'translate-x-5' : ''}`} />
+              </div>
+            </button>
+
+            {s3Enabled && (
+              <div className="mt-4 space-y-3 animate-fade-in p-3 rounded-lg bg-muted/20 border border-border/30">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Deixe os campos vazios para usar os valores padrão do sistema.
+                </p>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Endpoint S3</label>
+                  <input
+                    type="url"
+                    value={s3Endpoint}
+                    onChange={e => setS3Endpoint(e.target.value)}
+                    placeholder={DEFAULT_S3_CONFIG.endpoint}
+                    className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Access Key</label>
+                  <input
+                    type="text"
+                    value={s3AccessKey}
+                    onChange={e => setS3AccessKey(e.target.value)}
+                    placeholder={DEFAULT_S3_CONFIG.accessKey}
+                    className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Secret Key</label>
+                  <div className="relative">
+                    <input
+                      type={showS3Secret ? 'text' : 'password'}
+                      value={s3SecretKey}
+                      onChange={e => setS3SecretKey(e.target.value)}
+                      placeholder={DEFAULT_S3_CONFIG.secretKey ? '••••••••' : ''}
+                      className="w-full px-3 py-2 pr-10 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowS3Secret(!showS3Secret)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showS3Secret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Bucket</label>
+                    <input
+                      type="text"
+                      value={s3Bucket}
+                      onChange={e => setS3Bucket(e.target.value)}
+                      placeholder={DEFAULT_S3_CONFIG.bucket}
+                      className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Região</label>
+                    <input
+                      type="text"
+                      value={s3Region}
+                      onChange={e => setS3Region(e.target.value)}
+                      placeholder={DEFAULT_S3_CONFIG.region}
+                      className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <button onClick={handleConnect} disabled={isLoading}

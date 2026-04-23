@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
 
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
@@ -266,19 +267,40 @@ export function StepMessages() {
                           }
                           setUploading(true);
                           try {
-                            const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-                            const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
-                            const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBase}`;
-                            const { error: upErr } = await supabase.storage
-                              .from('campaign-media')
-                              .upload(path, file, { contentType: file.type, upsert: false });
-                            if (upErr) throw upErr;
-                            const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
-                            setMediaUrl(pub.publicUrl);
+                            // Check if UnoAPI is connected with S3 enabled
+                            const unoCreds = loadUnoApiCredentials();
+                            const useS3 = unoCreds?.s3Enabled;
+                            
+                            if (useS3) {
+                              // Upload to S3 (for UnoAPI)
+                              const s3Config = {
+                                endpoint: unoCreds.s3Endpoint || DEFAULT_S3_CONFIG.endpoint,
+                                accessKey: unoCreds.s3AccessKey || DEFAULT_S3_CONFIG.accessKey,
+                                secretKey: unoCreds.s3SecretKey || DEFAULT_S3_CONFIG.secretKey,
+                                bucket: unoCreds.s3Bucket || DEFAULT_S3_CONFIG.bucket,
+                                region: unoCreds.s3Region || DEFAULT_S3_CONFIG.region,
+                              };
+                              console.log('[upload] Using S3 upload for UnoAPI');
+                              const s3Url = await uploadToS3(file, s3Config);
+                              setMediaUrl(s3Url);
+                              toast.success('Arquivo enviado para S3! URL preenchida.');
+                            } else {
+                              // Upload to Supabase Storage (default)
+                              const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
+                              const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
+                              const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBase}`;
+                              const { error: upErr } = await supabase.storage
+                                .from('campaign-media')
+                                .upload(path, file, { contentType: file.type, upsert: false });
+                              if (upErr) throw upErr;
+                              const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
+                              setMediaUrl(pub.publicUrl);
+                              toast.success('Arquivo enviado! URL preenchida.');
+                            }
+                            
                             if (mediaType === 'document' && !mediaFilename) {
                               setMediaFilename(file.name);
                             }
-                            toast.success('Arquivo enviado! URL preenchida.');
                           } catch (err: any) {
                             console.error('[upload]', err);
                             toast.error(`Falha no upload: ${err.message || 'erro desconhecido'}`);
@@ -689,12 +711,25 @@ export function StepMessages() {
                     {mediaType === 'buttons' && buttons.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
                         {buttons.map((b) => (
+                          b.type === 'url' ? (
+                            <a
+                              key={b.id}
+                              href={b.value || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5 hover:bg-primary/10 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              {b.label || `Abrir link`}
+                            </a>
+                          ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
                             {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label || `Botão ${b.type}`}
                           </div>
+                          )
                         ))}
                         {btnFooter && <p className="text-[10px] text-muted-foreground text-center mt-2">{btnFooter}</p>}
                       </div>
@@ -702,12 +737,25 @@ export function StepMessages() {
                     {(mediaType === 'image' || mediaType === 'video' || mediaType === 'document') && buttons.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
                         {buttons.map((b) => (
+                          b.type === 'url' ? (
+                            <a
+                              key={b.id}
+                              href={b.value || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5 hover:bg-primary/10 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              {b.label || `Abrir link`}
+                            </a>
+                          ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
                             {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label || `Botão ${b.type}`}
                           </div>
+                          )
                         ))}
                       </div>
                     )}

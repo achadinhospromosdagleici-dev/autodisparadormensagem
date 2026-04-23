@@ -5,6 +5,27 @@ import { supabase } from '@/integrations/supabase/client';
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
+  s3Endpoint?: string;   // S3 endpoint (optional)
+  s3AccessKey?: string;  // S3 access key (optional)
+  s3SecretKey?: string; // S3 secret key (optional)
+  s3Bucket?: string;     // S3 bucket name (optional)
+}
+
+// Default S3 configuration values (can be overridden in panel settings)
+export const DEFAULT_S3_CONFIG = {
+  endpoint: 'https://s3minio.bigcreditos.com.br',
+  accessKey: 'ztyD3jX470hl2UsCvXMb',
+  secretKey: 'eA7uptli3Q4EqIOlkce0Rku532hvyVbSbndaZ6Uh',
+  bucket: 'chatwoot',
+  region: 'ENAM',
+};
+
+export interface S3Config {
+  endpoint: string;
+  accessKey: string;
+  secretKey: string;
+  bucket: string;
+  region?: string;
 }
 
 export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document';
@@ -56,6 +77,33 @@ export function loadUnoApiCredentials(): UnoApiCredentials | null {
 
 export function clearUnoApiCredentials(): void {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+// Upload file to S3 via edge function
+export async function uploadToS3(file: File, s3Config: S3Config): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('endpoint', s3Config.endpoint);
+  formData.append('accessKey', s3Config.accessKey);
+  formData.append('secretKey', s3Config.secretKey);
+  formData.append('bucket', s3Config.bucket);
+  if (s3Config.region) {
+    formData.append('region', s3Config.region);
+  }
+
+  const { data, error } = await supabase.functions.invoke('s3-upload', {
+    body: formData,
+  });
+
+  if (error) {
+    throw new Error(`Upload failed: ${error.message}`);
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return data.url;
 }
 
 function getHeaders(token: string) {
