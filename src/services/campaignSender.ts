@@ -281,10 +281,12 @@ export async function sendCampaign(
               if (b.type === 'url') {
                 return null; // Skip URL buttons, sent as text above
               } else if (b.type === 'phone') {
+                const phoneValue = replaceButtonValue(b.value, contact);
+                console.log('[campaignSender] Phone button:', { label: b.label, originalValue: b.value, resolvedPhone: phoneValue });
                 return {
                   id: b.id,
                   title: b.label,
-                  phone: replaceButtonValue(b.value, contact),
+                  phone: phoneValue,
                 };
               } else {
                 return {
