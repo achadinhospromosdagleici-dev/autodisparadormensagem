@@ -466,15 +466,14 @@ export async function sendInteractiveButtons(
               title: btn.title,
             };
           } else if (btn.phone) {
-            // Phone button - send as contact to share
+            // Phone button - use URL button pointing to wa.me for Baileys compatibility
+            const waMeUrl = `https://wa.me/${btn.phone.replace(/\D/g, '')}`;
             return {
-              type: 'contact',
-              message: {
-                contacts: [{
-                  name: { formatted_name: btn.title || 'Contato' },
-                  phones: [{ phone: btn.phone }]
-                }]
-              }
+              type: 'URL',
+              url: {
+                url: waMeUrl,
+              },
+              title: btn.title,
             };
           } else {
             return {
