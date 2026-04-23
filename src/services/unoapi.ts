@@ -215,17 +215,19 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instan
         if (instances.length > 0) return { instances };
       }
 
-      // If still nothing found, return error
-      return { instances: [], error: 'Nenhum número encontrado na API. Verifique se a URL e token estão corretos.' };
-    } catch (err: any) {
-      console.error('[UnoAPI] Erro ao buscar instâncias:', err);
-      return { 
-        instances: [], 
-        error: `Erro: ${err.message}` 
-      };
     }
+
+    return { instances: [], error: 'Nenhum número encontrado na API. Verifique se a URL e token estão corretos.' };
+  } catch (err: any) {
+    console.error('[UnoAPI] Erro ao buscar instâncias:', err);
+    return { 
+      instances: [], 
+      error: `Erro: ${err.message}` 
+    };
   }
-}// Manual instances storage
+}
+
+// Manual instances storage
 const MANUAL_INSTANCES_KEY = 'unoapi_manual_instances';
 
 export function saveManualInstances(instances: UnoApiInstance[]): void {
