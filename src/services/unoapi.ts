@@ -215,7 +215,13 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instan
         // FORMATO 4: Objeto com phone numbers como chaves { "5511999999999": { status: "connected" } }
         else if (data && typeof data === 'object' && !Array.isArray(data) && !data.text) {
           instances = Object.entries(data)
-            .filter(([key]) => key !== 'error' && key !== 'text' && !key.startsWith('_'))
+            .filter(([key]) => {
+              // Ignore non-phone keys
+              if (key === 'error' || key === 'text' || key === 'data' || key === 'instances' || key === 'status' || key.startsWith('_')) return false;
+              // Only accept keys that look like phone numbers (digits only, min 10 chars)
+              if (!/^\d{10,20}$/.test(key)) return false;
+              return true;
+            })
             .map(([phone, config]: [string, any]) => ({
               phone,
               status: (config?.status === 'connected' || config?.status === 'open' || config?.status === 'online' || config?.isConnected) 
