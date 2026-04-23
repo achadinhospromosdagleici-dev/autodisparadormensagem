@@ -17,8 +17,11 @@ import {
   Phone,
   ExternalLink,
   X,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
@@ -30,6 +33,7 @@ export function StepMessages() {
   const [mediaType, setMediaType] = useState<EditorMediaType>('text');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFilename, setMediaFilename] = useState('');
+  const [uploading, setUploading] = useState(false);
   // Buttons editor state
   const [btnTitle, setBtnTitle] = useState('');
   const [btnFooter, setBtnFooter] = useState('');
@@ -220,13 +224,75 @@ export function StepMessages() {
                     <Link className="w-3.5 h-3.5" />
                     URL da {mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'}
                   </label>
-                  <input
-                    type="url"
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    placeholder={`https://exemplo.com/${mediaType === 'image' ? 'foto.jpg' : mediaType === 'audio' ? 'audio.mp3' : mediaType === 'video' ? 'video.mp4' : 'arquivo.pdf'}`}
-                    className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      placeholder={`https://exemplo.com/${mediaType === 'image' ? 'foto.jpg' : mediaType === 'audio' ? 'audio.mp3' : mediaType === 'video' ? 'video.mp4' : 'arquivo.pdf'}`}
+                      className="flex-1 px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                    <label
+                      className={`shrink-0 px-3 py-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary text-xs font-medium cursor-pointer flex items-center gap-1.5 transition-colors ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+                      title="Enviar arquivo do computador"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span className="hidden sm:inline">Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Upload</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept={
+                          mediaType === 'image' ? 'image/*'
+                          : mediaType === 'audio' ? 'audio/*'
+                          : mediaType === 'video' ? 'video/*'
+                          : '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip'
+                        }
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          // 25MB safety cap
+                          if (file.size > 25 * 1024 * 1024) {
+                            toast.error('Arquivo muito grande (máx. 25MB)');
+                            return;
+                          }
+                          setUploading(true);
+                          try {
+                            const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
+                            const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
+                            const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBase}`;
+                            const { error: upErr } = await supabase.storage
+                              .from('campaign-media')
+                              .upload(path, file, { contentType: file.type, upsert: false });
+                            if (upErr) throw upErr;
+                            const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
+                            setMediaUrl(pub.publicUrl);
+                            if (mediaType === 'document' && !mediaFilename) {
+                              setMediaFilename(file.name);
+                            }
+                            toast.success('Arquivo enviado! URL preenchida.');
+                          } catch (err: any) {
+                            console.error('[upload]', err);
+                            toast.error(`Falha no upload: ${err.message || 'erro desconhecido'}`);
+                          } finally {
+                            setUploading(false);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70">
+                    Cole uma URL ou clique em <strong>Upload</strong> para enviar do seu computador (máx. 25MB).
+                  </p>
                 </div>
                 {mediaType === 'document' && (
                   <div className="space-y-1.5">
