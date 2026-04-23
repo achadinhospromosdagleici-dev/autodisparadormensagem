@@ -157,91 +157,48 @@ export function forceSetApiType(type: 'unoapi' | 'evolution'): void {
 // Fetch connected instances/phone numbers
 export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
   console.log('[UnoAPI] Fetching instances from:', creds.baseUrl);
-  localStorage.setItem('api_type_detected', 'unoapi');
 
-  // Try different endpoints that UnoAPI might use
-  const endpoints = ['/instances', '/sessions', '/devices', '/connected', '/phone-numbers'];
-  
-  for (const endpoint of endpoints) {
-    try {
-      console.log('[UnoAPI] Trying endpoint:', endpoint);
-      const result = await proxyCall(creds, endpoint);
-      
-      if (result.ok && result.data) {
-        const data = result.data;
-        console.log(`[UnoAPI] ${endpoint} response:`, JSON.stringify(data).substring(0, 500));
+  try {
+    // Use ONLY /sessions endpoint
+    const result = await proxyCall(creds, 'sessions');
+    
+    if (result.ok && result.data) {
+      const data = result.data;
+      console.log('[UnoAPI] /sessions response:', JSON.stringify(data).substring(0, 1000));
 
-        if (data.error) {
-          continue;
-        }
+      // Handle error response from proxy
+      if (data?.error) {
+        return { instances: [], error: data.error?.title || data.error };
+      }
 
-        // Try to extract instances from various response formats
-        let instances: UnoApiInstance[] = [];
-
-        // FORMATO 1: { data: [{ display_phone_number, status, ... }] }
-        if (data?.data && Array.isArray(data.data)) {
-          instances = data.data
-            .filter((item: any) => item.display_phone_number || item.phone)
-            .map((item: any) => ({
-              phone: item.display_phone_number || item.phone,
-              status: (item.status === 'online' || item.status === 'connected' || item.status === 'open')
-                ? 'connected' as const
-                : 'disconnected' as const,
-              name: item.pushName || item.name || undefined,
-            }));
-        }
-        // FORMATO 2: Array direto de instâncias
-        else if (Array.isArray(data)) {
-          instances = data
-            .filter((item: any) => item.phone || item.display_phone_number || item.name)
-            .map((item: any) => ({
-              phone: item.phone || item.display_phone_number || item.instanceName || '',
-              status: (item.status === 'online' || item.status === 'connected' || item.status === 'open' || item.isConnected)
-                ? 'connected' as const
-                : 'disconnected' as const,
-              name: item.pushName || item.profileName || item.name || undefined,
-            }));
-        }
-        // FORMATO 3: { instances: [...] }
-        else if (data?.instances && Array.isArray(data.instances)) {
-          instances = data.instances.map((item: any) => ({
-            phone: item.phone || item.display_phone_number || item.instanceName || '',
+      // FORMATO EXATO da UnoAPI: { "data": [{ "display_phone_number": "5531...", "status": "online" }] }
+      if (data?.data && Array.isArray(data.data)) {
+        const instances: UnoApiInstance[] = data.data
+          .filter((item: any) => item.display_phone_number && typeof item.display_phone_number === 'string')
+          .map((item: any) => ({
+            phone: item.display_phone_number,
             status: (item.status === 'online' || item.status === 'connected' || item.status === 'open')
               ? 'connected' as const
               : 'disconnected' as const,
             name: item.pushName || item.profileName || item.name || undefined,
           }));
-        }
-        // FORMATO 4: Objeto com phone numbers como chaves { "5511999999999": { status: "connected" } }
-        else if (data && typeof data === 'object' && !Array.isArray(data) && !data.text) {
-          instances = Object.entries(data)
-            .filter(([key]) => {
-              // Ignore non-phone keys
-              if (key === 'error' || key === 'text' || key === 'data' || key === 'instances' || key === 'status' || key.startsWith('_')) return false;
-              // Only accept keys that look like phone numbers (digits only, min 10 chars)
-              if (!/^\d{10,20}$/.test(key)) return false;
-              return true;
-            })
-            .map(([phone, config]: [string, any]) => ({
-              phone,
-              status: (config?.status === 'connected' || config?.status === 'open' || config?.status === 'online' || config?.isConnected) 
-                ? 'connected' as const 
-                : 'disconnected' as const,
-              name: config?.pushName || config?.profileName || config?.name || undefined,
-            }));
-        }
-
+        
+        console.log('[UnoAPI] Found instances:', instances);
+        
+        // Only return if we found valid instances, don't fallback to manual
         if (instances.length > 0) {
-          console.log('[UnoAPI] Found instances:', instances);
           return { instances };
         }
       }
-    } catch (err) {
-      console.log(`[UnoAPI] ${endpoint} failed:`, err);
-    }
-  }
 
-  return { instances: [], error: 'Nenhum número encontrado. Verifique se há instâncias conectadas na UnoAPI.' };
+      return { instances: [], error: 'Nenhum número encontrado. Verifique se há instâncias conectadas na UnoAPI.' };
+    }
+    
+    return { instances: [], error: 'Erro ao conectar com UnoAPI. Verifique URL e token.' };
+  } catch (err: any) {
+    console.error('[UnoAPI] Erro ao buscar instâncias:', err);
+    return { instances: [], error: `Erro: ${err.message}` };
+  }
 }
 
 // Manual instances storage

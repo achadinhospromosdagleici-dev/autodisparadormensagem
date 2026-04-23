@@ -33,8 +33,11 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
         'Authorization': token,
       },
-      body: requestBody ? JSON.stringify(requestBody) : undefined,
+      ...(requestBody && method !== 'GET' ? { body: JSON.stringify(requestBody) } : {}),
     });
+
+    console.log('[unoapi-proxy] Response status:', response.status);
+    console.log('[unoapi-proxy] Target URL:', targetUrl);
 
     let data: any;
     const contentType = response.headers.get('content-type') || '';
