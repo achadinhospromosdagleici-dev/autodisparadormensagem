@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWizard, Instance } from '@/contexts/WizardContext';
 import {
   Smartphone,
@@ -40,10 +40,25 @@ export function StepInstances() {
   const [unoInstances, setUnoInstances] = useState<UnoApiInstance[]>([]);
   const [evoInstances, setEvoInstances] = useState<EvolutionInstance[]>([]);
   const [loading, setLoading] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    loadAllInstances();
+    console.log('[StepInstances] unoApiConnected:', unoApiConnected);
+    if (!hasLoadedRef.current || unoApiConnected) {
+      loadAllInstances();
+      hasLoadedRef.current = true;
+    }
   }, [unoApiConnected]);
+
+  useEffect(() => {
+    // Also call on initial mount
+    if (!hasLoadedRef.current) {
+      console.log('[StepInstances] Mount - loading instances');
+      loadAllInstances();
+      hasLoadedRef.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cleanup orphaned selections (instances no longer available)
   useEffect(() => {
@@ -58,28 +73,50 @@ export function StepInstances() {
   }, [evoInstances, unoInstances, loading]);
 
   const loadAllInstances = async () => {
+    console.log('[StepInstances] loadAllInstances called');
     setLoading(true);
     const promises: Promise<void>[] = [];
 
     // UnoAPI
     if (unoApiConnected) {
       const creds = loadUnoApiCredentials();
+      console.log('[StepInstances] UnoAPI connected, creds:', creds ? 'found' : 'not found');
       if (creds) {
         promises.push(
-          fetchUnoInstances(creds).then(({ instances: fetched }) => setUnoInstances(fetched)).catch(() => {})
+          fetchUnoInstances(creds)
+            .then(({ instances: fetched }) => {
+              console.log('[StepInstances] UnoAPI instances fetched:', fetched);
+              setUnoInstances(fetched);
+            })
+            .catch((err) => {
+              console.error('[StepInstances] UnoAPI fetch error:', err);
+              setUnoInstances([]);
+            })
         );
       }
+    } else {
+      console.log('[StepInstances] UnoAPI not connected, skipping');
     }
 
     // Evolution
     const evoCreds = loadEvolutionCredentials();
+    console.log('[StepInstances] Evolution creds:', evoCreds ? 'found' : 'not found');
     if (evoCreds) {
       promises.push(
-        fetchEvoInstances(evoCreds).then(setEvoInstances).catch(() => {})
+        fetchEvoInstances(evoCreds)
+          .then((fetched) => {
+            console.log('[StepInstances] Evolution instances fetched:', fetched);
+            setEvoInstances(fetched);
+          })
+          .catch((err) => {
+            console.error('[StepInstances] Evolution fetch error:', err);
+            setEvoInstances([]);
+          })
       );
     }
 
     await Promise.all(promises);
+    console.log('[StepInstances] All instances loaded, unoApiConnected:', unoApiConnected);
     setLoading(false);
   };
 
