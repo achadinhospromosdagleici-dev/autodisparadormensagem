@@ -217,6 +217,11 @@ export async function sendCampaign(
           console.log('[campaignSender] Evolution send result:', result);
         } else if (source === 'unoapi' && unoCreds) {
           // UnoAPI sending
+          console.log('[campaignSender] Sending via UnoAPI:', {
+            senderName,
+            phoneNumber,
+            unoApiUrl: unoCreds.baseUrl
+          });
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           
           if (msg.mediaType === 'buttons') {

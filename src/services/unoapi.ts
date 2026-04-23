@@ -232,21 +232,20 @@ export async function sendTextMessage(
     text: { body },
   };
   
+  console.log('[unoapi] sendTextMessage:', {
+    baseUrl: creds.baseUrl,
+    phoneNumberId,
+    to,
+    body: body.substring(0, 50)
+  });
+  
   try {
-    return await proxySendMessage(creds, phoneNumberId, payload);
+    const result = await proxySendMessage(creds, phoneNumberId, payload);
+    console.log('[unoapi] sendTextMessage result:', result);
+    return result;
   } catch (err) {
-    // Fallback to direct fetch if proxy fails
-    console.warn('[unoapi] Proxy failed, trying direct fetch:', err);
-    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-      method: 'POST',
-      headers: getHeaders(creds.token),
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const errorData = await res.text();
-      throw new Error(`Erro ao enviar texto: ${res.status} - ${errorData}`);
-    }
-    return await res.json();
+    console.error('[unoapi] sendTextMessage error:', err);
+    throw err;
   }
 }
 

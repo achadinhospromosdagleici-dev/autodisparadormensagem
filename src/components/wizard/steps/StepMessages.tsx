@@ -640,9 +640,39 @@ export function StepMessages() {
                     <p className="text-xs text-primary mb-2 font-medium">
                       Nova mensagem (prévia) {mediaType !== 'text' && `• ${mediaIcon(mediaType)} ${mediaType}`}
                     </p>
-                    {['image','audio','video','document'].includes(mediaType) && mediaUrl && (
-                      <div className="mb-2 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground flex items-center gap-1">
-                        <Link className="w-3 h-3" /> {mediaUrl}
+                    {mediaType === 'image' && mediaUrl && (
+                      <div className="mb-3">
+                        <img
+                          src={mediaUrl}
+                          alt="Prévia da imagem"
+                          className="w-full max-h-64 object-contain rounded-lg border border-border/50 bg-muted/30"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    {mediaType === 'video' && mediaUrl && (
+                      <div className="mb-3">
+                        <video
+                          src={mediaUrl}
+                          controls
+                          className="w-full max-h-48 rounded-lg border border-border/50 bg-muted/30"
+                        />
+                      </div>
+                    )}
+                    {mediaType === 'audio' && mediaUrl && (
+                      <div className="mb-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+                        <audio src={mediaUrl} controls className="w-full" />
+                      </div>
+                    )}
+                    {mediaType === 'document' && mediaUrl && (
+                      <div className="mb-2 p-3 rounded-lg bg-muted/50 border border-border/50 flex items-center gap-3">
+                        <FileText className="w-8 h-8 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{mediaFilename || 'documento'}</p>
+                          <p className="text-xs text-muted-foreground truncate">{mediaUrl}</p>
+                        </div>
                       </div>
                     )}
                     {mediaType === 'buttons' && btnTitle && (
