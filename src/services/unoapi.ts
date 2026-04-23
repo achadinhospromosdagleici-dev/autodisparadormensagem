@@ -466,8 +466,9 @@ export async function sendInteractiveButtons(
               title: btn.title,
             };
           } else if (btn.phone) {
+            // Phone number button - opens contact to call
             return {
-              type: 'phone_number',
+              type: 'PHONE_NUMBER',
               phone_number: btn.phone,
               title: btn.title,
             };
