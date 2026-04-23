@@ -60,13 +60,13 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
         {/* Logo */}
         <div className="p-4 border-b border-border/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-              <Send className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-transparent">
+              <img src="/logo-nexia.png" alt="Nexia" className="w-full h-full object-contain" />
             </div>
             {!collapsed && (
               <div className="overflow-hidden">
-                <p className="font-bold text-sm leading-none">MessageFlow</p>
-                <p className="text-[10px] text-muted-foreground">Automação WhatsApp</p>
+                <p className="font-bold text-sm leading-none">Nexia</p>
+                <p className="text-[10px] text-muted-foreground">Mais alcance, menos esforço</p>
               </div>
             )}
           </div>
