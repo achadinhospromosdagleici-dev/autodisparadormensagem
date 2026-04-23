@@ -282,11 +282,14 @@ export async function sendCampaign(
                 return null; // Skip URL buttons, sent as text above
               } else if (b.type === 'phone') {
                 const phoneValue = replaceButtonValue(b.value, contact);
-                console.log('[campaignSender] Phone button:', { label: b.label, originalValue: b.value, resolvedPhone: phoneValue });
+                // For contact button, use button label as contact name
+                const contactName = b.label || 'Contato';
+                console.log('[campaignSender] Contact button:', { label: b.label, contactName, phone: phoneValue });
                 return {
                   id: b.id,
                   title: b.label,
                   phone: phoneValue,
+                  contactName: contactName,
                 };
               } else {
                 return {

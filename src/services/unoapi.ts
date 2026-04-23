@@ -41,7 +41,7 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
-  buttons?: Array<{ id: string; title: string; url?: string; phone?: string }>;
+  buttons?: Array<{ id: string; title: string; url?: string; phone?: string; contactName?: string }>;
   list?: {
     buttonText: string;
     sections: Array<{
@@ -466,11 +466,15 @@ export async function sendInteractiveButtons(
               title: btn.title,
             };
           } else if (btn.phone) {
-            // Phone number button - opens contact to call
+            // Phone button - send as contact to share
             return {
-              type: 'PHONE_NUMBER',
-              phone_number: btn.phone,
-              title: btn.title,
+              type: 'contact',
+              message: {
+                contacts: [{
+                  name: { formatted_name: btn.title || 'Contato' },
+                  phones: [{ phone: btn.phone }]
+                }]
+              }
             };
           } else {
             return {
