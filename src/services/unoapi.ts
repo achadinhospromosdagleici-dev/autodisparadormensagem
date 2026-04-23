@@ -391,6 +391,8 @@ export async function sendInteractiveButtons(
   buttons: Array<{ id: string; title: string }>,
   header?: string,
   footer?: string
+  ,
+  mediaHeader?: { type: 'image' | 'video' | 'document'; url: string; filename?: string }
 ): Promise<any> {
   const payload: any = {
     messaging_product: 'whatsapp',
@@ -409,7 +411,19 @@ export async function sendInteractiveButtons(
     },
   };
 
-  if (header) {
+  if (mediaHeader) {
+    // Header com mídia (imagem/vídeo/documento) — formato WhatsApp Cloud API
+    if (mediaHeader.type === 'image') {
+      payload.interactive.header = { type: 'image', image: { link: mediaHeader.url } };
+    } else if (mediaHeader.type === 'video') {
+      payload.interactive.header = { type: 'video', video: { link: mediaHeader.url } };
+    } else if (mediaHeader.type === 'document') {
+      payload.interactive.header = {
+        type: 'document',
+        document: { link: mediaHeader.url, filename: mediaHeader.filename || 'arquivo' },
+      };
+    }
+  } else if (header) {
     payload.interactive.header = { type: 'text', text: header };
   }
   if (footer) {
