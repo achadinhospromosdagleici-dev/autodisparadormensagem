@@ -236,9 +236,10 @@ export async function sendCampaign(
               : personalizedContent;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
-            // Media messages (image, audio, video, document)
+            // Media messages (image, audio, video, document) — exclude buttons/link
+            const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
             unoMsg.media = {
-              type: msg.mediaType,
+              type: mt,
               url: msg.mediaUrl,
               caption: personalizedCaption || personalizedContent,
               filename: msg.mediaFilename,
