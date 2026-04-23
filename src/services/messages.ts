@@ -83,7 +83,7 @@ export async function getConversation(conversationId: string): Promise<Conversat
 export async function markConversationAsRead(conversationId: string): Promise<void> {
   await supabase
     .from('conversations')
-    .update({ unread_count: 0 })
+    .update({ unread_count: 0 } as any)
     .eq('id', conversationId);
 }
 

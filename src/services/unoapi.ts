@@ -392,7 +392,7 @@ export async function sendInteractiveButtons(
   header?: string,
   footer?: string
 ): Promise<any> {
-  const payload = {
+  const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
@@ -447,7 +447,7 @@ export async function sendInteractiveList(
   header?: string,
   footer?: string
 ): Promise<any> {
-  const payload = {
+  const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,

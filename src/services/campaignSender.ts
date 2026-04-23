@@ -237,8 +237,13 @@ export async function sendCampaign(
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             // Media messages (image, audio, video, document)
+            const mt = msg.mediaType;
+            if (mt === 'buttons' || mt === 'link') {
+              await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+              continue;
+            }
             unoMsg.media = {
-              type: msg.mediaType,
+              type: mt,
               url: msg.mediaUrl,
               caption: personalizedCaption || personalizedContent,
               filename: msg.mediaFilename,

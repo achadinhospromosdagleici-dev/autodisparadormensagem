@@ -5,7 +5,7 @@ import {
   Send,
   Image,
   Video,
-  Audio,
+  Music as Audio,
   FileText,
   Phone,
   MoreVertical,
