@@ -13,6 +13,7 @@ import {
   WifiOff,
   Plus,
   List,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +28,7 @@ import {
   getInstanceStatus,
   logoutInstance,
 } from '@/services/evolution';
+import { ConversationsPanel } from './ConversationsPanel';
 
 interface EvolutionConnectionProps {
   onInstancesLoaded?: (instances: EvolutionInstance[]) => void;
@@ -41,6 +43,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
   const [isLoading, setIsLoading] = useState(false);
   const [instances, setInstances] = useState<EvolutionInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(false);
+  const [conversationsInstance, setConversationsInstance] = useState<string | null>(null);
 
   // QR flow
   const [activeInstance, setActiveInstance] = useState('');
@@ -326,19 +329,27 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
                       {inst.profileName && (
                         <p className="text-xs text-muted-foreground mb-2">👤 {inst.profileName}</p>
                       )}
-                      {!isOpen && (
-                        <button onClick={() => handleGenerateQR(inst.instanceName)}
-                          disabled={isLoading}
-                          className="w-full mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors flex items-center justify-center gap-1">
-                          <QrCode className="w-3 h-3" /> Conectar
-                        </button>
-                      )}
                       {isOpen && (
                         <div className="flex items-center gap-1 mt-1">
                           <CheckCircle2 className="w-3 h-3 text-success" />
                           <span className="text-xs text-success">Pronto para envio</span>
                         </div>
                       )}
+                      <div className="flex gap-2 mt-2">
+                        {!isOpen && (
+                          <button onClick={() => handleGenerateQR(inst.instanceName)}
+                            disabled={isLoading}
+                            className="flex-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors flex items-center justify-center gap-1">
+                            <QrCode className="w-3 h-3" /> Conectar
+                          </button>
+                        )}
+                        {isOpen && (
+                          <button onClick={() => setConversationsInstance(inst.instanceName)}
+                            className="flex-1 px-3 py-1.5 rounded-lg bg-success/10 text-success text-xs font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-1">
+                            <MessageSquare className="w-3 h-3" /> Conversas
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -346,6 +357,14 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
             </div>
           )}
         </>
+      )}
+
+      {/* Conversations Panel */}
+      {conversationsInstance && (
+        <ConversationsPanel 
+          instanceName={conversationsInstance}
+          onClose={() => setConversationsInstance(null)}
+        />
       )}
     </div>
   );

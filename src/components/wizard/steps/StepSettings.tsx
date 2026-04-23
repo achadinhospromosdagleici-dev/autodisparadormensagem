@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWizard } from '@/contexts/WizardContext';
+import { MessageTemplates } from '../MessageTemplates';
 import {
   Clock,
   MessageSquare,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export function StepSettings() {
-  const { settings, setSettings } = useWizard();
+  const { settings, setSettings, addMessage } = useWizard();
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -240,6 +241,38 @@ export function StepSettings() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Templates Library Toggle */}
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Biblioteca de Templates</p>
+                <p className="text-sm text-muted-foreground">
+                  Salve e reutilize modelos de mensagens
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSettings({ templatesEnabled: !settings.templatesEnabled })}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                settings.templatesEnabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${settings.templatesEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Templates Library Content */}
+        {settings.templatesEnabled && (
+          <div className="glass-card p-6 animate-fade-in">
+            <MessageTemplates onUseTemplate={(content) => addMessage(content)} />
           </div>
         )}
       </div>

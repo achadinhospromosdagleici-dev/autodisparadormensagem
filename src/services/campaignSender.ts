@@ -217,23 +217,36 @@ export async function sendCampaign(
           console.log('[campaignSender] Evolution send result:', result);
         } else if (source === 'unoapi' && unoCreds) {
           // UnoAPI sending
-          if (msg.mediaType === 'buttons' || msg.mediaType === 'link') {
-            // UnoAPI não suporta botões interativos no momento — fallback para texto + URL
-            const fallbackText = msg.linkUrl
+          const unoMsg: UnoApiMessage = { content: personalizedContent };
+          
+          if (msg.mediaType === 'buttons') {
+            // UnoAPI interactive buttons
+            const buttonsToSend = msg.buttons?.map(b => ({
+              id: b.id,
+              title: b.label,
+            })) || [];
+            unoMsg.buttons = buttonsToSend;
+            if (msg.title) unoMsg.header = msg.title;
+            if (msg.footer) unoMsg.footer = msg.footer;
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+          } else if (msg.mediaType === 'link' && msg.linkUrl) {
+            // Link message - send as text with URL
+            const linkText = msg.linkUrl
               ? `${personalizedContent}\n\n${msg.linkUrl}`
               : personalizedContent;
-            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: fallbackText });
-          } else {
-          const unoMsg: UnoApiMessage = { content: personalizedContent };
-          if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
+          } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
+            // Media messages (image, audio, video, document)
             unoMsg.media = {
               type: msg.mediaType,
               url: msg.mediaUrl,
               caption: personalizedCaption || personalizedContent,
               filename: msg.mediaFilename,
             };
-          }
-          await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+          } else {
+            // Text only
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           }
         } else {
           throw new Error(`Nenhuma API disponível para a instância "${senderName}"`);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import {
   GitBranch,
@@ -9,7 +9,18 @@ import {
   CheckCircle2,
   Zap,
   Layers,
+  Loader2,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  setWebhook,
+  removeWebhook,
+  getWebhook,
+  loadEvolutionCredentials,
+} from '@/services/evolution';
+import { getWebhookUrl } from '@/services/messages';
 
 export type FollowUpMode = 'greeting-then-all' | 'greeting-then-one-by-one';
 
@@ -28,7 +39,65 @@ interface FollowUpSettingsProps {
 }
 
 export function FollowUpSettings({ config, onChange }: FollowUpSettingsProps) {
-  const { messages } = useWizard();
+  const { messages, selectedInstances } = useWizard();
+  const [webhookStatus, setWebhookStatus] = useState<'checking' | 'enabled' | 'disabled' | 'error'>('checking');
+  const [webhookUrl, setWebhookUrl] = useState('');
+
+  useEffect(() => {
+    setWebhookUrl(getWebhookUrl());
+    checkWebhookStatus();
+  }, []);
+
+  const checkWebhookStatus = async () => {
+    const creds = loadEvolutionCredentials();
+    if (!creds || selectedInstances.length === 0) {
+      setWebhookStatus('disabled');
+      return;
+    }
+
+    try {
+      const webhookInfo = await getWebhook(creds, selectedInstances[0]);
+      setWebhookStatus(webhookInfo.enabled && webhookInfo.url ? 'enabled' : 'disabled');
+    } catch {
+      setWebhookStatus('error');
+    }
+  };
+
+  const handleToggle = async (enabled: boolean) => {
+    const creds = loadEvolutionCredentials();
+    if (!creds) {
+      toast.error('Conecte a Evolution API primeiro nas Configurações');
+      return;
+    }
+
+    if (selectedInstances.length === 0) {
+      toast.error('Selecione pelo menos uma instância para enviar mensagens');
+      return;
+    }
+
+    const url = getWebhookUrl();
+
+    try {
+      if (enabled) {
+        for (const instanceName of selectedInstances) {
+          await setWebhook(creds, instanceName, url);
+        }
+        toast.success('Webhook configurado! Mensagens serão recebidas.');
+      } else {
+        for (const instanceName of selectedInstances) {
+          await removeWebhook(creds, instanceName);
+        }
+        toast.info('Webhook removido.');
+      }
+      setWebhookStatus(enabled ? 'enabled' : 'disabled');
+    } catch (error: any) {
+      toast.error(`Erro ao configurar webhook: ${error.message}`);
+      setWebhookStatus('error');
+      return;
+    }
+
+    onChange({ ...config, enabled });
+  };
 
   const update = (partial: Partial<FollowUpConfig>) => {
     onChange({ ...config, ...partial });
@@ -39,25 +108,39 @@ export function FollowUpSettings({ config, onChange }: FollowUpSettingsProps) {
       {/* Enable Toggle */}
       <div className="glass-card p-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <GitBranch className="w-5 h-5 text-primary" />
+<div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <GitBranch className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Follow-up Inteligente</p>
+                <p className="text-sm text-muted-foreground">
+                  Envie saudação primeiro e aguarde resposta antes de continuar
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium">Follow-up Inteligente</p>
-              <p className="text-sm text-muted-foreground">
-                Envie saudação primeiro e aguarde resposta antes de continuar
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => update({ enabled: !config.enabled })}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-              config.enabled ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${config.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
+            <div className="flex items-center gap-3">
+              {webhookStatus === 'checking' && (
+                <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+              )}
+              {webhookStatus === 'enabled' && (
+                <span className="text-xs text-success flex items-center gap-1">
+                  <Wifi className="w-3 h-3" /> Webhook ativo
+                </span>
+              )}
+              {webhookStatus === 'error' && (
+                <span className="text-xs text-destructive flex items-center gap-1">
+                  <WifiOff className="w-3 h-3" /> Erro webhook
+                </span>
+              )}
+              <button
+                onClick={() => handleToggle(!config.enabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  config.enabled ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${config.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
         </div>
       </div>
 

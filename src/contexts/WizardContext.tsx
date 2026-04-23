@@ -53,6 +53,7 @@ export interface WizardSettings {
   useAI: boolean;
   messageRandomization: 'random' | 'sequential';
   instanceRandomization: boolean;
+  templatesEnabled: boolean;
 }
 
 interface WizardState {
@@ -122,8 +123,9 @@ const defaultSettings: WizardSettings = {
   maxInterval: 10,
   sendType: 'single',
   useAI: false,
-  messageRandomization: 'random',
+  messageRandomization: 'sequential',
   instanceRandomization: true,
+  templatesEnabled: false,
 };
 
 const defaultFollowUpConfig: FollowUpConfig = {

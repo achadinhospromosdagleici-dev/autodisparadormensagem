@@ -11,7 +11,6 @@ import { FollowUpSettings } from './FollowUpSettings';
 import { Dashboard } from './Dashboard';
 import { CampaignScheduler, ScheduledCampaign } from './CampaignScheduler';
 import { BlacklistManager } from './BlacklistManager';
-import { MessageTemplates } from './MessageTemplates';
 import { ABTesting } from './ABTesting';
 import { AppSidebar, AppView } from '@/components/AppSidebar';
 import { CampaignHistory } from './CampaignHistory';
@@ -42,7 +41,6 @@ const campaignSections = [
   { id: 'data-review', title: 'Revisar e Corrigir', description: 'Valide e edite os dados importados' },
   { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
   { id: 'followup', title: 'Follow-up', description: 'Configure fluxo inteligente', icon: GitBranch },
-  { id: 'templates', title: 'Templates', description: 'Biblioteca de mensagens', icon: FileText },
   { id: 'messages', title: 'Mensagens', description: 'Crie o conteúdo das mensagens' },
   { id: 'ab-testing', title: 'Teste A/B', description: 'Compare variantes', icon: FlaskConical },
   { id: 'instances', title: 'Instâncias', description: 'Escolha os canais de envio' },
@@ -173,16 +171,9 @@ export function WizardLayout() {
             </section>
 
             <section ref={el => sectionRefs.current['followup'] = el} className="scroll-mt-24">
-              <SectionHeader title="Follow-up Inteligente" description="Configure fluxo de saudação e resposta" isComplete onNext={() => scrollToSection('templates')} icon={<GitBranch className="w-6 h-6" />} />
+              <SectionHeader title="Follow-up Inteligente" description="Configure fluxo de saudação e resposta" isComplete onNext={() => scrollToSection('messages')} icon={<GitBranch className="w-6 h-6" />} />
               <div className="mt-4 max-w-3xl mx-auto">
                 <FollowUpSettings config={followUpConfig} onChange={setFollowUpConfig} />
-              </div>
-            </section>
-
-            <section ref={el => sectionRefs.current['templates'] = el} className="scroll-mt-24">
-              <SectionHeader title="Templates" description="Biblioteca de mensagens reutilizáveis" isComplete onNext={() => scrollToSection('messages')} icon={<FileText className="w-6 h-6" />} />
-              <div className="mt-4 max-w-4xl mx-auto">
-                <MessageTemplates onUseTemplate={content => addMessage(content)} />
               </div>
             </section>
 

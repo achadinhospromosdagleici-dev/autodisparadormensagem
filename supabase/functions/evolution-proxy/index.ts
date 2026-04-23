@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, baseUrl, apiKey, instanceName, phoneNumber, to, message } = await req.json();
+    const { action, baseUrl, apiKey, instanceName, phoneNumber, to, message, webhookUrl, events } = await req.json();
 
     if (!baseUrl || !apiKey) {
       return jsonResponse({ error: 'baseUrl and apiKey are required' }, 400);
@@ -294,6 +294,75 @@ Deno.serve(async (req) => {
 
         const sendData = await sendRes.json();
         return jsonResponse({ success: true, data: sendData });
+      }
+
+      // ── WEBHOOK: Configurar webhook para receber mensagens ──
+      case 'setWebhook': {
+        if (!instanceName || !webhookUrl) {
+          return jsonResponse({ error: 'instanceName and webhookUrl are required' }, 400);
+        }
+
+        const webhookRes = await fetch(`${base}/webhook/${instanceName}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            enabled: true,
+            url: webhookUrl,
+            webhookByEvents: false,
+            events: events || ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE'],
+          }),
+        });
+
+        if (!webhookRes.ok) {
+          const text = await webhookRes.text();
+          return jsonResponse({ error: `Erro ao configurar webhook: ${webhookRes.status}`, detail: text }, webhookRes.status);
+        }
+
+        const webhookData = await webhookRes.json();
+        return jsonResponse({ success: true, webhookUrl, data: webhookData });
+      }
+
+      // ── WEBHOOK: Remover webhook ──
+      case 'removeWebhook': {
+        if (!instanceName) {
+          return jsonResponse({ error: 'instanceName is required' }, 400);
+        }
+
+        const removeRes = await fetch(`${base}/webhook/${instanceName}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            enabled: false,
+          }),
+        });
+
+        if (!removeRes.ok) {
+          const text = await removeRes.text();
+          return jsonResponse({ error: `Erro ao remover webhook: ${removeRes.status}`, detail: text }, removeRes.status);
+        }
+
+        return jsonResponse({ success: true, message: 'Webhook removido' });
+      }
+
+      // ── WEBHOOK: Buscar configuração atual ──
+      case 'getWebhook': {
+        if (!instanceName) {
+          return jsonResponse({ error: 'instanceName is required' }, 400);
+        }
+
+        const getRes = await fetch(`${base}/webhook/find/${instanceName}`, { headers });
+
+        if (!getRes.ok) {
+          const text = await getRes.text();
+          return jsonResponse({ error: `Erro ao buscar webhook: ${getRes.status}`, detail: text }, getRes.status);
+        }
+
+        const getData = await getRes.json();
+        return jsonResponse({
+          enabled: getData.enabled || false,
+          url: getData.url || '',
+          events: getData.events || [],
+        });
       }
 
       default:

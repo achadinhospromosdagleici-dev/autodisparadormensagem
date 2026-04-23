@@ -5,61 +5,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function jsonResponse(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { baseUrl, token, endpoint } = await req.json();
+    const body = await req.json();
+    const { baseUrl, token, endpoint, method, body: requestBody } = body;
 
     if (!baseUrl || !token) {
-      return new Response(JSON.stringify({ error: 'baseUrl and token are required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'baseUrl and token are required' }, 400);
     }
 
-    // Only allow specific safe endpoints
-    const allowedEndpoints = ['sessions', 'ping'];
-    const cleanEndpoint = (endpoint || 'sessions').replace(/^\//, '');
-    
-    if (!allowedEndpoints.includes(cleanEndpoint)) {
-      return new Response(JSON.stringify({ error: 'Endpoint not allowed' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const targetUrl = `${baseUrl.replace(/\/$/, '')}/${cleanEndpoint}`;
+    const targetUrl = `${baseUrl.replace(/\/$/, '')}${endpoint || '/sessions'}`;
     
     const response = await fetch(targetUrl, {
+      method: method || 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': token,
       },
+      body: requestBody ? JSON.stringify(requestBody) : undefined,
     });
 
+    let data: any;
     const contentType = response.headers.get('content-type') || '';
-    let body: string;
 
     if (contentType.includes('application/json')) {
-      const data = await response.json();
-      body = JSON.stringify(data);
+      data = await response.json();
     } else {
-      body = await response.text();
-      // Wrap text in JSON
-      body = JSON.stringify({ text: body });
+      const text = await response.text();
+      data = { text, status: response.status };
     }
 
-    return new Response(body, {
-      status: response.status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (!response.ok) {
+      return jsonResponse({ 
+        error: `HTTP ${response.status}`, 
+        details: data 
+      }, response.status);
+    }
+
+    return jsonResponse(data);
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('[unoapi-proxy] Error:', error);
+    return jsonResponse({ error: error.message }, 500);
   }
 });

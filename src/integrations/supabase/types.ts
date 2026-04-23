@@ -14,7 +14,88 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      conversations: {
+        Row: {
+          id: string;
+          instance_name: string;
+          phone_number: string;
+          contact_name: string | null;
+          profile_picture: string | null;
+          last_message_at: string | null;
+          last_message_preview: string | null;
+          unread_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          instance_name: string;
+          phone_number: string;
+          contact_name?: string | null;
+          profile_picture?: string | null;
+          last_message_at?: string | null;
+          last_message_preview?: string | null;
+          unread_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          instance_name?: string;
+          phone_number?: string;
+          contact_name?: string | null;
+          profile_picture?: string | null;
+          last_message_at?: string | null;
+          last_message_preview?: string | null;
+          unread_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          instance_name: string;
+          message_id: string | null;
+          from_me: boolean;
+          phone_number: string;
+          content: string | null;
+          message_type: string | null;
+          media_url: string | null;
+          media_caption: string | null;
+          timestamp: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          instance_name: string;
+          message_id?: string | null;
+          from_me: boolean;
+          phone_number: string;
+          content?: string | null;
+          message_type?: string | null;
+          media_url?: string | null;
+          media_caption?: string | null;
+          timestamp?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          instance_name?: string;
+          message_id?: string | null;
+          from_me?: boolean;
+          phone_number?: string;
+          content?: string | null;
+          message_type?: string | null;
+          media_url?: string | null;
+          media_caption?: string | null;
+          timestamp?: string | null;
+          created_at?: string;
+        };
+      };
     }
     Views: {
       [_ in never]: never

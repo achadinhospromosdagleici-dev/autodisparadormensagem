@@ -20,6 +20,16 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
+  buttons?: Array<{ id: string; title: string }>;
+  list?: {
+    buttonText: string;
+    sections: Array<{
+      title: string;
+      rows: Array<{ id: string; title: string; description?: string }>;
+    }>;
+  };
+  header?: string;
+  footer?: string;
 }
 
 export interface UnoApiInstance {
@@ -60,16 +70,38 @@ function buildApiUrl(baseUrl: string, phoneNumberId: string): string {
 }
 
 // Proxy call via edge function (avoids CORS)
-async function proxyCall(creds: UnoApiCredentials, endpoint: string): Promise<{ ok: boolean; data: any }> {
+async function proxyCall(creds: UnoApiCredentials, endpoint: string, method = 'GET', requestBody?: any): Promise<{ ok: boolean; data: any }> {
   try {
     const { data, error } = await supabase.functions.invoke('unoapi-proxy', {
-      body: { baseUrl: creds.baseUrl, token: creds.token, endpoint },
+      body: { 
+        baseUrl: creds.baseUrl, 
+        token: creds.token, 
+        endpoint,
+        method,
+        body: requestBody,
+      },
     });
     if (error) return { ok: false, data: null };
     return { ok: true, data };
   } catch {
     return { ok: false, data: null };
   }
+}
+
+// Proxy send message (avoids CORS issues)
+async function proxySendMessage(creds: UnoApiCredentials, phoneNumberId: string, payload: any): Promise<any> {
+  const endpoint = `/v15.0/${phoneNumberId}/messages`;
+  const result = await proxyCall(creds, endpoint, 'POST', payload);
+  
+  if (!result.ok || !result.data) {
+    throw new Error(result.data?.error || 'Erro ao enviar mensagem via proxy');
+  }
+  
+  if (result.data.error) {
+    throw new Error(result.data.error);
+  }
+  
+  return result.data;
 }
 
 // Auto-detect Evolution API by trying its fetchInstances endpoint
@@ -215,21 +247,29 @@ export async function sendTextMessage(
   to: string,
   body: string
 ): Promise<any> {
-  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-    method: 'POST',
-    headers: getHeaders(creds.token),
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'text',
-      text: { body },
-    }),
-  });
-  if (!res.ok) {
-    const errorData = await res.text();
-    throw new Error(`Erro ao enviar texto: ${res.status} - ${errorData}`);
+  const payload = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'text',
+    text: { body },
+  };
+  
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    // Fallback to direct fetch if proxy fails
+    console.warn('[unoapi] Proxy failed, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar texto: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
   }
-  return await res.json();
 }
 
 // Send image message
@@ -247,17 +287,22 @@ export async function sendImageMessage(
     image: { link: imageUrl },
   };
   if (caption) payload.image.caption = caption;
-
-  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-    method: 'POST',
-    headers: getHeaders(creds.token),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const errorData = await res.text();
-    throw new Error(`Erro ao enviar imagem: ${res.status} - ${errorData}`);
+  
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for image, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar imagem: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
   }
-  return await res.json();
 }
 
 // Send audio message
@@ -267,21 +312,28 @@ export async function sendAudioMessage(
   to: string,
   audioUrl: string
 ): Promise<any> {
-  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-    method: 'POST',
-    headers: getHeaders(creds.token),
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'audio',
-      audio: { link: audioUrl },
-    }),
-  });
-  if (!res.ok) {
-    const errorData = await res.text();
-    throw new Error(`Erro ao enviar áudio: ${res.status} - ${errorData}`);
+  const payload = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'audio',
+    audio: { link: audioUrl },
+  };
+  
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for audio, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar áudio: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
   }
-  return await res.json();
 }
 
 // Send video message
@@ -299,17 +351,22 @@ export async function sendVideoMessage(
     video: { link: videoUrl },
   };
   if (caption) payload.video.caption = caption;
-
-  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-    method: 'POST',
-    headers: getHeaders(creds.token),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const errorData = await res.text();
-    throw new Error(`Erro ao enviar vídeo: ${res.status} - ${errorData}`);
+  
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for video, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar vídeo: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
   }
-  return await res.json();
 }
 
 // Send document message
@@ -329,17 +386,133 @@ export async function sendDocumentMessage(
   };
   if (filename) payload.document.filename = filename;
   if (caption) payload.document.caption = caption;
-
-  const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-    method: 'POST',
-    headers: getHeaders(creds.token),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const errorData = await res.text();
-    throw new Error(`Erro ao enviar documento: ${res.status} - ${errorData}`);
+  
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for document, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar documento: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
   }
-  return await res.json();
+}
+
+// Send interactive buttons message
+export async function sendInteractiveButtons(
+  creds: UnoApiCredentials,
+  phoneNumberId: string,
+  to: string,
+  body: string,
+  buttons: Array<{ id: string; title: string }>,
+  header?: string,
+  footer?: string
+): Promise<any> {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: body },
+      action: {
+        buttons: buttons.map(btn => ({
+          type: 'reply',
+          reply: { id: btn.id, title: btn.title },
+        })),
+      },
+    },
+  };
+
+  if (header) {
+    payload.interactive.header = { type: 'text', text: header };
+  }
+  if (footer) {
+    payload.interactive.footer = { text: footer };
+  }
+
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for buttons, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar botões: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
+  }
+}
+
+// Send interactive list message
+export async function sendInteractiveList(
+  creds: UnoApiCredentials,
+  phoneNumberId: string,
+  to: string,
+  body: string,
+  buttonText: string,
+  sections: Array<{
+    title: string;
+    rows: Array<{ id: string; title: string; description?: string }>;
+  }>,
+  header?: string,
+  footer?: string
+): Promise<any> {
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: body },
+      action: {
+        button: buttonText,
+        sections: sections.map(section => ({
+          title: section.title,
+          rows: section.rows.map(row => ({
+            id: row.id,
+            title: row.title,
+            description: row.description || '',
+          })),
+        })),
+      },
+    },
+  };
+
+  if (header) {
+    payload.interactive.header = { type: 'text', text: header };
+  }
+  if (footer) {
+    payload.interactive.footer = { text: footer };
+  }
+
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for list, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar lista: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
+  }
 }
 
 // Generic send based on media type
@@ -349,10 +522,39 @@ export async function sendUnoApiMessage(
   to: string,
   message: UnoApiMessage
 ): Promise<any> {
+  // Check for interactive buttons
+  if (message.buttons && message.buttons.length > 0) {
+    return sendInteractiveButtons(
+      creds,
+      phoneNumberId,
+      to,
+      message.content,
+      message.buttons,
+      message.header,
+      message.footer
+    );
+  }
+
+  // Check for interactive list
+  if (message.list) {
+    return sendInteractiveList(
+      creds,
+      phoneNumberId,
+      to,
+      message.content,
+      message.list.buttonText,
+      message.list.sections,
+      message.header,
+      message.footer
+    );
+  }
+
+  // Text only (no media)
   if (!message.media || message.media.type === 'text') {
     return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
 
+  // Media messages
   const { type, url, caption, filename } = message.media;
   if (!url) {
     return sendTextMessage(creds, phoneNumberId, to, message.content);

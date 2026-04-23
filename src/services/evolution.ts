@@ -129,3 +129,45 @@ export async function sendMessage(
     message,
   });
 }
+
+// ── WEBHOOK: Configurar webhook para receber mensagens ──
+export async function setWebhook(
+  creds: EvolutionCredentials,
+  instanceName: string,
+  webhookUrl: string
+): Promise<{ success: boolean; webhookUrl: string }> {
+  return evolutionCall({
+    action: 'setWebhook',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
+    webhookUrl,
+    events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE'],
+  });
+}
+
+// ── WEBHOOK: Remover webhook ──
+export async function removeWebhook(
+  creds: EvolutionCredentials,
+  instanceName: string
+): Promise<{ success: boolean }> {
+  return evolutionCall({
+    action: 'removeWebhook',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
+  });
+}
+
+// ── WEBHOOK: Buscar configuração atual ──
+export async function getWebhook(
+  creds: EvolutionCredentials,
+  instanceName: string
+): Promise<{ enabled: boolean; url: string; events: string[] }> {
+  return evolutionCall({
+    action: 'getWebhook',
+    baseUrl: creds.baseUrl,
+    apiKey: creds.apiKey,
+    instanceName,
+  });
+}
