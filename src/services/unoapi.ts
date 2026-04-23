@@ -41,7 +41,7 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
-  buttons?: Array<{ id: string; title: string }>;
+  buttons?: Array<{ id: string; title: string; url?: string }>;
   list?: {
     buttonText: string;
     sections: Array<{
@@ -435,30 +435,44 @@ export async function sendInteractiveButtons(
   phoneNumberId: string,
   to: string,
   body: string,
-  buttons: Array<{ id: string; title: string }>,
+  buttons: Array<{ id: string; title: string; url?: string }>,
   header?: string,
-  footer?: string
-  ,
+  footer?: string,
   mediaHeader?: { type: 'image' | 'video' | 'document'; url: string; filename?: string }
 ): Promise<any> {
+  // Check if any button has a URL - use URL button format
+  const hasUrlButton = buttons.some(b => b.url);
+
   const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to,
     type: 'interactive',
     interactive: {
-      type: 'button',
+      type: hasUrlButton ? 'button' : 'button',
       body: { text: body },
       action: {
-        buttons: buttons.map(btn => ({
-          type: 'reply',
-          reply: { id: btn.id, title: btn.title },
-        })),
+        buttons: buttons.map(btn => {
+          if (btn.url) {
+            // URL button - opens link when clicked
+            return {
+              type: 'url',
+              url: btn.url,
+              title: btn.title,
+            };
+          } else {
+            // Reply button - sends quick reply
+            return {
+              type: 'reply',
+              reply: { id: btn.id, title: btn.title },
+            };
+          }
+        }),
       },
     },
   };
 
-  if (mediaHeader) {
+if (mediaHeader) {
     // Header com mídia (imagem/vídeo/documento) — formato WhatsApp Cloud API
     if (mediaHeader.type === 'image') {
       payload.interactive.header = { type: 'image', image: { link: mediaHeader.url } };
@@ -467,7 +481,7 @@ export async function sendInteractiveButtons(
     } else if (mediaHeader.type === 'document') {
       payload.interactive.header = {
         type: 'document',
-        document: { link: mediaHeader.url, filename: mediaHeader.filename || 'arquivo' },
+        document: { link: mediaHeader.url, filename: mediaHeader.filename || undefined },
       };
     }
   } else if (header) {

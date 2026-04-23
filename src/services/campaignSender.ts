@@ -226,7 +226,11 @@ export async function sendCampaign(
           
           if (msg.mediaType === 'buttons') {
             // UnoAPI interactive buttons (texto puro com botões)
-            const buttonsToSend = msg.buttons?.map(b => ({ id: b.id, title: b.label })) || [];
+            const buttonsToSend = msg.buttons?.map(b => ({
+              id: b.id,
+              title: b.label,
+              url: b.type === 'url' ? b.value : undefined
+            })) || [];
             unoMsg.buttons = buttonsToSend;
             if (msg.title) unoMsg.header = msg.title;
             if (msg.footer) unoMsg.footer = msg.footer;
@@ -249,7 +253,11 @@ export async function sendCampaign(
                 senderName,
                 phoneNumber,
                 personalizedCaption || personalizedContent,
-                msg.buttons!.map(b => ({ id: b.id, title: b.label })),
+                msg.buttons!.map(b => ({
+                  id: b.id,
+                  title: b.label,
+                  url: b.type === 'url' ? b.value : undefined
+                })),
                 undefined,
                 msg.footer,
                 { type: mt, url: msg.mediaUrl, filename: msg.mediaFilename },
