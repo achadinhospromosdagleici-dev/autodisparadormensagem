@@ -790,12 +790,25 @@ export function StepMessages() {
                     {msg.mediaType === 'buttons' && msg.buttons && msg.buttons.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
                         {msg.buttons.map((b) => (
+                          b.type === 'url' ? (
+                            <a
+                              key={b.id}
+                              href={b.value || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5 hover:bg-primary/10 transition-colors"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              {b.label || `Abrir link`}
+                            </a>
+                          ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
                             {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label}
                           </div>
+                          )
                         ))}
                         {msg.mediaFilename && <p className="text-[10px] text-muted-foreground text-center mt-2">{msg.mediaFilename}</p>}
                       </div>
