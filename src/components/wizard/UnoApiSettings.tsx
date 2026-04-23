@@ -69,10 +69,10 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     if (fetched.length > 0) {
       setInstances(fetched);
       saveManualInstances(fetched);
+      setFetchError(null);
     } else {
-      // Load manual/cached instances as fallback
-      const manual = loadManualInstances();
-      setInstances(manual);
+      // Only show error, don't fallback to manual cache
+      setInstances([]);
       if (error) setFetchError(error);
     }
     setLoadingInstances(false);
@@ -109,6 +109,10 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     }
 
     setIsLoading(true);
+    
+    // Clear old manual instances cache before connecting
+    clearManualInstances();
+    
     const creds: UnoApiCredentials = {
       baseUrl: baseUrl.replace(/\/$/, ''),
       token: token.trim(),
@@ -119,6 +123,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
       saveUnoApiCredentials(creds);
       setIsConnected(true);
       setIsOnline(online);
+      setInstances([]); // Clear any old instances
       onConnectionChange(true);
       
       await loadInstancesFromApi(creds);
@@ -234,7 +239,11 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
               <CheckCircle2 className="w-6 h-6 text-success" />
               <h3 className="font-semibold">Números Conectados</h3>
             </div>
-            <button onClick={() => { const c = loadUnoApiCredentials(); if (c) loadInstancesFromApi(c); }}
+            <button onClick={() => { 
+                clearManualInstances(); // Clear cache first
+                const c = loadUnoApiCredentials(); 
+                if (c) loadInstancesFromApi(c); 
+              }}
               disabled={loadingInstances}
               className="text-xs text-primary hover:underline flex items-center gap-1">
               <RefreshCw className={`w-3 h-3 ${loadingInstances ? 'animate-spin' : ''}`} />
