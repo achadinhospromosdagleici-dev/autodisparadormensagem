@@ -68,6 +68,11 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
     }
+    // Validação de botões opcionais em mídia (image/video/document)
+    if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+      const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
+      if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
+    }
 
     if (mediaType === 'buttons') {
       addRichMessage({
@@ -82,6 +87,16 @@ export function StepMessages() {
         content: newMessage.trim(),
         mediaType: 'link',
         linkUrl: linkUrl.trim(),
+      });
+    } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+      // Mídia + botões anexados (será enviado como interactive com header de mídia)
+      addRichMessage({
+        content: newMessage.trim(),
+        mediaType,
+        mediaUrl: mediaUrl.trim(),
+        mediaCaption: newMessage.trim(),
+        mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+        buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
       });
     } else {
       addMessage(newMessage.trim(), {
