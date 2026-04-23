@@ -262,21 +262,49 @@ export async function sendCampaign(
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           
           if (msg.mediaType === 'buttons') {
-            // UnoAPI interactive buttons (texto puro com botões)
-            const buttonsToSend = msg.buttons?.map(b => ({
-              id: b.id,
-              title: b.label,
-              url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
-              phone: b.type === 'phone' ? replaceButtonValue(b.value, contact) : undefined,
-            })) || [];
-            unoMsg.buttons = buttonsToSend;
-            if (msg.title) unoMsg.header = msg.title;
-            if (msg.footer) unoMsg.footer = msg.footer;
+            // Check if any button is URL - for Baileys, send as text with link instead of buttons
+            const urlButtons = msg.buttons?.filter(b => b.type === 'url') || [];
+            const phoneButtons = msg.buttons?.filter(b => b.type === 'phone') || [];
+            const replyButtons = msg.buttons?.filter(b => b.type === 'reply') || [];
+            
+            // If has URL buttons, include link in message text (works better with Baileys)
+            if (urlButtons.length > 0) {
+              const linksText = urlButtons.map(b => {
+                const linkUrl = replaceButtonValue(b.value, contact);
+                return `🔗 ${b.label}: ${linkUrl}`;
+              }).join('\n');
+              unoMsg.content = `${personalizedContent}\n\n${linksText}`;
+            }
+            
+            // Only send interactive buttons for phone and reply (URL buttons as text above)
+            const interactiveButtons = msg.buttons?.map(b => {
+              if (b.type === 'url') {
+                return null; // Skip URL buttons, sent as text above
+              } else if (b.type === 'phone') {
+                return {
+                  id: b.id,
+                  title: b.label,
+                  phone: replaceButtonValue(b.value, contact),
+                };
+              } else {
+                return {
+                  id: b.id,
+                  title: b.label,
+                };
+              }
+            }).filter(b => b !== null) || [];
+            
+            if (interactiveButtons.length > 0) {
+              unoMsg.buttons = interactiveButtons as Array<{ id: string; title: string; url?: string; phone?: string }>;
+              if (msg.title) unoMsg.header = msg.title;
+              if (msg.footer) unoMsg.footer = msg.footer;
+            }
+            
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           } else if (msg.mediaType === 'link' && msg.linkUrl) {
             // Link message - send as text with URL
             const linkText = msg.linkUrl
-              ? `${personalizedContent}\n\n${msg.linkUrl}`
+              ? `${personalizedContent}\n\n🔗 Link: ${msg.linkUrl}`
               : personalizedContent;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {

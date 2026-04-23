@@ -455,9 +455,14 @@ export async function sendInteractiveButtons(
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
+            // URL button format for WhatsApp Cloud API
+            // signature is optional for tracking clicks per user
             return {
-              type: 'url',
-              url: btn.url,
+              type: 'URL',
+              url: {
+                url: btn.url,
+                signature: to, // Add recipient as signature for tracking
+              },
               title: btn.title,
             };
           } else if (btn.phone) {
