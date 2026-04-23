@@ -80,10 +80,7 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
       return contact[k];
     }
   }
-  return value;
-}
-    return contact[key] || contact[key.toLowerCase()] || `{{${key}}}`;
-  });
+return value;
 }
 
 export interface CampaignMessage {
