@@ -41,7 +41,7 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
-  buttons?: Array<{ id: string; title: string; url?: string }>;
+  buttons?: Array<{ id: string; title: string; url?: string; phone?: string }>;
   list?: {
     buttonText: string;
     sections: Array<{
@@ -435,13 +435,14 @@ export async function sendInteractiveButtons(
   phoneNumberId: string,
   to: string,
   body: string,
-  buttons: Array<{ id: string; title: string; url?: string }>,
+  buttons: Array<{ id: string; title: string; url?: string; phone?: string }>,
   header?: string,
   footer?: string,
   mediaHeader?: { type: 'image' | 'video' | 'document'; url: string; filename?: string }
 ): Promise<any> {
-  // Check if any button has a URL - use URL button format
+  // Check button types
   const hasUrlButton = buttons.some(b => b.url);
+  const hasPhoneButton = buttons.some(b => b.phone);
 
   const payload: any = {
     messaging_product: 'whatsapp',
@@ -449,19 +450,23 @@ export async function sendInteractiveButtons(
     to,
     type: 'interactive',
     interactive: {
-      type: hasUrlButton ? 'button' : 'button',
+      type: 'button',
       body: { text: body },
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
-            // URL button - opens link when clicked
             return {
               type: 'url',
               url: btn.url,
               title: btn.title,
             };
+          } else if (btn.phone) {
+            return {
+              type: 'phone_number',
+              phone_number: btn.phone,
+              title: btn.title,
+            };
           } else {
-            // Reply button - sends quick reply
             return {
               type: 'reply',
               reply: { id: btn.id, title: btn.title },

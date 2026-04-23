@@ -39,12 +39,49 @@ function getRandomInterval(min: number, max: number): number {
 
 function replaceVariables(template: string, contact: Record<string, any>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const keyLower = key.toLowerCase();
+    
     // Handle special {{primeiro_nome}} variable - extract first name from 'nome'
-    if (key.toLowerCase() === 'primeiro_nome') {
-      const nome = contact.nome || contact.Nome || contact.NOME || '';
-      const primeiro = String(nome).trim().split(/\s+/)[0];
-      return primeiro || `{{${key}}}`;
+    if (keyLower === 'primeiro_nome') {
+      let nomeValue = '';
+      for (const k of Object.keys(contact)) {
+        if (k.toLowerCase().includes('nome') && !k.toLowerCase().includes('primeiro')) {
+          nomeValue = contact[k];
+          break;
+        }
+      }
+      if (nomeValue) {
+        const primeiro = String(nomeValue).trim().split(/\s+/)[0];
+        return primeiro || `{{${key}}`;
+      }
+      return `{{${key}}`;
     }
+    
+    // Case-insensitive search for the key
+    for (const k of Object.keys(contact)) {
+      if (k.toLowerCase() === keyLower) {
+        return contact[k];
+      }
+    }
+    
+    return `{{${key}}`;
+  });
+}
+
+// Replace button values with contact data
+function replaceButtonValue(value: string, contact: Record<string, any>): string {
+  // If value contains a variable, replace it
+  if (value.includes('{{')) {
+    return replaceVariables(value, contact);
+  }
+  // If value is exactly a variable name, try to find it
+  for (const k of Object.keys(contact)) {
+    if (k.toLowerCase() === value.toLowerCase()) {
+      return contact[k];
+    }
+  }
+  return value;
+}
     return contact[key] || contact[key.toLowerCase()] || `{{${key}}}`;
   });
 }
@@ -229,7 +266,8 @@ export async function sendCampaign(
             const buttonsToSend = msg.buttons?.map(b => ({
               id: b.id,
               title: b.label,
-              url: b.type === 'url' ? b.value : undefined
+              url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
+              phone: b.type === 'phone' ? replaceButtonValue(b.value, contact) : undefined,
             })) || [];
             unoMsg.buttons = buttonsToSend;
             if (msg.title) unoMsg.header = msg.title;
@@ -256,7 +294,8 @@ export async function sendCampaign(
                 msg.buttons!.map(b => ({
                   id: b.id,
                   title: b.label,
-                  url: b.type === 'url' ? b.value : undefined
+                  url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
+                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact) : undefined,
                 })),
                 undefined,
                 msg.footer,

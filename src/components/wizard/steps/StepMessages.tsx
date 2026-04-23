@@ -514,14 +514,14 @@ export function StepMessages() {
                       </div>
                       {btn.type !== 'reply' && (
                         <input
-                          type={btn.type === 'phone' ? 'tel' : 'url'}
+                          type={btn.type === 'phone' ? 'text' : 'url'}
                           value={btn.value}
                           onChange={(e) => {
                             const next = [...buttons];
                             next[idx] = { ...btn, value: e.target.value };
                             setButtons(next);
                           }}
-                          placeholder={btn.type === 'url' ? 'https://seusite.com/...' : '+5511999999999'}
+                          placeholder={btn.type === 'url' ? 'https://seusite.com/...' : '{{contato}} ou +5511999999999'}
                           className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                         />
                       )}

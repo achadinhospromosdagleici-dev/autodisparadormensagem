@@ -103,6 +103,9 @@ export function StepConfirmation() {
         return obj;
       });
 
+      console.log('[StepConfirmation] contactsData sample:', JSON.stringify(contactsData[0]).substring(0, 300));
+      console.log('[StepConfirmation] messages[0] content:', messages[0]?.content);
+
       const campaignMessages: CampaignMessage[] = messages.map(m => ({
         content: m.content,
         mediaType: (m as any).mediaType || 'text',
