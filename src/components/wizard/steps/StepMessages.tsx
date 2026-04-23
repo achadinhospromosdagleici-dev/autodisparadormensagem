@@ -603,6 +603,18 @@ export function StepMessages() {
                         {btnFooter && <p className="text-[10px] text-muted-foreground text-center mt-2">{btnFooter}</p>}
                       </div>
                     )}
+                    {(mediaType === 'image' || mediaType === 'video' || mediaType === 'document') && buttons.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
+                        {buttons.map((b) => (
+                          <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
+                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
+                            {b.type === 'phone' && <Phone className="w-3 h-3" />}
+                            {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
+                            {b.label || `Botão ${b.type}`}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
