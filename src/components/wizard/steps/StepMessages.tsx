@@ -17,8 +17,11 @@ import {
   Phone,
   ExternalLink,
   X,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
@@ -30,6 +33,7 @@ export function StepMessages() {
   const [mediaType, setMediaType] = useState<EditorMediaType>('text');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFilename, setMediaFilename] = useState('');
+  const [uploading, setUploading] = useState(false);
   // Buttons editor state
   const [btnTitle, setBtnTitle] = useState('');
   const [btnFooter, setBtnFooter] = useState('');
