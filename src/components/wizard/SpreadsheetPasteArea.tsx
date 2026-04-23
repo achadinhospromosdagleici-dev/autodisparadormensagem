@@ -13,6 +13,7 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
   const [resizing, setResizing] = useState<{ colIndex: number; startX: number; startWidth: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
   const minRows = 5;
   const minCols = 4;
@@ -36,7 +37,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
 
   const grid = displayCells();
 
-  // Ensure columnWidths array matches grid columns
   const getColumnWidth = (colIndex: number): number => {
     return columnWidths[colIndex] ?? defaultColWidth;
   };
@@ -64,7 +64,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
     
     setColumnWidths(prev => {
       const newWidths = [...prev];
-      // Ensure array is long enough
       while (newWidths.length <= resizing.colIndex) {
         newWidths.push(defaultColWidth);
       }
@@ -79,7 +78,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
     document.body.style.userSelect = '';
   }, []);
 
-  // Add global mouse event listeners for resizing
   React.useEffect(() => {
     if (resizing) {
       window.addEventListener('mousemove', handleResizeMove);
@@ -91,26 +89,84 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
     }
   }, [resizing, handleResizeMove, handleResizeEnd]);
 
+  const getInputRef = (rowIndex: number, colIndex: number): HTMLInputElement | null => {
+    return inputRefs.current.get(`${rowIndex}-${colIndex}`) || null;
+  };
+
+  const setInputRef = (rowIndex: number, colIndex: number, el: HTMLInputElement | null) => {
+    const key = `${rowIndex}-${colIndex}`;
+    if (el) {
+      inputRefs.current.set(key, el);
+    } else {
+      inputRefs.current.delete(key);
+    }
+  };
+
+  const focusInput = (row: number, col: number) => {
+    const input = getInputRef(row, col);
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  };
+
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
     const text = e.clipboardData.getData('text');
-    
+
     if (!text.trim()) return;
 
     const lines = text.split('\n').filter(line => line.trim());
-    const newCells = lines.map(line => {
+    const pastedData = lines.map(line => {
       const delimiter = line.includes('\t') ? '\t' : ',';
       return line.split(delimiter).map(cell => cell.trim().replace(/^"|"$/g, ''));
     });
 
-    setCells(newCells);
+    const startRow = focusedCell?.row ?? 0;
+    const startCol = focusedCell?.col ?? 0;
+
+    setCells(prev => {
+      const newCells = prev.map(row => [...row]);
+
+      pastedData.forEach((pastedRow, r) => {
+        const targetRow = startRow + r;
+        while (newCells.length <= targetRow) {
+          newCells.push([]);
+        }
+
+        pastedRow.forEach((value, c) => {
+          const targetCol = startCol + c;
+          while (newCells[targetRow].length <= targetCol) {
+            newCells[targetRow].push('');
+          }
+          newCells[targetRow][targetCol] = value;
+        });
+      });
+
+      return newCells;
+    });
+
+    const maxCols = pastedData.reduce((max, row) => Math.max(max, row.length), 0);
+    if (maxCols > columnWidths.length) {
+      setColumnWidths(prev => {
+        const newWidths = [...prev];
+        while (newWidths.length < startCol + maxCols) {
+          newWidths.push(defaultColWidth);
+        }
+        return newWidths;
+      });
+    }
+
+    const lastPastedRow = startRow + pastedData.length - 1;
+    const lastPastedCol = startCol + (pastedData[0]?.length || 1) - 1;
     
-    // Reset column widths for new data
-    const maxCols = Math.max(...newCells.map(row => row.length), minCols);
-    setColumnWidths(new Array(maxCols).fill(defaultColWidth));
-    
+    setTimeout(() => {
+      focusInput(lastPastedRow, lastPastedCol);
+      setFocusedCell({ row: lastPastedRow, col: lastPastedCol });
+    }, 0);
+
     onDataPaste(text);
-  }, [onDataPaste]);
+  }, [focusedCell, columnWidths.length, onDataPaste]);
 
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
     const newCells = [...cells];
@@ -131,24 +187,62 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
     if (e.key === 'Tab') {
       e.preventDefault();
       const nextCol = colIndex + 1;
-      if (nextCol < grid[0].length) {
-        setFocusedCell({ row: rowIndex, col: nextCol });
-      } else if (rowIndex + 1 < grid.length) {
-        setFocusedCell({ row: rowIndex + 1, col: 0 });
+      const maxCols = grid[0].length;
+      const maxRows = grid.length;
+
+      let nextRow = rowIndex;
+      let nextColIndex = nextCol;
+
+      if (nextColIndex >= maxCols) {
+        nextColIndex = 0;
+        nextRow = rowIndex + 1;
+      }
+
+      if (nextRow < maxRows) {
+        setFocusedCell({ row: nextRow, col: nextColIndex });
+        setTimeout(() => focusInput(nextRow, nextColIndex), 0);
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (rowIndex + 1 < grid.length) {
         setFocusedCell({ row: rowIndex + 1, col: colIndex });
+        setTimeout(() => focusInput(rowIndex + 1, colIndex), 0);
       }
     } else if (e.key === 'ArrowDown' && rowIndex + 1 < grid.length) {
+      e.preventDefault();
       setFocusedCell({ row: rowIndex + 1, col: colIndex });
+      setTimeout(() => focusInput(rowIndex + 1, colIndex), 0);
     } else if (e.key === 'ArrowUp' && rowIndex > 0) {
+      e.preventDefault();
       setFocusedCell({ row: rowIndex - 1, col: colIndex });
+      setTimeout(() => focusInput(rowIndex - 1, colIndex), 0);
     } else if (e.key === 'ArrowRight' && colIndex + 1 < grid[0].length) {
+      e.preventDefault();
       setFocusedCell({ row: rowIndex, col: colIndex + 1 });
+      setTimeout(() => focusInput(rowIndex, colIndex + 1), 0);
     } else if (e.key === 'ArrowLeft' && colIndex > 0) {
+      e.preventDefault();
       setFocusedCell({ row: rowIndex, col: colIndex - 1 });
+      setTimeout(() => focusInput(rowIndex, colIndex - 1), 0);
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+    if (e.key === 'Tab') {
+      e.stopPropagation();
+    }
+    handleKeyDown(e, rowIndex, colIndex);
+  };
+
+  const handleInputPaste = (e: React.ClipboardEvent, rowIndex: number, colIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const text = e.clipboardData.getData('text');
+    if (text.trim()) {
+      containerRef.current?.dispatchEvent(new ClipboardEvent('paste', {
+        bubbles: true,
+        clipboardData: e.clipboardData
+      }));
     }
   };
 
@@ -160,7 +254,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
       className="relative rounded-xl border border-border/50 bg-muted/30 overflow-hidden"
       onPaste={handlePaste}
     >
-      {/* Header hint */}
       {!hasData && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 bg-muted/50">
           <Grid3X3 className="w-12 h-12 text-muted-foreground/50 mb-3" />
@@ -169,7 +262,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
         </div>
       )}
 
-      {/* Spreadsheet Grid */}
       <div className="overflow-auto max-h-64 scrollbar-thin" tabIndex={0}>
         <table ref={tableRef} className="border-collapse" style={{ tableLayout: 'fixed' }}>
           <thead className="sticky top-0 z-10">
@@ -188,7 +280,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
                 >
                   {String.fromCharCode(65 + colIndex)}
                   
-                  {/* Resize Handle */}
                   <div
                     className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group hover:bg-primary/50 transition-colors ${
                       resizing?.colIndex === colIndex ? 'bg-primary' : ''
@@ -218,9 +309,11 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
                   >
                     <input
                       type="text"
+                      ref={(el) => setInputRef(rowIndex, colIndex, el)}
                       value={cell}
                       onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
+                      onKeyDown={(e) => handleInputKeyDown(e, rowIndex, colIndex)}
+                      onPaste={(e) => handleInputPaste(e, rowIndex, colIndex)}
                       onFocus={() => setFocusedCell({ row: rowIndex, col: colIndex })}
                       className={`w-full px-3 py-2 text-sm bg-transparent outline-none font-mono transition-colors ${
                         focusedCell?.row === rowIndex && focusedCell?.col === colIndex 
@@ -237,7 +330,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
         </table>
       </div>
 
-      {/* Footer info */}
       {hasData && (
         <div className="px-4 py-2 bg-muted/50 border-t border-border/30 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
