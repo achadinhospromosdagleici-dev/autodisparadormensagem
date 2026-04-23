@@ -34,6 +34,8 @@ import {
   Menu,
 } from 'lucide-react';
 import { ChatwootInbox } from '@/services/chatwoot';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import { cn } from '@/lib/utils';
 
 const campaignSections = [
   { id: 'data-entry', title: 'Importar Dados', description: 'Cole ou importe sua lista de contatos' },
@@ -154,19 +156,6 @@ export function WizardLayout() {
               <p className="text-sm text-muted-foreground">Configure e envie mensagens em massa</p>
             </div>
 
-            {/* Quick nav */}
-            <div className="flex flex-wrap gap-1">
-              {campaignSections.map(section => (
-                <button key={section.id} onClick={() => scrollToSection(section.id)}
-                  className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    isSectionComplete(section.id) ? 'bg-success/20 text-success' : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}>
-                  {isSectionComplete(section.id) && <Check className="w-3 h-3 inline mr-1" />}
-                  {section.title}
-                </button>
-              ))}
-            </div>
-
             {/* Sections */}
             <section ref={el => sectionRefs.current['data-entry'] = el} className="scroll-mt-24">
               <SectionHeader title="Importar Dados" description="Cole ou importe sua lista de contatos" isComplete={data.length > 0} onNext={() => scrollToSection('data-review')} />
@@ -231,28 +220,60 @@ export function WizardLayout() {
   };
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
-        <div className="flex-1 flex flex-col min-h-screen">
-          <header className="h-14 flex items-center border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50 px-4 gap-3">
-            <SidebarTrigger />
-            <div className="flex items-center gap-2">
-              <Send className="w-4 h-4 text-primary" />
-              <span className="font-semibold text-sm">MessageFlow</span>
-            </div>
-            {chatwootConnected && (
-              <span className="ml-auto text-xs bg-success/20 text-success px-2 py-1 rounded-full flex items-center gap-1">
-                <MessageCircle className="w-3 h-3" /> Chatwoot
-              </span>
-            )}
-          </header>
-          <main className="flex-1 p-6 overflow-y-auto pb-12">
-            {renderView()}
-          </main>
+    <TooltipPrimitive.Provider delayDuration={300}>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+          <div className="flex-1 flex flex-col min-h-screen">
+            <header className="h-14 flex items-center border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50 px-4 gap-3">
+              <SidebarTrigger />
+
+              {currentView === 'campaign' && (
+                <>
+                  <div className="flex items-center gap-1">
+                    {campaignSections.map((section, index) => {
+                      const isComplete = isSectionComplete(section.id);
+                      return (
+                        <TooltipPrimitive.Root key={section.id}>
+                          <TooltipPrimitive.Trigger asChild>
+                            <button
+                              onClick={() => scrollToSection(section.id)}
+                              className={cn(
+                                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all',
+                                isComplete 
+                                  ? 'bg-success text-success-foreground' 
+                                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                              )}
+                            >
+                              {index + 1}
+                            </button>
+                          </TooltipPrimitive.Trigger>
+                          <TooltipPrimitive.Portal>
+                            <TooltipPrimitive.Content
+                              sideOffset={5}
+                              className="bg-foreground text-background px-2 py-1 rounded text-xs font-medium z-[100]"
+                            >
+                              {section.title}
+                              <TooltipPrimitive.Arrow className="fill-foreground" />
+                            </TooltipPrimitive.Content>
+                          </TooltipPrimitive.Portal>
+                        </TooltipPrimitive.Root>
+                      );
+                    })}
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    <span className="font-semibold text-sm text-primary">Nexia</span>
+                  </div>
+                </>
+              )}
+            </header>
+            <main className="flex-1 p-6 overflow-y-auto pb-12">
+              {renderView()}
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </TooltipPrimitive.Provider>
   );
 }
 

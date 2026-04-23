@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Send,
@@ -13,6 +13,7 @@ import {
   FlaskConical,
   Calendar,
   LogOut,
+  X,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -26,6 +27,12 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export type AppView =
   | 'dashboard'
@@ -53,6 +60,7 @@ const settingsItems = [
 export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const [logoModalOpen, setLogoModalOpen] = useState(false);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -60,7 +68,10 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
         {/* Logo */}
         <div className="p-4 border-b border-border/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-transparent">
+            <div 
+              className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 bg-transparent cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setLogoModalOpen(true)}
+            >
               <img src="/logo-nexia.png" alt="Nexia" className="w-full h-full object-contain" />
             </div>
             {!collapsed && (
@@ -114,6 +125,22 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* Logo Modal */}
+      <Dialog open={logoModalOpen} onOpenChange={setLogoModalOpen}>
+        <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">Nexia</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center p-4">
+            <img 
+              src="/logo-nexia.png" 
+              alt="Logo Nexia" 
+              className="max-w-full max-h-[60vh] object-contain rounded-lg"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }
