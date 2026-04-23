@@ -240,6 +240,83 @@ export function StepMessages() {
                     />
                   </div>
                 )}
+
+                {/* Botão opcional anexado à mídia (image/video/document) */}
+                {(mediaType === 'image' || mediaType === 'video' || mediaType === 'document') && (
+                  <div className="space-y-2 pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                        <MousePointerClick className="w-3.5 h-3.5" />
+                        Botão de ação (opcional) — {buttons.length}/3
+                      </label>
+                      {buttons.length < 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                          className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Adicionar botão
+                        </button>
+                      )}
+                    </div>
+                    {buttons.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        💡 Adicione um botão (ex: "CLIQUE AQUI") com link, telefone ou resposta rápida — igual ao exemplo do BemCash.
+                      </p>
+                    )}
+                    {buttons.map((btn, idx) => (
+                      <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={btn.type}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, type: e.target.value as MessageButton['type'], value: '' };
+                              setButtons(next);
+                            }}
+                            className="px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
+                          >
+                            <option value="url">🔗 URL</option>
+                            <option value="phone">📞 Telefone</option>
+                            <option value="reply">💬 Resposta</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={btn.label}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, label: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder="Ex: CLIQUE AQUI"
+                            maxLength={20}
+                            className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setButtons(buttons.filter((_, i) => i !== idx))}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {btn.type !== 'reply' && (
+                          <input
+                            type={btn.type === 'phone' ? 'tel' : 'url'}
+                            value={btn.value}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, value: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder={btn.type === 'url' ? 'https://seusite.com/oferta' : '+5511999999999'}
+                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
