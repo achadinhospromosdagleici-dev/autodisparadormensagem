@@ -140,14 +140,7 @@ async function fetchEvolutionInstances(creds: UnoApiCredentials): Promise<{ inst
 
 // Test connection by sending a ping
 export async function testConnection(creds: UnoApiCredentials): Promise<boolean> {
-  // Try Evolution API first
-  const isEvolution = await detectEvolutionApi(creds);
-  if (isEvolution) {
-    // Save detection result
-    localStorage.setItem('api_type_detected', 'evolution');
-    return true;
-  }
-  localStorage.setItem('api_type_detected', 'unoapi');
+  localStorage.setItem('api_type_detected', 'unoapi'); // Force UnoAPI mode
   const result = await proxyCall(creds, 'ping');
   if (result.ok && result.data) {
     const text = typeof result.data === 'string' ? result.data : (result.data.text || JSON.stringify(result.data));
@@ -156,20 +149,16 @@ export async function testConnection(creds: UnoApiCredentials): Promise<boolean>
   return false;
 }
 
+// Force set API type (for testing)
+export function forceSetApiType(type: 'unoapi' | 'evolution'): void {
+  localStorage.setItem('api_type_detected', type);
+}
+
 // Fetch connected instances/phone numbers
 export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instances: UnoApiInstance[]; error?: string }> {
-  // Check if this is an Evolution API
-  const detectedType = localStorage.getItem('api_type_detected');
-  if (detectedType === 'evolution') {
-    return fetchEvolutionInstances(creds);
-  }
-
-  // Try Evolution API detection as fallback
-  const isEvolution = await detectEvolutionApi(creds);
-  if (isEvolution) {
-    localStorage.setItem('api_type_detected', 'evolution');
-    return fetchEvolutionInstances(creds);
-  }
+  // Force UnoAPI mode for this specific UnoAPI URL
+  console.log('[UnoAPI] Fetching instances from:', creds.baseUrl);
+  localStorage.setItem('api_type_detected', 'unoapi');
 
   try {
     const result = await proxyCall(creds, 'sessions');
@@ -236,8 +225,7 @@ export async function fetchInstances(creds: UnoApiCredentials): Promise<{ instan
       };
     }
   }
-
-// Manual instances storage
+}// Manual instances storage
 const MANUAL_INSTANCES_KEY = 'unoapi_manual_instances';
 
 export function saveManualInstances(instances: UnoApiInstance[]): void {

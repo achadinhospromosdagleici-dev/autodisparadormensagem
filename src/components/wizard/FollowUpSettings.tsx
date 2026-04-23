@@ -108,7 +108,7 @@ export function FollowUpSettings({ config, onChange }: FollowUpSettingsProps) {
       {/* Enable Toggle */}
       <div className="glass-card p-4">
         <div className="flex items-center justify-between gap-4">
-<div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <GitBranch className="w-5 h-5 text-primary" />
               </div>
