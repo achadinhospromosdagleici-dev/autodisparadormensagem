@@ -1,7 +1,9 @@
 // Messages Service
 // Manages conversations and messages from WhatsApp webhooks
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as supabaseClient } from '@/integrations/supabase/client';
+// Tables `conversations` and `messages` are managed via webhook and not in generated types
+const supabase: any = supabaseClient;
 
 export interface Conversation {
   id: string;
@@ -83,7 +85,7 @@ export async function getConversation(conversationId: string): Promise<Conversat
 export async function markConversationAsRead(conversationId: string): Promise<void> {
   await supabase
     .from('conversations')
-    .update({ unread_count: 0 } as any)
+    .update({ unread_count: 0 })
     .eq('id', conversationId);
 }
 
