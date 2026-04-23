@@ -68,6 +68,11 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
     }
+    // Validação de botões opcionais em mídia (image/video/document)
+    if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+      const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
+      if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
+    }
 
     if (mediaType === 'buttons') {
       addRichMessage({
@@ -82,6 +87,16 @@ export function StepMessages() {
         content: newMessage.trim(),
         mediaType: 'link',
         linkUrl: linkUrl.trim(),
+      });
+    } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+      // Mídia + botões anexados (será enviado como interactive com header de mídia)
+      addRichMessage({
+        content: newMessage.trim(),
+        mediaType,
+        mediaUrl: mediaUrl.trim(),
+        mediaCaption: newMessage.trim(),
+        mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+        buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
       });
     } else {
       addMessage(newMessage.trim(), {
@@ -223,6 +238,83 @@ export function StepMessages() {
                       placeholder="documento.pdf"
                       className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
+                  </div>
+                )}
+
+                {/* Botão opcional anexado à mídia (image/video/document) */}
+                {(mediaType === 'image' || mediaType === 'video' || mediaType === 'document') && (
+                  <div className="space-y-2 pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                        <MousePointerClick className="w-3.5 h-3.5" />
+                        Botão de ação (opcional) — {buttons.length}/3
+                      </label>
+                      {buttons.length < 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                          className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Adicionar botão
+                        </button>
+                      )}
+                    </div>
+                    {buttons.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        💡 Adicione um botão (ex: "CLIQUE AQUI") com link, telefone ou resposta rápida — igual ao exemplo do BemCash.
+                      </p>
+                    )}
+                    {buttons.map((btn, idx) => (
+                      <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={btn.type}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, type: e.target.value as MessageButton['type'], value: '' };
+                              setButtons(next);
+                            }}
+                            className="px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
+                          >
+                            <option value="url">🔗 URL</option>
+                            <option value="phone">📞 Telefone</option>
+                            <option value="reply">💬 Resposta</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={btn.label}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, label: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder="Ex: CLIQUE AQUI"
+                            maxLength={20}
+                            className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setButtons(buttons.filter((_, i) => i !== idx))}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        {btn.type !== 'reply' && (
+                          <input
+                            type={btn.type === 'phone' ? 'tel' : 'url'}
+                            value={btn.value}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, value: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder={btn.type === 'url' ? 'https://seusite.com/oferta' : '+5511999999999'}
+                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -509,6 +601,18 @@ export function StepMessages() {
                           </div>
                         ))}
                         {btnFooter && <p className="text-[10px] text-muted-foreground text-center mt-2">{btnFooter}</p>}
+                      </div>
+                    )}
+                    {(mediaType === 'image' || mediaType === 'video' || mediaType === 'document') && buttons.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
+                        {buttons.map((b) => (
+                          <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
+                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
+                            {b.type === 'phone' && <Phone className="w-3 h-3" />}
+                            {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
+                            {b.label || `Botão ${b.type}`}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
