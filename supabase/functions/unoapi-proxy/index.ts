@@ -25,8 +25,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'baseUrl and token are required' }, 400);
     }
 
-    const targetUrl = `${baseUrl.replace(/\/$/, '')}${endpoint || '/sessions'}`;
-    
+    // Normalize: strip trailing slash from baseUrl, ensure leading slash on endpoint
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    const rawEndpoint = endpoint || '/sessions';
+    const cleanEndpoint = rawEndpoint.startsWith('/') ? rawEndpoint : `/${rawEndpoint}`;
+    const targetUrl = `${cleanBase}${cleanEndpoint}`;
+
+    console.log('[unoapi-proxy] →', method || 'GET', targetUrl);
+
     const response = await fetch(targetUrl, {
       method: method || 'GET',
       headers: {
