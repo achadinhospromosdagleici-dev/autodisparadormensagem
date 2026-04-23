@@ -22,7 +22,7 @@ const countryPatterns: Record<string, { code: string; minLength: number; maxLeng
   '52': { code: 'MX', minLength: 10, maxLength: 10 }, // Mexico
 };
 
-export function validatePhoneNumber(phone: string): ValidationResult {
+export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode = false): ValidationResult {
   // Remove all non-numeric characters
   const cleaned = phone.replace(/\D/g, '');
   
@@ -50,31 +50,62 @@ export function validatePhoneNumber(phone: string): ValidationResult {
     };
   }
 
-  // Try to identify country code
   let countryCode = '';
   let localNumber = cleaned;
 
-  // Check for known country codes (longest first)
-  for (const code of Object.keys(countryPatterns).sort((a, b) => b.length - a.length)) {
-    if (cleaned.startsWith(code)) {
-      countryCode = code;
-      localNumber = cleaned.slice(code.length);
-      break;
+  // If assumeAlreadyHasCountryCode is true, skip auto-detection
+  if (assumeAlreadyHasCountryCode) {
+    // Check for known country codes to identify format
+    for (const code of Object.keys(countryPatterns).sort((a, b) => b.length - a.length)) {
+      if (cleaned.startsWith(code)) {
+        countryCode = code;
+        localNumber = cleaned.slice(code.length);
+        break;
+      }
     }
-  }
+    // If no known country code found, assume it's Brazilian DDD + number
+    // This happens when user provides DDD without +55 (e.g., 11999999999)
+    if (!countryCode) {
+      // For Brazilian numbers: 10 or 11 digits where first digit of local number is 2-9
+      if (cleaned.length >= 10 && cleaned.length <= 11) {
+        const firstDigit = cleaned[0];
+        if (firstDigit >= '2' && firstDigit <= '9') {
+          // This is likely a Brazilian number (DDD + number) without +55
+          countryCode = '55';
+          localNumber = cleaned;
+        } else {
+          // Length doesn't match typical BR format, assume it's local number
+          countryCode = '55';
+          localNumber = cleaned;
+        }
+      } else {
+        // Assume it's a Brazilian number (common case for this app)
+        countryCode = '55';
+        localNumber = cleaned;
+      }
+    }
+  } else {
+    // Normal mode: try to identify country code
+    for (const code of Object.keys(countryPatterns).sort((a, b) => b.length - a.length)) {
+      if (cleaned.startsWith(code)) {
+        countryCode = code;
+        localNumber = cleaned.slice(code.length);
+        break;
+      }
+    }
 
-  // If no country code found, assume Brazil (+55)
-  if (!countryCode) {
-    // Check if it's a valid Brazilian number without country code
-    if (cleaned.length >= 10 && cleaned.length <= 11) {
-      countryCode = '55';
-      localNumber = cleaned;
-    } else {
-      return {
-        isValid: false,
-        formatted: phone,
-        errorMessage: 'Código de país não identificado',
-      };
+    // If no country code found, assume Brazil (+55)
+    if (!countryCode) {
+      if (cleaned.length >= 10 && cleaned.length <= 11) {
+        countryCode = '55';
+        localNumber = cleaned;
+      } else {
+        return {
+          isValid: false,
+          formatted: phone,
+          errorMessage: 'Código de país não identificado',
+        };
+      }
     }
   }
 

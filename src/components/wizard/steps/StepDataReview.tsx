@@ -173,7 +173,7 @@ export function StepDataReview() {
       let phone = String(newRow.numero || '');
       phone = cleanPhoneValue(phone);
       if (addDDI && phone && !phone.startsWith('55')) phone = '55' + phone;
-      const validation = validatePhoneNumber(phone);
+      const validation = validatePhoneNumber(phone, !addDDI);
       newRow.numero = validation.formatted;
       newRow.isValid = validation.isValid;
       newRow.errorMessage = validation.errorMessage;

@@ -72,7 +72,7 @@ export function StepDataEntry() {
 
         // Validate phone number
         const phoneValue = row.numero as string;
-        const validation = validatePhoneNumber(phoneValue);
+        const validation = validatePhoneNumber(phoneValue, true);
         row.isValid = validation.isValid;
         row.numero = validation.formatted;
         row.errorMessage = validation.errorMessage;
