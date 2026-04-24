@@ -60,8 +60,7 @@ function createMappingOptions(spreadsheetColumns: string[]) {
   ];
 }
 
-// Get current mapping options based on columns
-const getMappingOptions = () => createMappingOptions(columns);
+// Get current mapping options based on columns (defined inside component after columns is available)
 
 function getMappingStyle(value: string) {
   const styles: Record<string, string> = {
@@ -122,6 +121,9 @@ export function StepDataReview() {
 
     return mapping;
   });
+
+  // Get mapping options based on current columns
+  const getMappingOptions = () => createMappingOptions(columns);
 
   const [autoMatchedCols, setAutoMatchedCols] = useState<Set<number>>(() => {
     const matched = new Set<number>();
