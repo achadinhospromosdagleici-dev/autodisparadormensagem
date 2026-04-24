@@ -9,23 +9,59 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 
 type FilterType = 'all' | 'valid' | 'invalid';
 
-const MAPPING_OPTIONS = [
-  { value: 'numero', label: 'Telefone *', icon: '📱', description: 'Número principal (obrigatório)' },
-  { value: 'nome', label: 'Nome', icon: '👤', description: 'Nome do contato' },
-  { value: 'email', label: 'Email', icon: '📧', description: 'Endereço de email' },
-  { value: 'cpf', label: 'CPF', icon: '🪪', description: 'Documento CPF' },
-  { value: 'empresa', label: 'Empresa', icon: '🏢', description: 'Nome da empresa' },
-  { value: 'cidade', label: 'Cidade', icon: '📍', description: 'Cidade/localidade' },
-  { value: 'custom', label: 'Campo Personalizado', icon: '🏷️', description: 'Atributo customizado' },
-  { value: '_skip', label: 'Não importar', icon: '⛔', description: 'Ignorar esta coluna' },
+interface MappingOption {
+  value: string;
+  label: string;
+  icon: string;
+  description: string;
+  native: boolean;
+  separator?: boolean;
+}
+
+// Native mapping options (fixed)
+const NATIVE_MAPPING_OPTIONS: MappingOption[] = [
+  { value: 'numero', label: 'Telefone *', icon: '📱', description: 'Número principal (obrigatório)', native: true },
+  { value: 'nome', label: 'Nome', icon: '👤', description: 'Nome do contato', native: true },
+  { value: 'email', label: 'Email', icon: '📧', description: 'Endereço de email', native: true },
+  { value: 'cpf', label: 'CPF', icon: '🪪', description: 'Documento CPF', native: true },
+  { value: 'empresa', label: 'Empresa', icon: '🏢', description: 'Nome da empresa', native: true },
+  { value: 'cidade', label: 'Cidade', icon: '📍', description: 'Cidade/localidade', native: true },
+  { value: 'custom', label: 'Campo Personalizado', icon: '🏷️', description: 'Atributo customizado', native: true },
+  { value: '_skip', label: 'Não importar', icon: '⛔', description: 'Ignorar esta coluna', native: true },
 ] as const;
+
+// Create dynamic mapping options based on spreadsheet columns
+function createMappingOptions(spreadsheetColumns: string[]) {
+  // Get column names that are NOT in native options (new columns from spreadsheet)
+  const nativeValues = NATIVE_MAPPING_OPTIONS.map(o => o.value);
+  const dynamicColumns = spreadsheetColumns.filter(col => !nativeValues.includes(col));
+
+  // Create options for dynamic columns with their original names
+  const dynamicOptions = dynamicColumns.map(col => ({
+    value: col,
+    label: col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    icon: '📋',
+    description: `Coluna: ${col}`,
+    native: false,
+  }));
+
+  // Return native options + separator + dynamic options
+  return [
+    ...NATIVE_MAPPING_OPTIONS,
+    ...(dynamicOptions.length > 0 ? [{ value: '_separator_', label: '---', icon: '', description: '', native: true, separator: true }] : []),
+    ...dynamicOptions,
+  ];
+}
+
+// Get current mapping options based on columns
+const getMappingOptions = () => createMappingOptions(columns);
 
 function getMappingStyle(value: string) {
   const styles: Record<string, string> = {
@@ -38,7 +74,7 @@ function getMappingStyle(value: string) {
     custom: 'bg-foreground/10 border-foreground/20 text-foreground',
     _skip: 'bg-muted/50 border-muted-foreground/20 text-muted-foreground opacity-60',
   };
-  return styles[value] || styles._skip;
+  return styles[value] || styles.custom;
 }
 
 export function StepDataReview() {
@@ -190,7 +226,7 @@ export function StepDataReview() {
 
   const getMappingOption = (colIndex: number) => {
     const value = columnMapping[colIndex] || '_skip';
-    return MAPPING_OPTIONS.find(o => o.value === value) || MAPPING_OPTIONS[MAPPING_OPTIONS.length - 1];
+    return getMappingOptions().find(o => o.value === value) || getMappingOptions()[getMappingOptions().length - 1];
   };
 
   // Preview what a phone value will look like after cleaning
@@ -456,7 +492,10 @@ export function StepDataReview() {
                           <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-60" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-56">
-                          {MAPPING_OPTIONS.map(opt => (
+                          {getMappingOptions().map((opt, idx) => (
+                            opt.separator ? (
+                              <DropdownMenuSeparator key={`sep-${idx}`} className="my-1" />
+                            ) : (
                             <DropdownMenuItem
                               key={opt.value}
                               onClick={() => handleMappingChange(colIndex, opt.value)}
@@ -468,6 +507,7 @@ export function StepDataReview() {
                               </span>
                               <span className="text-xs text-muted-foreground pl-6">{opt.description}</span>
                             </DropdownMenuItem>
+                            )
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>

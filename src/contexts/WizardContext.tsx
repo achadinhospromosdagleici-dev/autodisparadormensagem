@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Campaign } from '@/components/wizard/CampaignHistory';
 import { ActiveCampaign } from '@/components/wizard/ActiveCampaigns';
 import { ScheduledCampaign } from '@/components/wizard/CampaignScheduler';
@@ -6,6 +6,7 @@ import { ABTest } from '@/components/wizard/ABTesting';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
 import { CampaignMetrics } from '@/components/wizard/Dashboard';
 import { ChatwootInbox } from '@/services/chatwoot';
+import { loadUnoApiCredentials, testConnection } from '@/services/unoapi';
 
 export interface DataRow {
   id: string;
@@ -223,6 +224,39 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const updateRow = (id: string, updates: Partial<DataRow>) => setState(prev => ({ ...prev, data: prev.data.map(row => (row.id === id ? { ...row, ...updates } : row)) }));
   const deleteRow = (id: string) => setState(prev => ({ ...prev, data: prev.data.filter(row => row.id !== id) }));
   const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: prev.data.filter(row => !ids.includes(row.id)) }));
+
+  // Auto-check UnoAPI connection on mount and periodically
+  const checkUnoApiConnection = useRef(false);
+  
+  useEffect(() => {
+    const checkConnection = async () => {
+      // Prevent multiple simultaneous checks
+      if (checkUnoApiConnection.current) return;
+      checkUnoApiConnection.current = true;
+      
+      try {
+        const creds = loadUnoApiCredentials();
+        if (creds) {
+          const isOnline = await testConnection(creds);
+          setUnoApiConnected(isOnline);
+          console.log('[WizardContext] UnoAPI connection checked:', isOnline ? 'online' : 'offline');
+        }
+      } catch (err) {
+        console.error('[WizardContext] UnoAPI connection check failed:', err);
+        setUnoApiConnected(false);
+      } finally {
+        checkUnoApiConnection.current = false;
+      }
+    };
+
+    // Check immediately on mount
+    checkConnection();
+
+    // Check every 30 seconds
+    const interval = setInterval(checkConnection, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
     setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
