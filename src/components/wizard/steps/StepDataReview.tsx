@@ -38,7 +38,7 @@ const NATIVE_MAPPING_OPTIONS: MappingOption[] = [
 ] as const;
 
 // Create dynamic mapping options based on spreadsheet columns
-function createMappingOptions(spreadsheetColumns: string[]) {
+function createMappingOptions(spreadsheetColumns: string[]): MappingOption[] {
   // Get column names that are NOT in native options (new columns from spreadsheet)
   const nativeValues = NATIVE_MAPPING_OPTIONS.map(o => o.value);
   const dynamicColumns = spreadsheetColumns.filter(col => !nativeValues.includes(col));
