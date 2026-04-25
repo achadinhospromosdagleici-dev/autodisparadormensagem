@@ -13,6 +13,9 @@ import { BlacklistManager } from './BlacklistManager';
 import { AppSidebar, AppView } from '@/components/AppSidebar';
 import { CampaignHistory } from './CampaignHistory';
 import { ActiveCampaigns } from './ActiveCampaigns';
+import { SuperAdminPanel } from './SuperAdminPanel';
+import { useAuth } from '@/contexts/AuthContext';
+import { Crown, Clock } from 'lucide-react';
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -45,6 +48,7 @@ export function WizardLayout() {
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [currentView, setCurrentView] = useState<AppView>('campaign');
+  const { isSuperadmin, trialDaysLeft, profile } = useAuth();
 
   const scrollToSection = (id: string) => {
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -72,6 +76,20 @@ export function WizardLayout() {
 
   const renderView = () => {
     switch (currentView) {
+      case 'admin':
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <Crown className="w-6 h-6 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold">Painel do Superadmin</h1>
+                <p className="text-sm text-muted-foreground">Gerencie contas, trials e configurações globais</p>
+              </div>
+            </div>
+            <SuperAdminPanel />
+          </div>
+        );
+
       case 'dashboard':
         return (
           <div className="space-y-6">
@@ -221,6 +239,16 @@ export function WizardLayout() {
                     <span className="font-semibold text-sm text-primary">Nexia</span>
                   </div>
                 </>
+              )}
+              {!isSuperadmin && profile && currentView !== 'campaign' && (
+                <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" /> Trial: {trialDaysLeft}d restante(s)
+                </div>
+              )}
+              {!isSuperadmin && profile && currentView === 'campaign' && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" /> {trialDaysLeft}d
+                </div>
               )}
             </header>
             <main className="flex-1 p-6 overflow-y-auto pb-12">

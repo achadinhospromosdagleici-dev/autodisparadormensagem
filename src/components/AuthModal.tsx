@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClose?: () => void }) {
@@ -10,12 +10,14 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setFullName('');
       setIsSignUp(false);
     }
   }, [isOpen]);
@@ -38,9 +40,9 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
           setLoading(false);
           return;
         }
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, fullName);
         if (error) throw error;
-        toast.success('Conta criada! Verifique seu email para confirmar.');
+        toast.success('Conta criada! Verifique seu email para confirmar. Você tem 3 dias de teste.');
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
@@ -72,6 +74,23 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isSignUp && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nome completo</label>
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Seu nome"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Email</label>
             <div className="relative">

@@ -33,6 +33,26 @@ export function clearEvolutionCredentials(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+// ── Shared Evolution (fallback for trial users) ──
+export async function loadSharedEvolutionCredentials(): Promise<EvolutionCredentials | null> {
+  try {
+    const { data, error } = await (supabase as any).rpc('get_shared_evolution');
+    if (error || !data) return null;
+    const v = data as { baseUrl?: string; apiKey?: string; enabled?: boolean };
+    if (!v.enabled || !v.baseUrl || !v.apiKey) return null;
+    return { baseUrl: v.baseUrl, apiKey: v.apiKey };
+  } catch {
+    return null;
+  }
+}
+
+/** Returns user's own creds if set, otherwise the shared system creds (if enabled). */
+export async function resolveEvolutionCredentials(): Promise<EvolutionCredentials | null> {
+  const own = loadEvolutionCredentials();
+  if (own?.baseUrl && own?.apiKey) return own;
+  return loadSharedEvolutionCredentials();
+}
+
 // ── Generic proxy call ──
 async function evolutionCall(payload: Record<string, any>): Promise<any> {
   const { data, error } = await supabase.functions.invoke('evolution-proxy', {
