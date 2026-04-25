@@ -28,6 +28,9 @@ export interface Message {
   buttons?: MessageButton[];
   // Para tipo 'link': URL clicável anexada ao texto
   linkUrl?: string;
+  // Optional button block title/footer
+  btnTitle?: string;
+  btnFooter?: string;
 }
 
 export interface MessageButton {

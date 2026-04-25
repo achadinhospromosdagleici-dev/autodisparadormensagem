@@ -778,7 +778,6 @@ export function StepMessages() {
                             </a>
                           ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
-                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label || `Botão ${b.type}`}
@@ -804,7 +803,6 @@ export function StepMessages() {
                             </a>
                           ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
-                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label || `Botão ${b.type}`}
@@ -857,7 +855,6 @@ export function StepMessages() {
                             </a>
                           ) : (
                           <div key={b.id} className="w-full py-2 px-3 rounded-md bg-background border border-border/50 text-xs text-center font-medium text-primary flex items-center justify-center gap-1.5">
-                            {b.type === 'url' && <ExternalLink className="w-3 h-3" />}
                             {b.type === 'phone' && <Phone className="w-3 h-3" />}
                             {b.type === 'reply' && <MessageSquare className="w-3 h-3" />}
                             {b.label}

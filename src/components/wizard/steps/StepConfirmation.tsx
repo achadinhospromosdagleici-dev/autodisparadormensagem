@@ -442,6 +442,8 @@ export function StepConfirmation() {
                       return;
                     }
                     addScheduledCampaign({
+                      id: crypto.randomUUID(),
+                      status: 'scheduled',
                       name: scheduleName.trim(),
                       scheduledDate,
                       messageIds: messages.map(m => m.id),
