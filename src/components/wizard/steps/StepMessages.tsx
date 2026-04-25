@@ -49,7 +49,7 @@ export function StepMessages() {
   // Link editor state
   const [linkUrl, setLinkUrl] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
-  const toast = useToast();
+
 
   const isApiUno = selectedApi === 'unoapi';
   const isApiEvo = selectedApi === 'evolution';
