@@ -21,6 +21,7 @@ import {
   Loader2,
   ArrowUp,
   ArrowDown,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,7 +30,7 @@ import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
-  const { messages, columns, addMessage, addRichMessage, updateMessage, deleteMessage, moveMessage, settings, data } =
+  const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data } =
     useWizard();
   const [newMessage, setNewMessage] = useState('');
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -37,6 +38,7 @@ export function StepMessages() {
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaFilename, setMediaFilename] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   // Buttons editor state
   const [btnTitle, setBtnTitle] = useState('');
   const [btnFooter, setBtnFooter] = useState('');
@@ -56,7 +58,6 @@ export function StepMessages() {
   };
 
   const handleAddMessage = () => {
-    // Validações por tipo
     if (mediaType === 'text' && !newMessage.trim()) {
       toast.error('Digite uma mensagem');
       return;
@@ -75,44 +76,58 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
     }
-    // Validação de botões opcionais em mídia (image/video/document)
     if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
       const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
     }
 
-    if (mediaType === 'buttons') {
-      addRichMessage({
-        content: newMessage.trim(),
-        mediaType: 'buttons',
-        buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
-        mediaCaption: btnTitle.trim() || undefined,
-        mediaFilename: btnFooter.trim() || undefined,
-      });
-    } else if (mediaType === 'link') {
-      addRichMessage({
-        content: newMessage.trim(),
-        mediaType: 'link',
-        linkUrl: linkUrl.trim(),
-      });
-    } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
-      // Mídia + botões anexados (será enviado como interactive com header de mídia)
-      addRichMessage({
-        content: newMessage.trim(),
-        mediaType,
-        mediaUrl: mediaUrl.trim(),
-        mediaCaption: newMessage.trim(),
-        mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
-        buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
-      });
+    const isEditing = !!editingMessageId;
+    const baseData = {
+      content: newMessage.trim(),
+      mediaType: mediaType as Message['mediaType'],
+      mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
+      mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
+      mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+    };
+
+    if (isEditing) {
+      updateRichMessage(editingMessageId, baseData);
+      toast.success('Mensagem atualizada');
     } else {
-      addMessage(newMessage.trim(), {
-        mediaType,
-        mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
-        mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
-        mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
-      });
+      if (mediaType === 'buttons') {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'buttons',
+          buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
+          mediaCaption: btnTitle.trim() || undefined,
+          mediaFilename: btnFooter.trim() || undefined,
+        });
+      } else if (mediaType === 'link') {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'link',
+          linkUrl: linkUrl.trim(),
+        });
+      } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType,
+          mediaUrl: mediaUrl.trim(),
+          mediaCaption: newMessage.trim(),
+          mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+          buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
+        });
+      } else {
+        addMessage(newMessage.trim(), {
+          mediaType,
+          mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
+          mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
+          mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+        });
+      }
+      toast.success('Mensagem adicionada');
     }
+
     setNewMessage('');
     setMediaUrl('');
     setMediaFilename('');
@@ -121,7 +136,7 @@ export function StepMessages() {
     setButtons([]);
     setLinkUrl('');
     setMediaType('text');
-    toast.success('Mensagem adicionada');
+    setEditingMessageId(null);
   };
 
   const replaceVariables = (text: string, rowIndex: number) => {
@@ -562,7 +577,7 @@ export function StepMessages() {
               }`}
             >
               <Plus className="w-4 h-4" />
-              Adicionar {mediaType === 'text' ? 'Mensagem' : `Mensagem com ${mediaType === 'image' ? 'Imagem' : mediaType === 'audio' ? 'Áudio' : mediaType === 'video' ? 'Vídeo' : 'Documento'}`}
+              {editingMessageId ? 'Atualizar' : 'Adicionar'} {mediaType === 'text' ? 'Mensagem' : `Mensagem com ${mediaType === 'image' ? 'Imagem' : mediaType === 'audio' ? 'Áudio' : mediaType === 'video' ? 'Vídeo' : 'Documento'}`}
             </button>
           </div>
 
@@ -605,6 +620,24 @@ export function StepMessages() {
                         title="Mover para baixo"
                       >
                         <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingMessageId(msg.id);
+                          setNewMessage(msg.content);
+                          setMediaType(msg.mediaType || 'text');
+                          setMediaUrl(msg.mediaUrl || '');
+                          setMediaFilename(msg.mediaFilename || '');
+                          setBtnTitle(msg.btnTitle || '');
+                          setBtnFooter(msg.btnFooter || '');
+                          setButtons(msg.buttons || []);
+                          setLinkUrl(msg.linkUrl || '');
+                          toast.info('Modo de edição ativado');
+                        }}
+                        className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                        title="Editar mensagem"
+                      >
+                        <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => {

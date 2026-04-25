@@ -90,6 +90,7 @@ interface WizardContextType extends WizardState {
   addMessage: (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => void;
   addRichMessage: (msg: Omit<Message, 'id'>) => void;
   updateMessage: (id: string, content: string) => void;
+  updateRichMessage: (id: string, updates: Partial<Omit<Message, 'id'>>) => void;
   deleteMessage: (id: string) => void;
   moveMessage: (fromIndex: number, toIndex: number) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
@@ -266,6 +267,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), ...msg }] }));
   };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
+  const updateRichMessage = (id: string, updates: Partial<Omit<Message, 'id'>>) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, ...updates } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
   const moveMessage = (fromIndex: number, toIndex: number) => setState(prev => {
     const msgs = [...prev.messages];
@@ -305,7 +307,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     <WizardContext.Provider value={{
       ...state,
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
-      addMessage, addRichMessage, updateMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
+      addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
