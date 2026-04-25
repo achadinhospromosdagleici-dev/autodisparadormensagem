@@ -9,6 +9,7 @@ import {
   X,
   User,
   LogIn,
+  Crown,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -36,7 +37,8 @@ export type AppView =
   | 'campaign'
   | 'settings'
   | 'history'
-  | 'blacklist';
+  | 'blacklist'
+  | 'admin';
 
 interface AppSidebarProps {
   currentView: AppView;
@@ -54,12 +56,16 @@ const settingsItems = [
   { id: 'settings' as AppView, label: 'Configurações', icon: Settings },
 ];
 
+const adminItems = [
+  { id: 'admin' as AppView, label: 'Admin', icon: Crown },
+];
+
 export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const [logoModalOpen, setLogoModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, isSuperadmin, trialDaysLeft, loading, signOut } = useAuth();
 
   // Auto-close modal when logged in
   useEffect(() => {
@@ -128,6 +134,18 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
                   >
                     <item.icon className="w-4 h-4" />
                     <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {isSuperadmin && adminItems.map(item => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    onClick={() => onViewChange(item.id)}
+                    isActive={currentView === item.id}
+                    tooltip={item.label}
+                  >
+                    <item.icon className="w-4 h-4 text-primary" />
+                    <span className="text-primary font-medium">{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
