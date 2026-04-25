@@ -30,11 +30,10 @@ import { cn } from '@/lib/utils';
 const campaignSections = [
   { id: 'data-entry', title: 'Importar Dados', description: 'Cole ou importe sua lista de contatos' },
   { id: 'data-review', title: 'Revisar e Corrigir', description: 'Valide e edite os dados importados' },
-  { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
   { id: 'messages', title: 'Mensagens', description: 'Crie o conteúdo das mensagens' },
   { id: 'instances', title: 'Instâncias', description: 'Escolha os canais de envio' },
-  { id: 'schedule', title: 'Agendamento', description: 'Programe campanhas', icon: Calendar },
-  { id: 'send', title: 'Enviar', description: 'Revise e inicie o disparo' },
+  { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
+  { id: 'send', title: 'Enviar', description: 'Revise e envie ou agende' },
 ];
 
 export function WizardLayout() {
@@ -56,10 +55,10 @@ export function WizardLayout() {
     switch (id) {
       case 'data-entry': return data.length > 0;
       case 'data-review': return data.some(row => row.isValid);
-      case 'settings': return true;
       case 'messages': return messages.length > 0;
       case 'instances': return selectedInstances.length > 0;
-      case 'schedule': return true;
+      case 'settings': return true;
+      case 'send': return false;
       default: return false;
     }
   };
@@ -154,26 +153,19 @@ export function WizardLayout() {
               <div className={`mt-4 ${data.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepDataReview /></div>
             </section>
 
-            <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
-              <SectionHeader title="Configurações de Envio" description="Defina intervalos e opções" isComplete onNext={() => scrollToSection('messages')} />
-              <div className="mt-4"><StepSettings /></div>
-            </section>
-
             <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">
               <SectionHeader title="Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('instances')} />
               <div className="mt-4"><StepMessages /></div>
             </section>
 
             <section ref={el => sectionRefs.current['instances'] = el} className="scroll-mt-24">
-              <SectionHeader title="Instâncias" description="Escolha os canais de envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('schedule')} />
+              <SectionHeader title="Instâncias" description="Escolha os canais de envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('settings')} />
               <div className="mt-4"><StepInstances /></div>
             </section>
 
-            <section ref={el => sectionRefs.current['schedule'] = el} className="scroll-mt-24">
-              <SectionHeader title="Agendamento" description="Programe campanhas futuras" isComplete onNext={() => scrollToSection('send')} icon={<Calendar className="w-6 h-6" />} />
-              <div className="mt-4 max-w-3xl mx-auto">
-                <CampaignScheduler scheduledCampaigns={scheduledCampaigns} onSchedule={handleSchedule} onCancel={cancelScheduledCampaign} contactCount={getValidCount()} messageCount={messages.length} />
-              </div>
+            <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
+              <SectionHeader title="Configurações de Envio" description="Defina intervalos e opções" isComplete onNext={() => scrollToSection('send')} />
+              <div className="mt-4"><StepSettings /></div>
             </section>
 
             <section ref={el => sectionRefs.current['send'] = el} className="scroll-mt-24">

@@ -4,6 +4,7 @@ import { CampaignHistory, Campaign } from '../CampaignHistory';
 import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
 import { loadUnoApiCredentials } from '@/services/unoapi';
 import { loadEvolutionCredentials } from '@/services/evolution';
+import { ScheduledCampaign } from '../CampaignScheduler';
 import {
   Users,
   MessageSquare,
@@ -18,6 +19,7 @@ import {
   Zap,
   XCircle,
   Reply,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,11 +27,15 @@ export function StepConfirmation() {
   const {
     data, messages, instances, selectedInstances, settings,
     getValidCount, campaignHistory, addCampaign, reuseCampaign,
-    unoApiConnected, followUpConfig, updateMetrics,
+    unoApiConnected, followUpConfig, updateMetrics, scheduledCampaigns, addScheduledCampaign,
   } = useWizard();
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleName, setScheduleName] = useState('');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
   const validContacts = getValidCount();
@@ -361,17 +367,105 @@ export function StepConfirmation() {
                 <StopCircle className="w-5 h-5" /> Parar Envio
               </button>
             ) : (
-              <button onClick={handleStartSending}
-                disabled={validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0}
-                className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                  validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0
-                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
-                }`}>
-                <Send className="w-5 h-5" /> Iniciar Envio via {apiLabel}
-              </button>
+              <>
+                <button onClick={handleStartSending}
+                  disabled={validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0}
+                  className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
+                    validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
+                  }`}>
+                  <Send className="w-5 h-5" /> Enviar Agora
+                </button>
+                <button onClick={() => setIsScheduling(true)}
+                  disabled={validContacts === 0 || messages.length === 0 || selectedInstances.length === 0}
+                  className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
+                    validContacts === 0 || messages.length === 0 || selectedInstances.length === 0
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : 'bg-muted text-foreground hover:bg-muted/80 border border-border'
+                  }`}>
+                  <Calendar className="w-5 h-5" /> Agendar
+                </button>
+              </>
             )}
           </div>
+
+          {/* Scheduling Form */}
+          {isScheduling && (
+            <div className="glass-card p-6 space-y-4 animate-fade-in">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Agendar Campanha
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-muted-foreground">Nome da Campanha</label>
+                  <input
+                    type="text"
+                    value={scheduleName}
+                    onChange={(e) => setScheduleName(e.target.value)}
+                    placeholder="Minha campanha"
+                    className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm text-muted-foreground">Data</label>
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground">Horário</label>
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (!scheduleName.trim() || !scheduleDate || !scheduleTime) {
+                      toast.error('Preencha todos os campos');
+                      return;
+                    }
+                    const scheduledDate = new Date(`${scheduleDate}T${scheduleTime}`);
+                    if (scheduledDate <= new Date()) {
+                      toast.error('A data deve ser futura');
+                      return;
+                    }
+                    addScheduledCampaign({
+                      name: scheduleName.trim(),
+                      scheduledDate,
+                      messageIds: messages.map(m => m.id),
+                      contactCount: validContacts,
+                    });
+                    toast.success('Campanha agendada!');
+                    setIsScheduling(false);
+                    setScheduleName('');
+                    setScheduleDate('');
+                    setScheduleTime('');
+                  }}
+                  className="flex-1 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
+                >
+                  Confirmar Agendamento
+                </button>
+                <button
+                  onClick={() => setIsScheduling(false)}
+                  className="px-6 py-3 rounded-lg bg-muted font-medium hover:bg-muted/80"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {!hasRequiredCreds && (
             <p className="text-center text-sm text-muted-foreground">Conecte a Evolution API ou UnoAPI nas Configurações para habilitar o envio</p>
