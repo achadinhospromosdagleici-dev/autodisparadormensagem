@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClose?: () => void }) {
@@ -10,12 +10,14 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setFullName('');
       setIsSignUp(false);
     }
   }, [isOpen]);
@@ -38,9 +40,9 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
           setLoading(false);
           return;
         }
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, fullName);
         if (error) throw error;
-        toast.success('Conta criada! Verifique seu email para confirmar.');
+        toast.success('Conta criada! Verifique seu email para confirmar. Você tem 3 dias de teste.');
       } else {
         const { error } = await signIn(email, password);
         if (error) throw error;
