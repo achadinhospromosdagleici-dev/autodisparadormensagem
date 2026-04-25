@@ -27,14 +27,18 @@ import {
   getQRCode,
   getInstanceStatus,
   logoutInstance,
+  loadSharedEvolutionCredentials,
 } from '@/services/evolution';
 import { ConversationsPanel } from './ConversationsPanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EvolutionConnectionProps {
   onInstancesLoaded?: (instances: EvolutionInstance[]) => void;
 }
 
 export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionProps) {
+  const { isSuperadmin } = useAuth();
+  const [usingShared, setUsingShared] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [newInstanceName, setNewInstanceName] = useState('');
@@ -53,13 +57,26 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
   const pollRef = useRef<ReturnType<typeof setInterval>>();
 
   useEffect(() => {
-    const creds = loadEvolutionCredentials();
-    if (creds) {
-      setBaseUrl(creds.baseUrl);
-      setApiKey(creds.apiKey);
-      setIsConnected(true);
-      handleFetchInstances(creds);
-    }
+    (async () => {
+      const own = loadEvolutionCredentials();
+      if (own) {
+        setBaseUrl(own.baseUrl);
+        setApiKey(own.apiKey);
+        setIsConnected(true);
+        setUsingShared(false);
+        handleFetchInstances(own);
+        return;
+      }
+      // No own creds — try shared (trial fallback)
+      const shared = await loadSharedEvolutionCredentials();
+      if (shared) {
+        setBaseUrl(shared.baseUrl);
+        setApiKey(shared.apiKey);
+        setIsConnected(true);
+        setUsingShared(true);
+        handleFetchInstances(shared);
+      }
+    })();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
@@ -196,6 +213,12 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
 
   return (
     <div className="space-y-4">
+      {usingShared && (
+        <div className="glass-card p-3 border-primary/30 bg-primary/5 text-sm flex items-center gap-2">
+          <Wifi className="w-4 h-4 text-primary" />
+          <span>Você está usando a <strong>Evolution compartilhada</strong> do sistema (período de teste). Crie sua instância abaixo e escaneie o QR para conectar seu WhatsApp.</span>
+        </div>
+      )}
       {/* Status bar */}
       <div className={`glass-card p-4 flex items-center justify-between ${isConnected ? 'border-success/30' : 'border-border/50'}`}>
         <div className="flex items-center gap-3">
