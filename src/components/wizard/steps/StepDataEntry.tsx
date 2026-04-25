@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useWizard, DataRow } from '@/contexts/WizardContext';
 import { validatePhoneNumber, parseCSVLine, detectDelimiter } from '@/utils/phoneValidation';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Table, FileText, ListOrdered } from 'lucide-react';
@@ -9,6 +9,30 @@ export function StepDataEntry() {
   const { setData, setColumns, data, columns, settings, setSettings } = useWizard();
   const [pasteData, setPasteData] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [showPasteArea, setShowPasteArea] = useState(false);
+
+  // Auto-hide paste area when data is processed
+  useEffect(() => {
+    if (data.length > 0 && showPasteArea) {
+      setShowPasteArea(false);
+    }
+  }, [data.length, showPasteArea]);
+
+  // Listen for Ctrl+V globally when paste area is shown
+  useEffect(() => {
+    if (!showPasteArea) return;
+
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData.getData('text');
+      if (text && text.trim()) {
+        processData(text, settings.hasHeader);
+        setShowPasteArea(false);
+      }
+    };
+
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, [showPasteArea, settings.hasHeader]);
 
   const processData = useCallback((text: string, hasHeader: boolean = true) => {
     const lines = text.trim().split('\n').filter(line => line.trim());
@@ -175,6 +199,14 @@ export function StepDataEntry() {
               <FileSpreadsheet className="w-4 h-4 inline-block mr-2" />
               Selecionar Arquivo
             </label>
+            <button
+              onClick={() => setShowPasteArea(true)}
+              className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              title="Colar dados diretamente da planilha (Ctrl+V)"
+            >
+              <Table className="w-4 h-4 inline-block mr-2" />
+              Planilha
+            </button>
           </div>
 
           <div className="flex items-center gap-4 w-full">
@@ -230,29 +262,39 @@ export function StepDataEntry() {
             </div>
           </div>
 
-          {/* Spreadsheet-style Paste Area */}
-          <div className="w-full space-y-3">
-            <div className="flex items-center gap-2">
-              <Table className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">
-                Cole diretamente da planilha (Ctrl+V)
-              </span>
-            </div>
-            
-            <SpreadsheetPasteArea 
-              onDataPaste={(text) => {
-                setPasteData(text);
-                processData(text, settings.hasHeader);
-              }}
-            />
-
-            {data.length > 0 && (
-              <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Dados carregados! Clique em <strong>Avançar</strong> para continuar.</span>
+          {/* Spreadsheet-style Paste Area - Only shown when activated */}
+          {showPasteArea && (
+            <div className="w-full space-y-3 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Table className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">
+                    Cole dados da planilha (Ctrl+V)
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowPasteArea(false)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  ✕ Fechar
+                </button>
               </div>
-            )}
-          </div>
+              
+              <SpreadsheetPasteArea 
+                onDataPaste={(text) => {
+                  setPasteData(text);
+                  processData(text, settings.hasHeader);
+                }}
+              />
+
+              {data.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Dados carregados! Clique em <strong>Avançar</strong> para continuar.</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

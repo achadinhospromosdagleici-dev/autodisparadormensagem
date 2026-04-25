@@ -184,42 +184,59 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+    const maxRows = grid.length;
+    const maxCols = grid[0].length;
+    const isLastRow = rowIndex >= maxRows - 1;
+    const isLastCol = colIndex >= maxCols - 1;
+
     if (e.key === 'Tab') {
       e.preventDefault();
-      const nextCol = colIndex + 1;
-      const maxCols = grid[0].length;
-      const maxRows = grid.length;
-
       let nextRow = rowIndex;
-      let nextColIndex = nextCol;
+      let nextColIndex = colIndex + 1;
 
       if (nextColIndex >= maxCols) {
         nextColIndex = 0;
         nextRow = rowIndex + 1;
       }
 
-      if (nextRow < maxRows) {
+      // Create new row if needed
+      if (nextRow >= maxRows) {
+        setCells(prev => [...prev, Array(maxCols).fill('')]);
+        setFocusedCell({ row: nextRow, col: nextColIndex });
+        setTimeout(() => focusInput(nextRow, nextColIndex), 0);
+      } else {
         setFocusedCell({ row: nextRow, col: nextColIndex });
         setTimeout(() => focusInput(nextRow, nextColIndex), 0);
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (rowIndex + 1 < grid.length) {
-        setFocusedCell({ row: rowIndex + 1, col: colIndex });
-        setTimeout(() => focusInput(rowIndex + 1, colIndex), 0);
+      // Create new row if needed
+      if (rowIndex + 1 >= maxRows) {
+        setCells(prev => [...prev, Array(maxCols).fill('')]);
       }
-    } else if (e.key === 'ArrowDown' && rowIndex + 1 < grid.length) {
-      e.preventDefault();
       setFocusedCell({ row: rowIndex + 1, col: colIndex });
       setTimeout(() => focusInput(rowIndex + 1, colIndex), 0);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const targetRow = isLastRow ? rowIndex + 1 : rowIndex + 1;
+      if (targetRow >= maxRows) {
+        setCells(prev => [...prev, Array(maxCols).fill('')]);
+      }
+      setFocusedCell({ row: targetRow, col: colIndex });
+      setTimeout(() => focusInput(targetRow, colIndex), 0);
     } else if (e.key === 'ArrowUp' && rowIndex > 0) {
       e.preventDefault();
       setFocusedCell({ row: rowIndex - 1, col: colIndex });
       setTimeout(() => focusInput(rowIndex - 1, colIndex), 0);
-    } else if (e.key === 'ArrowRight' && colIndex + 1 < grid[0].length) {
+    } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      setFocusedCell({ row: rowIndex, col: colIndex + 1 });
-      setTimeout(() => focusInput(rowIndex, colIndex + 1), 0);
+      const targetCol = isLastCol ? colIndex + 1 : colIndex + 1;
+      if (targetCol >= maxCols) {
+        setCells(prev => prev.map(row => [...row, '']));
+        setColumnWidths(prev => [...prev, defaultColWidth]);
+      }
+      setFocusedCell({ row: rowIndex, col: targetCol });
+      setTimeout(() => focusInput(rowIndex, targetCol), 0);
     } else if (e.key === 'ArrowLeft' && colIndex > 0) {
       e.preventDefault();
       setFocusedCell({ row: rowIndex, col: colIndex - 1 });

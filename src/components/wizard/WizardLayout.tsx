@@ -33,7 +33,6 @@ const campaignSections = [
   { id: 'messages', title: 'Mensagens', description: 'Crie o conteúdo das mensagens' },
   { id: 'instances', title: 'Instâncias', description: 'Escolha os canais de envio' },
   { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
-  { id: 'send', title: 'Enviar', description: 'Revise e envie ou agende' },
 ];
 
 export function WizardLayout() {
@@ -58,7 +57,6 @@ export function WizardLayout() {
       case 'messages': return messages.length > 0;
       case 'instances': return selectedInstances.length > 0;
       case 'settings': return true;
-      case 'send': return false;
       default: return false;
     }
   };
