@@ -55,13 +55,20 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-background rounded-xl max-w-md w-full p-6 space-y-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold">{isSignUp ? 'Criar Conta' : 'Entrar'}</h2>
-          <p className="text-sm text-muted-foreground">
-            {isSignUp ? 'Crie sua conta para começar' : 'Entre com sua conta'}
-          </p>
+    <div className="fixed inset-0 bg-background flex items-center justify-center z-50 p-4">
+      <div className="bg-card border border-border/50 rounded-xl max-w-md w-full p-6 space-y-6 shadow-2xl">
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-transparent">
+              <img src="/logo-nexia.png" alt="Nexia" className="w-full h-full object-contain" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">{isSignUp ? 'Criar Conta' : 'Entrar no Nexia'}</h2>
+            <p className="text-sm text-muted-foreground">
+              {isSignUp ? 'Crie sua conta para começar' : 'Mais alcance, menos esforço'}
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
