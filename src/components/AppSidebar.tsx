@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Send,
@@ -60,6 +60,13 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
   const [logoModalOpen, setLogoModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const { user, profile, loading, signOut } = useAuth();
+
+  // Auto-close modal when logged in
+  useEffect(() => {
+    if (user && authModalOpen) {
+      setAuthModalOpen(false);
+    }
+  }, [user, authModalOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -124,39 +131,39 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-</SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
-        {/* User Section */}
-        <SidebarFooter>
-          {!loading && (
-            <div className="p-2">
-              {user ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleSignOut}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    {!collapsed && <span>Sair</span>}
-                  </button>
-                </div>
-              ) : (
+      {/* User Section */}
+      <SidebarFooter>
+        {!loading && (
+          <div className="p-2">
+            {user ? (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setAuthModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  onClick={handleSignOut}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
-                  <LogIn className="w-4 h-4" />
-                  {!collapsed && <span>Entrar</span>}
+                  <LogOut className="w-4 h-4" />
+                  {!collapsed && <span>Sair</span>}
                 </button>
-              )}
-            </div>
-          )}
-        </SidebarFooter>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+                {!collapsed && <span>Entrar</span>}
+              </button>
+            )}
+          </div>
+        )}
+      </SidebarFooter>
 
-        {/* Logo Modal */}
+      {/* Logo Modal */}
       <Dialog open={logoModalOpen} onOpenChange={setLogoModalOpen}>
         <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-sm">
           <DialogHeader>
@@ -173,7 +180,7 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
       </Dialog>
 
       {/* Auth Modal */}
-      <AuthModal onClose={() => setAuthModalOpen(false)} />
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </Sidebar>
   );
 }
