@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useWizard } from '@/contexts/WizardContext';
+import { useWizard, Message } from '@/contexts/WizardContext';
 import {
   GitBranch,
   MessageSquare,
@@ -35,10 +35,12 @@ export interface FollowUpConfig {
 interface FollowUpSettingsProps {
   config: FollowUpConfig;
   onChange: (config: FollowUpConfig) => void;
+  messages?: Message[];
 }
 
-export function FollowUpSettings({ config, onChange }: FollowUpSettingsProps) {
-  const { messages, selectedInstances } = useWizard();
+export function FollowUpSettings({ config, onChange, messages: propMessages }: FollowUpSettingsProps) {
+  const { messages: contextMessages, selectedInstances } = useWizard();
+  const messages = propMessages || contextMessages;
   const [webhookStatus, setWebhookStatus] = useState<'checking' | 'enabled' | 'disabled' | 'error'>('checking');
 
   useEffect(() => {

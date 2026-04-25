@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useWizard, MessageButton } from '@/contexts/WizardContext';
+import { useWizard, Message, MessageButton } from '@/contexts/WizardContext';
+import { FollowUpSettings } from '../FollowUpSettings';
 import {
   MessageSquare,
   Plus,
@@ -22,6 +23,7 @@ import {
   ArrowUp,
   ArrowDown,
   Pencil,
+  GitBranch,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +32,7 @@ import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
-  const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data } =
+  const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig } =
     useWizard();
   const [newMessage, setNewMessage] = useState('');
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -45,6 +47,7 @@ export function StepMessages() {
   const [buttons, setButtons] = useState<MessageButton[]>([]);
   // Link editor state
   const [linkUrl, setLinkUrl] = useState('');
+  const [showFollowUp, setShowFollowUp] = useState(false);
 
   const variables = columns.map((col) => `{{${col}}}`);
   // Add dynamic {{primeiro_nome}} variable if 'nome' column exists
@@ -885,6 +888,41 @@ export function StepMessages() {
             </div>
           )}
         </div>
+
+        {/* Floating Follow-up Button */}
+        {messages.length > 1 && (
+          <button
+            onClick={() => setShowFollowUp(true)}
+            className="fixed right-6 bottom-6 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-50"
+            title="Follow-up Inteligente"
+          >
+            <GitBranch className="w-6 h-6" />
+          </button>
+        )}
+
+        {/* Follow-up Modal */}
+        {showFollowUp && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-4 border-b flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <GitBranch className="w-5 h-5 text-primary" />
+                  Follow-up Inteligente
+                </h3>
+                <button onClick={() => setShowFollowUp(false)} className="p-2 hover:bg-muted rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <FollowUpSettings
+                  config={followUpConfig}
+                  onChange={setFollowUpConfig}
+                  messages={messages}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
