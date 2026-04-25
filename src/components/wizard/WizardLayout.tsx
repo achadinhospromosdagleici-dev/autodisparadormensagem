@@ -7,11 +7,9 @@ import { StepMessages } from './steps/StepMessages';
 import { StepInstances } from './steps/StepInstances';
 import { StepConfirmation } from './steps/StepConfirmation';
 import { SettingsPage } from './SettingsPage';
-import { FollowUpSettings } from './FollowUpSettings';
 import { Dashboard } from './Dashboard';
 import { CampaignScheduler, ScheduledCampaign } from './CampaignScheduler';
 import { BlacklistManager } from './BlacklistManager';
-import { ABTesting } from './ABTesting';
 import { AppSidebar, AppView } from '@/components/AppSidebar';
 import { CampaignHistory } from './CampaignHistory';
 import { ActiveCampaigns } from './ActiveCampaigns';
@@ -23,14 +21,7 @@ import {
   Send,
   ChevronDown,
   Check,
-  MessageCircle,
-  BarChart3,
   Calendar,
-  Shield,
-  FileText,
-  FlaskConical,
-  GitBranch,
-  Menu,
 } from 'lucide-react';
 import { ChatwootInbox } from '@/services/chatwoot';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -40,9 +31,7 @@ const campaignSections = [
   { id: 'data-entry', title: 'Importar Dados', description: 'Cole ou importe sua lista de contatos' },
   { id: 'data-review', title: 'Revisar e Corrigir', description: 'Valide e edite os dados importados' },
   { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
-  { id: 'followup', title: 'Follow-up', description: 'Configure fluxo inteligente', icon: GitBranch },
   { id: 'messages', title: 'Mensagens', description: 'Crie o conteúdo das mensagens' },
-  { id: 'ab-testing', title: 'Teste A/B', description: 'Compare variantes', icon: FlaskConical },
   { id: 'instances', title: 'Instâncias', description: 'Escolha os canais de envio' },
   { id: 'schedule', title: 'Agendamento', description: 'Programe campanhas', icon: Calendar },
   { id: 'send', title: 'Enviar', description: 'Revise e inicie o disparo' },
@@ -52,8 +41,8 @@ export function WizardLayout() {
   const {
     data, messages, selectedInstances, chatwootConnected, unoApiConnected,
     setChatwootConnected, setUnoApiConnected, setChatwootInboxes, chatwootInboxes, selectedInboxId, setSelectedInboxId,
-    followUpConfig, setFollowUpConfig, scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
-    abTests, addABTest, removeABTest, metrics, getValidCount, addMessage, campaignHistory,
+    scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
+    metrics, getValidCount, addMessage, campaignHistory,
     activeCampaigns, updateActiveCampaign, removeActiveCampaign,
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -70,7 +59,7 @@ export function WizardLayout() {
       case 'settings': return true;
       case 'messages': return messages.length > 0;
       case 'instances': return selectedInstances.length > 0;
-      case 'followup': case 'templates': case 'ab-testing': case 'schedule': return true;
+      case 'schedule': return true;
       default: return false;
     }
   };
@@ -166,27 +155,13 @@ export function WizardLayout() {
             </section>
 
             <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
-              <SectionHeader title="Configurações de Envio" description="Defina intervalos e opções" isComplete onNext={() => scrollToSection('followup')} />
+              <SectionHeader title="Configurações de Envio" description="Defina intervalos e opções" isComplete onNext={() => scrollToSection('messages')} />
               <div className="mt-4"><StepSettings /></div>
             </section>
 
-            <section ref={el => sectionRefs.current['followup'] = el} className="scroll-mt-24">
-              <SectionHeader title="Follow-up Inteligente" description="Configure fluxo de saudação e resposta" isComplete onNext={() => scrollToSection('messages')} icon={<GitBranch className="w-6 h-6" />} />
-              <div className="mt-4 max-w-3xl mx-auto">
-                <FollowUpSettings config={followUpConfig} onChange={setFollowUpConfig} />
-              </div>
-            </section>
-
             <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">
-              <SectionHeader title="Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('ab-testing')} />
+              <SectionHeader title="Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('instances')} />
               <div className="mt-4"><StepMessages /></div>
-            </section>
-
-            <section ref={el => sectionRefs.current['ab-testing'] = el} className="scroll-mt-24">
-              <SectionHeader title="Teste A/B" description="Compare variantes de mensagens" isComplete onNext={() => scrollToSection('instances')} icon={<FlaskConical className="w-6 h-6" />} />
-              <div className="mt-4 max-w-4xl mx-auto">
-                <ABTesting tests={abTests} onAddTest={addABTest} onRemoveTest={removeABTest} onUseVariant={content => addMessage(content)} />
-              </div>
             </section>
 
             <section ref={el => sectionRefs.current['instances'] = el} className="scroll-mt-24">
