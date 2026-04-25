@@ -70,6 +70,7 @@ function replaceVariables(template: string, contact: Record<string, any>): strin
     // Try partial match - if key is contained in column name
     for (const k of Object.keys(contact)) {
       const kNormalized = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const keyNormalized = keyLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       if (kNormalized.includes(keyNormalized) || keyNormalized.includes(kNormalized)) {
         return contact[k];
       }

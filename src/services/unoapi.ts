@@ -5,10 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
+  s3Enabled?: boolean;   // Whether to use S3 for media uploads
   s3Endpoint?: string;   // S3 endpoint (optional)
   s3AccessKey?: string;  // S3 access key (optional)
   s3SecretKey?: string; // S3 secret key (optional)
   s3Bucket?: string;     // S3 bucket name (optional)
+  s3Region?: string;     // S3 region (optional)
 }
 
 // Default S3 configuration values (can be overridden in panel settings)
