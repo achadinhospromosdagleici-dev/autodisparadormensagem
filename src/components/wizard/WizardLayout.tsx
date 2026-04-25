@@ -240,6 +240,16 @@ export function WizardLayout() {
                   </div>
                 </>
               )}
+              {!isSuperadmin && profile && currentView !== 'campaign' && (
+                <div className="ml-auto flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" /> Trial: {trialDaysLeft}d restante(s)
+                </div>
+              )}
+              {!isSuperadmin && profile && currentView === 'campaign' && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" /> {trialDaysLeft}d
+                </div>
+              )}
             </header>
             <main className="flex-1 p-6 overflow-y-auto pb-12">
               {renderView()}
