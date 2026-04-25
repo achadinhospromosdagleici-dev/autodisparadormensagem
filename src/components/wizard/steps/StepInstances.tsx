@@ -21,9 +21,12 @@ import {
 } from '@/services/unoapi';
 import {
   loadEvolutionCredentials,
+  loadSharedEvolutionCredentials,
+  resolveEvolutionCredentials,
   fetchInstances as fetchEvoInstances,
   EvolutionInstance,
 } from '@/services/evolution';
+import { useSharedEvolution } from '@/hooks/useSharedEvolution';
 
 export function StepInstances() {
   const {
@@ -45,11 +48,25 @@ export function StepInstances() {
   const hasLoadedRef = useRef(false);
 
   const hasEvolution = !!loadEvolutionCredentials();
-  const hasAnyApi = unoApiConnected || hasEvolution;
+  const hasSharedEvolution = useSharedEvolution();
+  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution;
 
   const handleSelectApi = (api: 'unoapi' | 'evolution') => {
     setSelectedApi(api);
   };
+
+  // Auto-detect API on first load
+  useEffect(() => {
+    if (!selectedApi && hasLoadedRef.current !== 'done') {
+      // Auto-select based on what's available
+      if (unoApiConnected) {
+        setSelectedApi('unoapi');
+      } else if (hasEvolution || hasSharedEvolution) {
+        setSelectedApi('evolution');
+      }
+      hasLoadedRef.current = 'done';
+    }
+  }, [unoApiConnected, hasEvolution, hasSharedEvolution]);
 
   useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -107,9 +124,9 @@ export function StepInstances() {
       console.log('[StepInstances] UnoAPI not connected, skipping');
     }
 
-    // Evolution
-    const evoCreds = loadEvolutionCredentials();
-    console.log('[StepInstances] Evolution creds:', evoCreds ? 'found' : 'not found');
+    // Evolution - try user's own first, then shared (for trial users)
+    const evoCreds = await resolveEvolutionCredentials();
+    console.log('[StepInstances] Evolution creds (resolved):', evoCreds ? 'found' : 'not found');
     if (evoCreds) {
       promises.push(
         fetchEvoInstances(evoCreds)
@@ -180,40 +197,18 @@ export function StepInstances() {
 
       {/* API Selection */}
       {hasAnyApi && (
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Phone className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">Escolha a API de Envio</p>
-                <p className="text-sm text-muted-foreground">Selecione qual API será usada para envio</p>
-              </div>
+        <div className="glass-card p-4 border-primary/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Phone className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleSelectApi('unoapi')}
-                disabled={!unoApiConnected || unoInstances.length === 0}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedApi === 'unoapi'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted disabled:opacity-50'
-                }`}
-              >
-                UnoAPI {!unoApiConnected || unoInstances.length === 0 ? '(sem números)' : ''}
-              </button>
-              <button
-                onClick={() => handleSelectApi('evolution')}
-                disabled={!hasEvolution || evoInstances.length === 0}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedApi === 'evolution'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted disabled:opacity-50'
-                }`}
-              >
-                Evolution {!hasEvolution || evoInstances.length === 0 ? '(sem números)' : ''}
-              </button>
+            <div>
+              <p className="font-medium">API de Envio</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedApi === 'unoapi' && 'Usando UnoAPI'}
+                {selectedApi === 'evolution' && 'Usando Evolution'}
+                {!selectedApi && loading ? 'Detectando...' : (!selectedApi && 'Automático')}
+              </p>
             </div>
           </div>
         </div>
