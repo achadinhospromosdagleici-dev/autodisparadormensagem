@@ -26,7 +26,15 @@ import {
   fetchInstances as fetchEvoInstances,
   EvolutionInstance,
 } from '@/services/evolution';
+import {
+  loadEvolutionGoCredentials,
+  isEvolutionGoConnected,
+  fetchEvolutionGoInstances,
+  EvolutionGoInstance,
+} from '@/services/evolutionGo';
 import { useSharedEvolution } from '@/hooks/useSharedEvolution';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function StepInstances() {
   const {
@@ -41,15 +49,39 @@ export function StepInstances() {
     selectedApi,
     setSelectedApi,
   } = useWizard();
+  const { user } = useAuth();
 
   const [unoInstances, setUnoInstances] = useState<UnoApiInstance[]>([]);
   const [evoInstances, setEvoInstances] = useState<EvolutionInstance[]>([]);
+  const [evoGoInstances, setEvoGoInstances] = useState<EvolutionGoInstance[]>([]);
+  const [userInstances, setUserInstances] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef(false);
 
   const hasEvolution = !!loadEvolutionCredentials();
   const hasSharedEvolution = useSharedEvolution();
-  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution;
+  const hasEvolutionGo = isEvolutionGoConnected();
+  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution || hasEvolutionGo;
+
+  // Fetch user's registered instances (for filtering when using shared Evolution)
+  useEffect(() => {
+    async function fetchUserInstances() {
+      if (!user?.id) return;
+      try {
+        const { data } = await (supabase as any)
+          .from('user_instances')
+          .select('instance_name')
+          .eq('user_id', user.id)
+          .eq('status', 'connected');
+        if (data) {
+          setUserInstances(data.map((r: any) => r.instance_name));
+        }
+      } catch (err) {
+        console.error('Error fetching user instances:', err);
+      }
+    }
+    fetchUserInstances();
+  }, [user]);
 
   const handleSelectApi = (api: 'unoapi' | 'evolution') => {
     setSelectedApi(api);
@@ -58,15 +90,16 @@ export function StepInstances() {
   // Auto-detect API on first load
   useEffect(() => {
     if (!selectedApi && hasLoadedRef.current !== 'done') {
-      // Auto-select based on what's available
       if (unoApiConnected) {
         setSelectedApi('unoapi');
+      } else if (hasEvolutionGo) {
+        setSelectedApi('evolution-go');
       } else if (hasEvolution || hasSharedEvolution) {
         setSelectedApi('evolution');
       }
       hasLoadedRef.current = 'done';
     }
-  }, [unoApiConnected, hasEvolution, hasSharedEvolution]);
+  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo]);
 
   useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -141,20 +174,49 @@ export function StepInstances() {
       );
     }
 
+    // Evolution Go
+    if (hasEvolutionGo) {
+      const evoGoCreds = loadEvolutionGoCredentials();
+      if (evoGoCreds) {
+        promises.push(
+          fetchEvolutionGoInstances(evoGoCreds)
+            .then((fetched) => {
+              console.log('[StepInstances] Evolution Go instances fetched:', fetched);
+              setEvoGoInstances(fetched);
+            })
+            .catch((err) => {
+              console.error('[StepInstances] Evolution Go fetch error:', err);
+              setEvoGoInstances([]);
+            })
+        );
+      }
+    }
+
     await Promise.all(promises);
     console.log('[StepInstances] All instances loaded, unoApiConnected:', unoApiConnected);
     setLoading(false);
   };
 
-  // Merge all sources into unified Instance[]
+// Merge all sources into unified Instance[]
+  // When using shared Evolution, only show user's own registered instances
+  const shouldFilterByUser = hasSharedEvolution && userInstances.length > 0;
   const mergedInstances: Instance[] = [
-    ...evoInstances.map((ei) => ({
-      id: `evo_${ei.instanceName}`,
+    ...evoGoInstances.map((ei) => ({
+      id: `evogo_${ei.instanceName}`,
       name: ei.profileName || ei.instanceName,
       status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
       phoneNumber: ei.phone || undefined,
-      source: 'evolution' as const,
+      source: 'evolution-go' as const,
     })),
+    ...evoInstances
+      .filter((ei) => !shouldFilterByUser || userInstances.includes(ei.instanceName))
+      .map((ei) => ({
+        id: `evo_${ei.instanceName}`,
+        name: ei.profileName || ei.instanceName,
+        status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
+        phoneNumber: ei.phone || undefined,
+        source: 'evolution' as const,
+      })),
     ...(unoApiConnected && unoInstances.length > 0
       ? unoInstances.map((ui) => ({
           id: `uno_${ui.phone}`,
@@ -164,7 +226,6 @@ export function StepInstances() {
           source: 'unoapi' as const,
         }))
       : []),
-    // Default instances only if no API instances
   ];
 
   const displayInstances = mergedInstances.length > 0 ? mergedInstances : instances.map(i => ({ ...i, source: 'default' as const }));
@@ -187,6 +248,7 @@ export function StepInstances() {
   };
 
   const getSourceBadge = (source: string) => {
+    if (source === 'evolution-go') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 font-medium">EvoGo</span>;
     if (source === 'evolution') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Evolution</span>;
     if (source === 'unoapi') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">UnoAPI</span>;
     return null;

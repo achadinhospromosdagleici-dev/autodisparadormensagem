@@ -24,12 +24,14 @@ import {
   ArrowDown,
   Pencil,
   GitBranch,
+  List,
+  LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
 
-type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
+type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
 
 export function StepMessages() {
   const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig, selectedApi } =
@@ -48,16 +50,24 @@ export function StepMessages() {
   const [buttons, setButtons] = useState<MessageButton[]>([]);
   // Link editor state
   const [linkUrl, setLinkUrl] = useState('');
+  // List editor state
+  const [listSections, setListSections] = useState<{ title: string; rows: { title: string; description: string }[] }[]>([]);
+  // Carousel editor state
+  const [carouselCards, setCarouselCards] = useState<{ image?: string; title: string; description: string; footer?: string; buttons: MessageButton[] }[]>([]);
   const [showFollowUp, setShowFollowUp] = useState(false);
 
 
   const isApiUno = selectedApi === 'unoapi';
   const isApiEvo = selectedApi === 'evolution';
+  const isApiEvoGo = selectedApi === 'evolution-go';
 
   // Check if feature is supported by current API
   const isFeatureSupported = (type: EditorMediaType) => {
-    if (type === 'buttons' && isApiEvo) return false;
-    if (type === 'link' && isApiEvo) return false;
+    // Buttons & Link - supported by all (unoapi, evo, evogo)
+    if (type === 'buttons') return !isApiEvo;
+    if (type === 'link') return !isApiEvo;
+    // List & Carousel - only Evolution Go
+    if (type === 'list' || type === 'carousel') return isApiEvoGo;
     return true;
   };
 
@@ -91,6 +101,18 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
     }
+    if (mediaType === 'list') {
+      if (!newMessage.trim()) { toast.error('Digite a descrição da lista'); return; }
+      if (!btnTitle.trim()) { toast.error('Digite o título da lista'); return; }
+      if (listSections.length === 0) { toast.error('Adicione pelo menos uma seção com itens'); return; }
+      const invalidSection = listSections.find(s => !s.title.trim() || s.rows.length === 0);
+      if (invalidSection) { toast.error('Cada seção precisa de título e pelo menos um item'); return; }
+    }
+    if (mediaType === 'carousel') {
+      if (carouselCards.length === 0) { toast.error('Adicione pelo menos um card'); return; }
+      const invalidCard = carouselCards.find(c => !c.title.trim());
+      if (invalidCard) { toast.error('Cada card precisa de um título'); return; }
+    }
     if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
       const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
@@ -123,6 +145,21 @@ export function StepMessages() {
           mediaType: 'link',
           linkUrl: linkUrl.trim(),
         });
+      } else if (mediaType === 'list' && isApiEvoGo) {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'list',
+          title: btnTitle.trim(),
+          btnTitle: 'Selecionar',
+          btnFooter: btnFooter.trim(),
+          buttons: listSections as Message['buttons'],
+        });
+      } else if (mediaType === 'carousel' && isApiEvoGo) {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'carousel',
+          buttons: carouselCards as Message['buttons'],
+        });
       } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
         addRichMessage({
           content: newMessage.trim(),
@@ -150,6 +187,8 @@ export function StepMessages() {
     setBtnFooter('');
     setButtons([]);
     setLinkUrl('');
+    setListSections([]);
+    setCarouselCards([]);
     setMediaType('text');
     setEditingMessageId(null);
   };
@@ -183,6 +222,10 @@ export function StepMessages() {
     { type: 'document' as EditorMediaType, icon: FileText, label: 'Documento' },
     { type: 'link' as EditorMediaType, icon: ExternalLink, label: 'Link' },
     { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
+    ...(isApiEvoGo ? [
+      { type: 'list' as EditorMediaType, icon: List, label: 'Lista' },
+      { type: 'carousel' as EditorMediaType, icon: LayoutGrid, label: 'Carrossel' },
+    ] : []),
   ];
 
   const mediaIcon = (type?: string) => {
@@ -193,6 +236,8 @@ export function StepMessages() {
       case 'document': return '📄';
       case 'buttons': return '🔘';
       case 'link': return '🔗';
+      case 'list': return '📋';
+      case 'carousel': return '🎠';
       default: return '📝';
     }
   };
@@ -579,6 +624,283 @@ export function StepMessages() {
               </div>
             )}
 
+            {/* List editor - only for Evolution Go */}
+            {mediaType === 'list' && isApiEvoGo && (
+              <div className="space-y-3 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Título da Lista</label>
+                    <input
+                      type="text"
+                      value={btnTitle}
+                      onChange={(e) => setBtnTitle(e.target.value)}
+                      placeholder="Ex: Nossos Produtos"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Botão</label>
+                    <input
+                      type="text"
+                      value={btnFooter}
+                      onChange={(e) => setBtnFooter(e.target.value)}
+                      placeholder="Ex: Ver opções"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground font-medium">
+                      Seções ({listSections.length})
+                    </label>
+                    {listSections.length < 2 && (
+                      <button
+                        type="button"
+                        onClick={() => setListSections([...listSections, { title: '', rows: [] }])}
+                        className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Adicionar seção
+                      </button>
+                    )}
+                  </div>
+
+                  {listSections.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/50 rounded-lg">
+                      Adicione seções para organizar os itens da lista
+                    </p>
+                  )}
+
+                  {listSections.map((section, sIdx) => (
+                    <div key={sIdx} className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={section.title}
+                          onChange={(e) => {
+                            const next = [...listSections];
+                            next[sIdx] = { ...section, title: e.target.value };
+                            setListSections(next);
+                          }}
+                          placeholder={`Título da seção ${sIdx + 1}`}
+                          className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = listSections.filter((_, i) => i !== sIdx);
+                            setListSections(next);
+                          }}
+                          className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5 pl-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] text-muted-foreground">Itens ({section.rows.length})</label>
+                          {section.rows.length < 10 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...listSections];
+                                next[sIdx].rows = [...section.rows, { title: '', description: '' }];
+                                setListSections(next);
+                              }}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+                            >
+                              <Plus className="w-3 h-3 inline" /> Item
+                            </button>
+                          )}
+                        </div>
+                        {section.rows.map((row, rIdx) => (
+                          <div key={rIdx} className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={row.title}
+                              onChange={(e) => {
+                                const next = [...listSections];
+                                next[sIdx].rows[rIdx].title = e.target.value;
+                                setListSections(next);
+                              }}
+                              placeholder="Título do item"
+                              className="flex-1 px-2 py-1 rounded-md bg-background border border-border/50 text-xs"
+                            />
+                            <input
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => {
+                                const next = [...listSections];
+                                next[sIdx].rows[rIdx].description = e.target.value;
+                                setListSections(next);
+                              }}
+                              placeholder="Descrição"
+                              className="flex-1 px-2 py-1 rounded-md bg-background border border-border/50 text-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...listSections];
+                                next[sIdx].rows = section.rows.filter((_, i) => i !== rIdx);
+                                setListSections(next);
+                              }}
+                              className="p-1 rounded text-destructive hover:bg-destructive/10"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground bg-purple-500/5 border border-purple-500/20 rounded-md p-2">
+                  📋 Lista interativa - o usuário vê um menu com as opções organizadas em seções.
+                </p>
+              </div>
+            )}
+
+            {/* Carousel editor - only for Evolution Go */}
+            {mediaType === 'carousel' && isApiEvoGo && (
+              <div className="space-y-3 animate-fade-in">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground font-medium">
+                      Cards ({carouselCards.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCarouselCards([...carouselCards, { image: '', title: '', description: '', footer: '', buttons: [] }])}
+                      className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Adicionar card
+                    </button>
+                  </div>
+
+                  {carouselCards.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/50 rounded-lg">
+                      Adicione cards com imagens e botões
+                    </p>
+                  )}
+
+                  {carouselCards.map((card, cIdx) => (
+                    <div key={cIdx} className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">Card {cIdx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setCarouselCards(carouselCards.filter((_, i) => i !== cIdx))}
+                          className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <input
+                        type="url"
+                        value={card.image || ''}
+                        onChange={(e) => {
+                          const next = [...carouselCards];
+                          next[cIdx].image = e.target.value;
+                          setCarouselCards(next);
+                        }}
+                        placeholder="URL da imagem (opcional)"
+                        className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
+                      />
+
+                      <input
+                        type="text"
+                        value={card.title}
+                        onChange={(e) => {
+                          const next = [...carouselCards];
+                          next[cIdx].title = e.target.value;
+                          setCarouselCards(next);
+                        }}
+                        placeholder="Título do card"
+                        className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
+                      />
+
+                      <input
+                        type="text"
+                        value={card.description}
+                        onChange={(e) => {
+                          const next = [...carouselCards];
+                          next[cIdx].description = e.target.value;
+                          setCarouselCards(next);
+                        }}
+                        placeholder="Descrição (opcional)"
+                        className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
+                      />
+
+                      <div className="flex items-center gap-1">
+                        <label className="text-[10px] text-muted-foreground">Botões:</label>
+                        {(card.buttons || []).length < 2 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...carouselCards];
+                              next[cIdx].buttons = [...(card.buttons || []), { id: crypto.randomUUID(), type: 'reply', label: '', value: '' }];
+                              setCarouselCards(next);
+                            }}
+                            className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary"
+                          >
+                            <Plus className="w-2 h-2 inline" />
+                          </button>
+                        )}
+                      </div>
+
+                      {(card.buttons || []).map((btn, bIdx) => (
+                        <div key={btn.id} className="flex items-center gap-1 pl-2">
+                          <select
+                            value={btn.type}
+                            onChange={(e) => {
+                              const next = [...carouselCards];
+                              next[cIdx].buttons[bIdx].type = e.target.value as MessageButton['type'];
+                              setCarouselCards(next);
+                            }}
+                            className="px-1 py-0.5 rounded bg-background border border-border/50 text-[10px]"
+                          >
+                            <option value="reply">Resposta</option>
+                            <option value="url">URL</option>
+                            <option value="phone">Telefone</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={btn.label}
+                            onChange={(e) => {
+                              const next = [...carouselCards];
+                              next[cIdx].buttons[bIdx].label = e.target.value;
+                              setCarouselCards(next);
+                            }}
+                            placeholder="Label"
+                            className="flex-1 px-1 py-0.5 rounded bg-background border border-border/50 text-[10px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...carouselCards];
+                              next[cIdx].buttons = card.buttons.filter((_, i) => i !== bIdx);
+                              setCarouselCards(next);
+                            }}
+                            className="p-0.5 text-destructive"
+                          >
+                            <X className="w-2 h-2" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground bg-purple-500/5 border border-purple-500/20 rounded-md p-2">
+                  🎠 Carrossel - vários cards em sequência com imagem e botões.
+                </p>
+              </div>
+            )}
+
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -886,6 +1208,40 @@ export function StepMessages() {
                           )
                         ))}
                         {msg.mediaFilename && <p className="text-[10px] text-muted-foreground text-center mt-2">{msg.mediaFilename}</p>}
+                      </div>
+                    )}
+
+                    {msg.mediaType === 'list' && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-[10px] text-purple-600 font-medium mb-1">📋 Lista Interativa</p>
+                        <div className="text-xs text-muted-foreground">
+                          {msg.title && <p className="font-bold">{msg.title}</p>}
+                          {msg.buttons && Array.isArray(msg.buttons) && msg.buttons.map((section: any, sIdx: number) => (
+                            <div key={sIdx} className="mt-2">
+                              <p className="font-medium text-purple-600">{section.title}</p>
+                              {section.rows?.map((row: any, rIdx: number) => (
+                                <p key={rIdx} className="pl-2 text-muted-foreground">• {row.title}</p>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {msg.mediaType === 'carousel' && (
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-[10px] text-purple-600 font-medium mb-1">🎠 Carrossel ({msg.buttons?.length || 0} cards)</p>
+                        <div className="text-xs text-muted-foreground">
+                          {msg.buttons && Array.isArray(msg.buttons) && msg.buttons.map((card: any, cIdx: number) => (
+                            <div key={cIdx} className="mt-1 p-2 rounded bg-muted/30">
+                              <p className="font-medium">{card.title || `Card ${cIdx + 1}`}</p>
+                              {card.description && <p className="text-muted-foreground">{card.description}</p>}
+                              {card.buttons?.length > 0 && (
+                                <p className="text-[10px] mt-1">{card.buttons.length} botão(ões)</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -20,7 +20,7 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
@@ -79,7 +79,7 @@ interface WizardState {
   abTests: ABTest[];
   metrics: CampaignMetrics;
   activeCampaigns: ActiveCampaign[];
-  selectedApi: 'unoapi' | 'evolution' | null;
+  selectedApi: 'unoapi' | 'evolution' | 'evolution-go' | null;
 }
 
 interface WizardContextType extends WizardState {
@@ -112,7 +112,7 @@ interface WizardContextType extends WizardState {
   setChatwootInboxes: (inboxes: ChatwootInbox[]) => void;
   setSelectedInboxId: (id: number | null) => void;
   setFollowUpConfig: (config: FollowUpConfig) => void;
-  setSelectedApi: (api: 'unoapi' | 'evolution' | null) => void;
+  setSelectedApi: (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => void;
   addScheduledCampaign: (campaign: ScheduledCampaign) => void;
   cancelScheduledCampaign: (id: string) => void;
   addABTest: (test: ABTest) => void;
@@ -300,7 +300,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
-  const setSelectedApi = (api: 'unoapi' | 'evolution' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
+  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
   const addScheduledCampaign = (campaign: ScheduledCampaign) => setState(prev => ({ ...prev, scheduledCampaigns: [...prev.scheduledCampaigns, campaign] }));
   const cancelScheduledCampaign = (id: string) => setState(prev => ({ ...prev, scheduledCampaigns: prev.scheduledCampaigns.map(c => c.id === id ? { ...c, status: 'cancelled' as const } : c) }));
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));

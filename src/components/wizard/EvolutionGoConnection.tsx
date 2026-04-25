@@ -3,39 +3,36 @@ import { Smartphone, Link2, Unlink, Loader2, Eye, EyeOff, QrCode, RefreshCw, Che
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  EvolutionCredentials,
-  EvolutionInstance,
-  saveEvolutionCredentials,
-  loadEvolutionCredentials,
-  clearEvolutionCredentials,
-  fetchInstances,
-  findOrCreateInstance,
-  getQRCode,
-  getInstanceStatus,
-  logoutInstance,
-  loadSharedEvolutionCredentials,
-} from '@/services/evolution';
+  EvolutionGoCredentials,
+  EvolutionGoInstance,
+  saveEvolutionGoCredentials,
+  loadEvolutionGoCredentials,
+  clearEvolutionGoCredentials,
+  fetchEvolutionGoInstances,
+  findOrCreateEvolutionGoInstance,
+  getEvolutionGoQRCode,
+  getEvolutionGoInstanceStatus,
+  logoutEvolutionGoInstance,
+} from '@/services/evolutionGo';
 import { ConversationsPanel } from './ConversationsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface EvolutionConnectionProps {
-  onInstancesLoaded?: (instances: EvolutionInstance[]) => void;
+interface EvolutionGoConnectionProps {
+  onInstancesLoaded?: (instances: EvolutionGoInstance[]) => void;
 }
 
-export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionProps) {
-  const { isSuperadmin } = useAuth();
-  const [usingShared, setUsingShared] = useState(false);
+export function EvolutionGoConnection({ onInstancesLoaded }: EvolutionGoConnectionProps) {
+  const { user } = useAuth();
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [newInstanceName, setNewInstanceName] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [instances, setInstances] = useState<EvolutionInstance[]>([]);
+  const [instances, setInstances] = useState<EvolutionGoInstance[]>([]);
   const [loadingInstances, setLoadingInstances] = useState(false);
   const [conversationsInstance, setConversationsInstance] = useState<string | null>(null);
 
-  // QR flow
   const [activeInstance, setActiveInstance] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [timer, setTimer] = useState(30);
@@ -44,23 +41,12 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
 
   useEffect(() => {
     (async () => {
-      const own = loadEvolutionCredentials();
-      if (own) {
-        setBaseUrl(own.baseUrl);
-        setApiKey(own.apiKey);
+      const creds = loadEvolutionGoCredentials();
+      if (creds) {
+        setBaseUrl(creds.baseUrl);
+        setApiKey(creds.apiKey);
         setIsConnected(true);
-        setUsingShared(false);
-        handleFetchInstances(own);
-        return;
-      }
-      // No own creds — try shared (trial fallback)
-      const shared = await loadSharedEvolutionCredentials();
-      if (shared) {
-        setBaseUrl(shared.baseUrl);
-        setApiKey(shared.apiKey);
-        setIsConnected(true);
-        setUsingShared(true);
-        handleFetchInstances(shared);
+        handleFetchInstances(creds);
       }
     })();
     return () => {
@@ -69,23 +55,16 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     };
   }, []);
 
-  const getCreds = (): EvolutionCredentials => ({
+  const getCreds = (): EvolutionGoCredentials => ({
     baseUrl: baseUrl.replace(/\/$/, ''),
     apiKey: apiKey.trim(),
   });
 
-  // ── Fetch all instances ──
-  const handleFetchInstances = async (creds?: EvolutionCredentials) => {
+  const handleFetchInstances = async (creds?: EvolutionGoCredentials) => {
     const c = creds || getCreds();
     setLoadingInstances(true);
     try {
-      const list = await fetchInstances(c);
-      // Register each connected instance to user in database
-      for (const inst of list) {
-        if (inst.status === 'open' || inst.status === 'connected') {
-          await registerUserInstance(inst);
-        }
-      }
+      const list = await fetchEvolutionGoInstances(c);
       setInstances(list);
       onInstancesLoaded?.(list);
     } catch (err: any) {
@@ -95,22 +74,6 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     }
   };
 
-  // Save user's instance to database when connected
-  const registerUserInstance = async (instance: EvolutionInstance) => {
-    if (!user?.id) return;
-    try {
-      await (supabase as any).rpc('register_user_instance', {
-        p_user_id: user.id,
-        p_instance_name: instance.instanceName,
-        p_phone: instance.phone || '',
-        p_profile_name: instance.profileName || ''
-      });
-    } catch (err) {
-      console.error('Error registering user instance:', err);
-    }
-  };
-
-  // ── Connect API (save creds + fetch) ──
   const handleConnect = async () => {
     if (!baseUrl.trim() || !apiKey.trim()) {
       toast.error('Preencha URL e API Key');
@@ -119,10 +82,10 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     setIsLoading(true);
     const creds = getCreds();
     try {
-      await fetchInstances(creds); // test connection
-      saveEvolutionCredentials(creds);
+      await fetchEvolutionGoInstances(creds);
+      saveEvolutionGoCredentials(creds);
       setIsConnected(true);
-      toast.success('Conectado à Evolution API!');
+      toast.success('Conectado à Evolution Go!');
       await handleFetchInstances(creds);
     } catch (err: any) {
       toast.error(`Falha: ${err.message}`);
@@ -132,7 +95,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
   };
 
   const handleDisconnect = () => {
-    clearEvolutionCredentials();
+    clearEvolutionGoCredentials();
     setIsConnected(false);
     setInstances([]);
     setQrCode('');
@@ -143,7 +106,6 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     toast.success('Desconectado');
   };
 
-  // ── Create new instance (anti-duplication) ──
   const handleCreateInstance = async () => {
     if (!newInstanceName.trim()) {
       toast.error('Digite um nome para a instância');
@@ -151,7 +113,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     }
     setIsLoading(true);
     try {
-      const result = await findOrCreateInstance(getCreds(), newInstanceName.trim());
+      const result = await findOrCreateEvolutionGoInstance(getCreds(), newInstanceName.trim());
       if (result.action === 'existing') {
         toast.info(`Instância "${result.instanceName}" já existe — reutilizando.`);
       } else {
@@ -171,12 +133,11 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     }
   };
 
-  // ── Generate QR for an instance ──
   const handleGenerateQR = async (instName: string) => {
     setIsLoading(true);
     setActiveInstance(instName);
     try {
-      const data = await getQRCode(getCreds(), instName);
+      const data = await getEvolutionGoQRCode(getCreds(), instName);
       setQrCode(data.qrcode || '');
       startQrTimer(instName);
     } catch (err: any) {
@@ -203,7 +164,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const status = await getInstanceStatus(getCreds(), instName);
+        const status = await getEvolutionGoInstanceStatus(getCreds(), instName);
         if (status.connected) {
           setQrCode('');
           clearInterval(pollRef.current!);
@@ -220,12 +181,6 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
 
   return (
     <div className="space-y-4">
-      {usingShared && (
-        <div className="glass-card p-3 border-primary/30 bg-primary/5 text-sm flex items-center gap-2">
-          <Wifi className="w-4 h-4 text-primary" />
-          <span>Você está usando a <strong>Evolution compartilhada</strong> do sistema (período de teste). Crie sua instância abaixo e escaneie o QR para conectar seu WhatsApp.</span>
-        </div>
-      )}
       {/* Status bar */}
       <div className={`glass-card p-4 flex items-center justify-between ${isConnected ? 'border-success/30' : 'border-border/50'}`}>
         <div className="flex items-center gap-3">
@@ -233,7 +188,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
             {isConnected ? <Wifi className="w-5 h-5 text-success" /> : <WifiOff className="w-5 h-5 text-warning" />}
           </div>
           <div>
-            <p className="font-medium">{isConnected ? 'Evolution API Conectada' : 'Evolution API Desconectada'}</p>
+            <p className="font-medium">{isConnected ? 'Evolution Go Conectada' : 'Evolution Go Desconectada'}</p>
             <p className="text-xs text-muted-foreground">
               {isConnected ? `${openInstances.length} instância(s) ativa(s) de ${instances.length}` : 'Configure URL e API Key'}
             </p>
@@ -257,8 +212,8 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
       {!isConnected && (
         <div className="glass-card p-6 space-y-4 animate-fade-in">
           <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">URL da Evolution API</label>
-            <input type="url" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://sua-evolution-api.com"
+            <label className="text-sm text-muted-foreground">URL da Evolution Go</label>
+            <input type="url" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://evogo.seusite.com"
               className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50" />
           </div>
           <div className="space-y-2">

@@ -171,34 +171,40 @@ export function SuperAdminPanel() {
           <Server className="w-5 h-5 text-primary" />
           <div>
             <h3 className="font-semibold">Evolution compartilhada (trial)</h3>
-            <p className="text-xs text-muted-foreground">Usada por contas em período de teste que não configuraram sua própria Evolution.</p>
+            <p className="text-xs text-muted-foreground">Usada automaticamente por contas em período de teste que não configuraram sua própria Evolution.</p>
           </div>
         </div>
         <div className="grid gap-3">
           <div className="flex items-center gap-2">
             <input type="checkbox" id="shared-enabled" checked={shared.enabled}
               onChange={e => setShared({ ...shared, enabled: e.target.checked })} />
-            <label htmlFor="shared-enabled" className="text-sm">Ativar para usuários em trial</label>
+            <label htmlFor="shared-enabled" className="text-sm font-medium">Ativar Evolution compartilhada para trial</label>
           </div>
-          <div>
-            <label className="text-xs text-muted-foreground">URL Evolution</label>
-            <input value={shared.baseUrl} onChange={e => setShared({ ...shared, baseUrl: e.target.value })}
-              placeholder="https://sua-evolution-api.com"
-              className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm" />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">API Key</label>
-            <div className="relative">
-              <input type={showKey ? 'text' : 'password'} value={shared.apiKey}
-                onChange={e => setShared({ ...shared, apiKey: e.target.value })}
-                className="w-full px-3 py-2 pr-10 rounded-lg bg-muted/50 border border-border/50 text-sm" />
-              <button type="button" onClick={() => setShowKey(!showKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
-                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+          
+          {shared.enabled && (
+            <div className="pl-6 space-y-3 border-l-2 border-primary/30 animate-fade-in">
+              <div>
+                <label className="text-xs text-muted-foreground">URL Evolution</label>
+                <input value={shared.baseUrl} onChange={e => setShared({ ...shared, baseUrl: e.target.value })}
+                  placeholder="https://sua-evolution-api.com"
+                  className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">API Key</label>
+                <div className="relative">
+                  <input type={showKey ? 'text' : 'password'} value={shared.apiKey}
+                    onChange={e => setShared({ ...shared, apiKey: e.target.value })}
+                    className="w-full px-3 py-2 pr-10 rounded-lg bg-muted/50 border border-border/50 text-sm" />
+                  <button type="button" onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <button onClick={saveShared} disabled={savingShared}
+          )}
+          
+          <button onClick={saveShared} disabled={savingShared || !shared.enabled}
             className="self-start flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
             {savingShared ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar
           </button>
@@ -274,12 +280,18 @@ export function SuperAdminPanel() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-wrap">
-                    <button onClick={() => extendTrial(p, 3)}
-                      className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+3d</button>
-                    <button onClick={() => extendTrial(p, 7)}
-                      className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+7d</button>
-                    <button onClick={() => extendTrial(p, 30)}
-                      className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+30d</button>
+                    {!isSuper && (
+                      <button onClick={() => extendTrial(p, 3)}
+                        className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+3d</button>
+                    )}
+                    {!isSuper && (
+                      <button onClick={() => extendTrial(p, 7)}
+                        className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+7d</button>
+                    )}
+                    {!isSuper && (
+                      <button onClick={() => extendTrial(p, 30)}
+                        className="px-2 py-1 rounded text-xs bg-muted hover:bg-muted/80">+30d</button>
+                    )}
                     <button onClick={() => toggleActive(p)} disabled={isSuper && p.id === user?.id}
                       className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${p.is_active ? 'bg-warning/10 text-warning hover:bg-warning/20' : 'bg-success/10 text-success hover:bg-success/20'} disabled:opacity-50`}>
                       <Power className="w-3 h-3" /> {p.is_active ? 'Desativar' : 'Ativar'}

@@ -12,6 +12,12 @@ import {
   getInstanceStatus,
   EvolutionMessage,
 } from './evolution';
+import {
+  loadEvolutionGoCredentials,
+  sendEvolutionGoMessage,
+  getEvolutionGoInstanceStatus,
+  EvolutionGoMessage,
+} from './evolutionGo';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
 
 export interface SendProgress {
@@ -99,26 +105,40 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
 
 export interface CampaignMessage {
   content: string;
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
   // Para tipo 'buttons'
   title?: string;
   footer?: string;
+  btnTitle?: string;
+  btnFooter?: string;
   buttons?: { id: string; type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
   // Para tipo 'link'
   linkUrl?: string;
+  // Para tipo 'list' (Evolution Go)
+  sections?: { title: string; rows: { id?: string; title: string; description: string }[] }[];
+  // Para tipo 'carousel' (Evolution Go)
+  cards?: {
+    image?: string;
+    title?: string;
+    description?: string;
+    footer?: string;
+    buttons?: { id: string; type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  }[];
 }
 
 // Detect which API to use based on selected instance ID prefix
-function getInstanceSource(instanceId: string): 'evolution' | 'unoapi' | 'default' {
+function getInstanceSource(instanceId: string): 'evolution-go' | 'evolution' | 'unoapi' | 'default' {
+  if (instanceId.startsWith('evogo_')) return 'evolution-go';
   if (instanceId.startsWith('evo_')) return 'evolution';
   if (instanceId.startsWith('uno_')) return 'unoapi';
   return 'default';
 }
 
 function getInstanceName(instanceId: string): string {
+  if (instanceId.startsWith('evogo_')) return instanceId.slice(7);
   if (instanceId.startsWith('evo_')) return instanceId.slice(4);
   if (instanceId.startsWith('uno_')) return instanceId.slice(4);
   return instanceId;
@@ -148,10 +168,11 @@ export async function sendCampaign(
   // Instances without prefix ('default') are kept ONLY if creds for the resolved API exist.
   const validInstances = selectedPhoneNumbers.filter(id => {
     const src = getInstanceSource(id);
+    if (src === 'evolution-go') return !!loadEvolutionGoCredentials();
     if (src === 'evolution') return !!evoCredsEarly;
     if (src === 'unoapi') return !!unoCredsEarly;
     // default → use whichever API is configured
-    return !!evoCredsEarly || !!unoCredsEarly;
+    return !!evoCredsEarly || !!unoCredsEarly || !!loadEvolutionGoCredentials();
   });
 
   if (validInstances.length === 0) {
@@ -177,13 +198,18 @@ export async function sendCampaign(
 
   const unoCreds = unoCredsEarly;
   const evoCreds = evoCredsEarly;
+  const evoGoCreds = loadEvolutionGoCredentials();
 
-  // Resolve API source per-instance (default → evolution if available, else unoapi)
-  const resolveSource = (id: string): 'evolution' | 'unoapi' => {
+  // Resolve API source per-instance (default → evolution → evolution-go → unoapi)
+  const resolveSource = (id: string): 'evolution-go' | 'evolution' | 'unoapi' => {
     const s = getInstanceSource(id);
+    if (s === 'evolution-go') return 'evolution-go';
     if (s === 'evolution') return 'evolution';
     if (s === 'unoapi') return 'unoapi';
-    return evoCreds ? 'evolution' : 'unoapi';
+    // default → any available
+    if (evoCreds) return 'evolution';
+    if (evoGoCreds) return 'evolution-go';
+    return 'unoapi';
   };
 
   if (validInstances.length < selectedPhoneNumbers.length) {
@@ -191,7 +217,8 @@ export async function sendCampaign(
   }
 
   const primarySource = resolveSource(validInstances[0]);
-  addLog(`🚀 Iniciando campanha via ${primarySource === 'evolution' ? 'Evolution API' : 'UnoAPI'}...`, 'info');
+  const sourceLabel = primarySource === 'evolution-go' ? 'Evolution Go' : primarySource === 'evolution' ? 'Evolution API' : 'UnoAPI';
+  addLog(`🚀 Iniciando campanha via ${sourceLabel}...`, 'info');
 
   // For Evolution: validate all instances (non-blocking — warn but continue)
   if (evoCreds) {
@@ -263,6 +290,25 @@ export async function sendCampaign(
           };
           const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
           console.log('[campaignSender] Evolution send result:', result);
+        } else if (source === 'evolution-go' && evoGoCreds) {
+          // Evolution Go sending
+          const evoGoMsg: EvolutionGoMessage = {
+            type: msg.mediaType || 'text',
+            content: personalizedContent,
+            mediaUrl: msg.mediaUrl,
+            caption: personalizedCaption || personalizedContent,
+            filename: msg.mediaFilename,
+            title: msg.title,
+            footer: msg.footer,
+            btnTitle: msg.btnTitle,
+            btnFooter: msg.btnFooter,
+            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            linkUrl: msg.linkUrl,
+            sections: msg.sections as EvolutionGoMessage['sections'],
+            cards: msg.cards as EvolutionGoMessage['cards'],
+          };
+          const result = await sendEvolutionGoMessage(evoGoCreds, senderName, phoneNumber, evoGoMsg);
+          console.log('[campaignSender] Evolution Go send result:', result);
         } else if (source === 'unoapi' && unoCreds) {
           // UnoAPI sending
           console.log('[campaignSender] Sending via UnoAPI:', {

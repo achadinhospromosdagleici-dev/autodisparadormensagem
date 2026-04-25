@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap } from 'lucide-react';
+import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu } from 'lucide-react';
 import { ChatwootSettings } from './ChatwootSettings';
 import { EvolutionConnection } from './EvolutionConnection';
+import { EvolutionGoConnection } from './EvolutionGoConnection';
 import { UnoApiSettings } from './UnoApiSettings';
 import { ChatwootInbox } from '@/services/chatwoot';
 
@@ -11,12 +12,13 @@ interface SettingsPageProps {
   onUnoApiConnectionChange: (connected: boolean) => void;
 }
 
-type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'ai-gateway';
+type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'ai-gateway';
 
 const tabs = [
   { id: 'unoapi' as SettingsTab, label: 'UnoAPI', icon: Zap, desc: 'Envio via WhatsApp Cloud API (texto, mídia, docs)' },
   { id: 'chatwoot' as SettingsTab, label: 'Chatwoot', icon: MessageCircle, desc: 'Integração com Chatwoot para envio e monitoramento' },
-  { id: 'evolution' as SettingsTab, label: 'WhatsApp / Evolution', icon: Smartphone, desc: 'Conectar número WhatsApp via Evolution API' },
+  { id: 'evolution' as SettingsTab, label: 'Evolution API', icon: Smartphone, desc: 'Conectar número via Evolution API (Node.js)' },
+  { id: 'evolution-go' as SettingsTab, label: 'Evolution Go', icon: Cpu, desc: 'Conectar número via Evolution Go (Go)' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
 ];
 
@@ -26,7 +28,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
   return (
     <div className="space-y-6">
       {/* Tab selector */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -36,14 +38,14 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                 activeTab === tab.id ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
               }`}>
                 <tab.icon className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm">{tab.label}</p>
-                <p className="text-xs text-muted-foreground truncate">{tab.desc}</p>
+                <p className="text-xs text-muted-foreground truncate hidden lg:block">{tab.desc}</p>
               </div>
               {activeTab === tab.id && <ChevronRight className="w-4 h-4 text-primary shrink-0" />}
             </div>
@@ -58,6 +60,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
           <ChatwootSettings onInboxesLoaded={onInboxesLoaded} onConnectionChange={onConnectionChange} />
         )}
         {activeTab === 'evolution' && <EvolutionConnection />}
+        {activeTab === 'evolution-go' && <EvolutionGoConnection />}
         {activeTab === 'ai-gateway' && <AIGatewaySettings />}
       </div>
     </div>
