@@ -38,8 +38,9 @@ function getRandomInterval(min: number, max: number): number {
 }
 
 function replaceVariables(template: string, contact: Record<string, any>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-    const keyLower = key.toLowerCase();
+  // Match variables with special characters (like ç, ã, etc)
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
+    const keyLower = key.toLowerCase().trim();
     
     // Handle special {{primeiro_nome}} variable - extract first name from 'nome'
     if (keyLower === 'primeiro_nome') {
@@ -57,9 +58,19 @@ function replaceVariables(template: string, contact: Record<string, any>): strin
       return `{{${key}}`;
     }
     
-    // Case-insensitive search for the key
+    // Case-insensitive and accent-insensitive search for the key
     for (const k of Object.keys(contact)) {
-      if (k.toLowerCase() === keyLower) {
+      const kNormalized = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const keyNormalized = keyLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (kNormalized === keyNormalized || k.toLowerCase() === keyLower) {
+        return contact[k];
+      }
+    }
+    
+    // Try partial match - if key is contained in column name
+    for (const k of Object.keys(contact)) {
+      const kNormalized = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (kNormalized.includes(keyNormalized) || keyNormalized.includes(kNormalized)) {
         return contact[k];
       }
     }
@@ -74,13 +85,15 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
   if (value.includes('{{')) {
     return replaceVariables(value, contact);
   }
-  // If value is exactly a variable name, try to find it
+  // If value is exactly a variable name, try to find it with accent-insensitive match
+  const valueNormalized = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   for (const k of Object.keys(contact)) {
-    if (k.toLowerCase() === value.toLowerCase()) {
+    const kNormalized = k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (kNormalized === valueNormalized) {
       return contact[k];
     }
   }
-return value;
+  return value;
 }
 
 export interface CampaignMessage {

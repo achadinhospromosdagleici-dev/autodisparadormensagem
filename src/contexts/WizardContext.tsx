@@ -91,6 +91,7 @@ interface WizardContextType extends WizardState {
   addRichMessage: (msg: Omit<Message, 'id'>) => void;
   updateMessage: (id: string, content: string) => void;
   deleteMessage: (id: string) => void;
+  moveMessage: (fromIndex: number, toIndex: number) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
   addInstance: (instance: Instance) => void;
   toggleInstanceSelection: (id: string) => void;
@@ -266,6 +267,12 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const deleteMessage = (id: string) => setState(prev => ({ ...prev, messages: prev.messages.filter(msg => msg.id !== id) }));
+  const moveMessage = (fromIndex: number, toIndex: number) => setState(prev => {
+    const msgs = [...prev.messages];
+    const [moved] = msgs.splice(fromIndex, 1);
+    msgs.splice(toIndex, 0, moved);
+    return { ...prev, messages: msgs };
+  });
   const setSettings = (settings: Partial<WizardSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }));
   const addInstance = (instance: Instance) => setState(prev => ({ ...prev, instances: [...prev.instances, instance] }));
   const toggleInstanceSelection = (id: string) => setState(prev => ({ ...prev, selectedInstances: prev.selectedInstances.includes(id) ? prev.selectedInstances.filter(i => i !== id) : [...prev.selectedInstances, id] }));
@@ -298,7 +305,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     <WizardContext.Provider value={{
       ...state,
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
-      addMessage, addRichMessage, updateMessage, deleteMessage, setSettings, addInstance, toggleInstanceSelection,
+      addMessage, addRichMessage, updateMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,

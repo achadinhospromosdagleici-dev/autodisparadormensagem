@@ -124,6 +124,9 @@ export function StepDataReview() {
 
   // Get mapping options based on current columns
   const getMappingOptions = () => createMappingOptions(columns);
+  
+  // Debug: log mapping options
+  console.log('[StepDataReview] getMappingOptions:', getMappingOptions().map(o => o.value));
 
   const [autoMatchedCols, setAutoMatchedCols] = useState<Set<number>>(() => {
     const matched = new Set<number>();
@@ -493,7 +496,7 @@ export function StepDataReview() {
                           </span>
                           <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-60" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuContent align="start" className="w-56 max-h-96 overflow-y-auto">
                           {getMappingOptions().map((opt, idx) => (
                             opt.separator ? (
                               <DropdownMenuSeparator key={`sep-${idx}`} className="my-1" />

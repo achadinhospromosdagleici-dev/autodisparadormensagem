@@ -19,6 +19,8 @@ import {
   X,
   Upload,
   Loader2,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +29,7 @@ import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
-  const { messages, columns, addMessage, addRichMessage, updateMessage, deleteMessage, settings, data } =
+  const { messages, columns, addMessage, addRichMessage, updateMessage, deleteMessage, moveMessage, settings, data } =
     useWizard();
   const [newMessage, setNewMessage] = useState('');
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -588,6 +590,22 @@ export function StepMessages() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => moveMessage(index, index - 1)}
+                        disabled={index === 0}
+                        className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Mover para cima"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveMessage(index, index + 1)}
+                        disabled={index === messages.length - 1}
+                        className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Mover para baixo"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(msg.content);
