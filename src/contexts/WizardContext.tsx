@@ -79,6 +79,7 @@ interface WizardState {
   abTests: ABTest[];
   metrics: CampaignMetrics;
   activeCampaigns: ActiveCampaign[];
+  selectedApi: 'unoapi' | 'evolution' | null;
 }
 
 interface WizardContextType extends WizardState {
@@ -111,6 +112,7 @@ interface WizardContextType extends WizardState {
   setChatwootInboxes: (inboxes: ChatwootInbox[]) => void;
   setSelectedInboxId: (id: number | null) => void;
   setFollowUpConfig: (config: FollowUpConfig) => void;
+  setSelectedApi: (api: 'unoapi' | 'evolution' | null) => void;
   addScheduledCampaign: (campaign: ScheduledCampaign) => void;
   cancelScheduledCampaign: (id: string) => void;
   addABTest: (test: ABTest) => void;
@@ -219,6 +221,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     abTests: [],
     metrics: defaultMetrics,
     activeCampaigns: [],
+    selectedApi: null,
   });
 
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
@@ -297,6 +300,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
+  const setSelectedApi = (api: 'unoapi' | 'evolution' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
   const addScheduledCampaign = (campaign: ScheduledCampaign) => setState(prev => ({ ...prev, scheduledCampaigns: [...prev.scheduledCampaigns, campaign] }));
   const cancelScheduledCampaign = (id: string) => setState(prev => ({ ...prev, scheduledCampaigns: prev.scheduledCampaigns.map(c => c.id === id ? { ...c, status: 'cancelled' as const } : c) }));
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));
@@ -312,7 +316,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
       addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
-      setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig,
+      setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig, setSelectedApi,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
       addActiveCampaign, updateActiveCampaign, removeActiveCampaign,
     }}>

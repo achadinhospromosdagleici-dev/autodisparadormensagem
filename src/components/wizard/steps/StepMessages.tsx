@@ -32,8 +32,9 @@ import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link';
 
 export function StepMessages() {
-  const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig } =
+  const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig, selectedApi } =
     useWizard();
+
   const [newMessage, setNewMessage] = useState('');
   const [previewIndex, setPreviewIndex] = useState(0);
   const [mediaType, setMediaType] = useState<EditorMediaType>('text');
@@ -48,6 +49,17 @@ export function StepMessages() {
   // Link editor state
   const [linkUrl, setLinkUrl] = useState('');
   const [showFollowUp, setShowFollowUp] = useState(false);
+  const toast = useToast();
+
+  const isApiUno = selectedApi === 'unoapi';
+  const isApiEvo = selectedApi === 'evolution';
+
+  // Check if feature is supported by current API
+  const isFeatureSupported = (type: EditorMediaType) => {
+    if (type === 'buttons' && isApiEvo) return false;
+    if (type === 'link' && isApiEvo) return false;
+    return true;
+  };
 
   const variables = columns.map((col) => `{{${col}}}`);
   // Add dynamic {{primeiro_nome}} variable if 'nome' column exists
@@ -220,20 +232,32 @@ export function StepMessages() {
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground font-medium">Tipo de mensagem</label>
               <div className="flex flex-wrap gap-1.5">
-                {mediaTypeConfig.map(({ type, icon: Icon, label }) => (
-                  <button
-                    key={type}
-                    onClick={() => setMediaType(type)}
-                    className={`flex-1 min-w-[80px] py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                      mediaType === type
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {label}
-                  </button>
-                ))}
+                {mediaTypeConfig.map(({ type, icon: Icon, label }) => {
+                  const supported = isFeatureSupported(type);
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        if (!supported) {
+                          toast.warning(`${label} não disponível com ${isApiUno ? 'UnoAPI' : 'Evolution'}. Configure em Configurações para habilitar.`);
+                          return;
+                        }
+                        setMediaType(type);
+                      }}
+                      disabled={!supported}
+                      className={`flex-1 min-w-[80px] py-2 px-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+                        mediaType === type
+                          ? 'bg-primary text-primary-foreground'
+                          : supported
+                            ? 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                            : 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
