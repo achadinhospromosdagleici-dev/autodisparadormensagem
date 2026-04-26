@@ -1,5 +1,9 @@
 project_id = "wbwpzsuxwwjplyzbjqmo"
 
+[auth]
+site_url = "https://remix-of-message-flow-lxe4.vercel.app"
+additional_redirect_urls = ["https://remix-of-message-flow-lxe4.vercel.app"]
+
 [functions.unoapi-proxy]
 verify_jwt = false
 
