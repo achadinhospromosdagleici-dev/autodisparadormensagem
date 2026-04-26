@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 const STORAGE_KEY = 'column_mapping_history';
 
 interface MappingEntry {
@@ -6,30 +8,49 @@ interface MappingEntry {
   count: number;
 }
 
-export function saveMappingHistory(mappings: Record<string, string>) {
+async function saveMappingToDb(mappings: Record<string, string>) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  for (const [originalPhone, mappedPhone] of Object.entries(mappings)) {
+    if (mappedPhone === '_skip') continue;
+    await supabase.from('phone_mappings').upsert({
+      user_id: user.id,
+      original_phone: originalPhone,
+      mapped_phone: mappedPhone,
+    }, { onConflict: 'user_id,original_phone' });
+  }
+}
+
+async function loadMappingFromDb(): Promise<Record<string, string>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const { data } = await supabase.from('phone_mappings').select('*').eq('user_id', user.id);
+  const result: Record<string, string> = {};
+  data?.forEach((m: any) => { result[m.original_phone] = m.mapped_phone; });
+  return result;
+}
+
+export async function saveMappingHistory(mappings: Record<string, string>) {
   try {
-    const existing = getMappingHistory();
+    const existing = await getMappingHistory();
     Object.entries(mappings).forEach(([colName, mappedTo]) => {
       if (mappedTo === '_skip') return;
       const normalized = colName.toLowerCase().trim();
       const entry = existing.find(e => e.columnName === normalized);
-      if (entry) {
-        entry.mappedTo = mappedTo;
-        entry.count++;
-      } else {
-        existing.push({ columnName: normalized, mappedTo, count: 1 });
-      }
+      if (entry) { entry.mappedTo = mappedTo; entry.count++; }
+      else { existing.push({ columnName: normalized, mappedTo, count: 1 }); }
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+    await saveMappingToDb(mappings);
   } catch {}
 }
 
-export function getMappingHistory(): MappingEntry[] {
+export async function getMappingHistory(): Promise<MappingEntry[]> {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return [];
 }
 
 export function autoMatchColumn(columnName: string): string | null {

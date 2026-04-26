@@ -63,8 +63,26 @@ export interface UnoApiInstance {
 
 const STORAGE_KEY = 'unoapi_credentials';
 
-export function saveUnoApiCredentials(credentials: UnoApiCredentials): void {
+async function saveUnoApiToDb(creds: UnoApiCredentials): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').upsert({
+    user_id: user.id,
+    key: 'unoapi',
+    value: creds as unknown as object
+  }, { onConflict: 'user_id,key' });
+}
+
+async function loadUnoApiFromDb(): Promise<UnoApiCredentials | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'unoapi').single();
+  return (data?.value ?? null) as UnoApiCredentials | null;
+}
+
+export async function saveUnoApiCredentials(credentials: UnoApiCredentials): Promise<void> {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+  await saveUnoApiToDb(credentials);
 }
 
 export function loadUnoApiCredentials(): UnoApiCredentials | null {
@@ -72,13 +90,20 @@ export function loadUnoApiCredentials(): UnoApiCredentials | null {
   if (!stored) return null;
   try {
     return JSON.parse(stored);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-export function clearUnoApiCredentials(): void {
+export async function loadUnoApiCredentialsWithFallback(): Promise<UnoApiCredentials | null> {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) { try { return JSON.parse(stored); } catch { return null; } }
+  return loadUnoApiFromDb();
+}
+
+export async function clearUnoApiCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'unoapi');
 }
 
 // Upload file to S3 via edge function

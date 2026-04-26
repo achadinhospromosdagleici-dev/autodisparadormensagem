@@ -8,8 +8,13 @@ import {
   Pause,
   CheckCircle2,
   AlertTriangle,
+  Repeat,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly_first' | 'monthly_last' | 'weekly_days';
 
 export interface ScheduledCampaign {
   id: string;
@@ -18,6 +23,9 @@ export interface ScheduledCampaign {
   status: 'scheduled' | 'running' | 'completed' | 'cancelled';
   messageIds: string[];
   contactCount: number;
+  recurrence?: RecurrenceType;
+  allowedTimes?: string[];
+  allowedWeekDays?: number[];
 }
 
 interface CampaignSchedulerProps {
@@ -39,6 +47,50 @@ export function CampaignScheduler({
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [recurrence, setRecurrence] = useState<RecurrenceType>('none');
+  const [allowedTimes, setAllowedTimes] = useState<string[]>(['09:00', '18:00']);
+  const [allowedWeekDays, setAllowedWeekDays] = useState<number[]>([1, 2, 3, 4, 5]);
+
+  const recurrenceOptions: { value: RecurrenceType; label: string }[] = [
+    { value: 'none', label: 'Sem recorrência' },
+    { value: 'daily', label: 'Diário' },
+    { value: 'weekly', label: 'Semanal' },
+    { value: 'monthly_first', label: 'Todo 1º dia do mês' },
+    { value: 'monthly_last', label: 'Todo último dia do mês' },
+    { value: 'weekly_days', label: 'Dias específicos da semana' },
+  ];
+
+  const weekDays = [
+    { value: 0, label: 'Dom' },
+    { value: 1, label: 'Seg' },
+    { value: 2, label: 'Ter' },
+    { value: 3, label: 'Qua' },
+    { value: 4, label: 'Qui' },
+    { value: 5, label: 'Sex' },
+    { value: 6, label: 'Sáb' },
+  ];
+
+  const timeSlots = [
+    '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00',
+    '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+  ];
+
+  const handleRecurrenceChange = (newRecurrence: RecurrenceType) => {
+    setRecurrence(newRecurrence);
+  };
+
+  const toggleWeekDay = (day: number) => {
+    setAllowedWeekDays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const toggleTimeSlot = (t: string) => {
+    setAllowedTimes(prev => 
+      prev.includes(t) ? prev.filter(time => time !== t) : [...prev, t].sort()
+    );
+  };
 
   const handleSchedule = () => {
     if (!name.trim() || !date || !time) {
@@ -46,8 +98,13 @@ export function CampaignScheduler({
       return;
     }
 
+    if (recurrence === 'weekly_days' && allowedWeekDays.length === 0) {
+      toast.error('Selecione pelo menos um dia da semana');
+      return;
+    }
+
     const scheduledDate = new Date(`${date}T${time}`);
-    if (scheduledDate <= new Date()) {
+    if (recurrence === 'none' && scheduledDate <= new Date()) {
       toast.error('A data deve ser no futuro');
       return;
     }
@@ -57,11 +114,15 @@ export function CampaignScheduler({
       scheduledDate,
       messageIds: [],
       contactCount,
+      recurrence,
+      allowedTimes: recurrence !== 'none' ? allowedTimes : undefined,
+      allowedWeekDays: recurrence === 'weekly_days' ? allowedWeekDays : undefined,
     });
 
     setName('');
     setDate('');
     setTime('');
+    setRecurrence('none');
     setShowForm(false);
     toast.success('Campanha agendada com sucesso!');
   };
@@ -130,6 +191,70 @@ export function CampaignScheduler({
               />
             </div>
           </div>
+
+          {/* Recurrence Options */}
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground flex items-center gap-2">
+              <Repeat className="w-4 h-4" />
+              Recorrência
+            </label>
+            <select
+              value={recurrence}
+              onChange={(e) => handleRecurrenceChange(e.target.value as RecurrenceType)}
+              className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              {recurrenceOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Allowed Times (for recurring) */}
+          {recurrence !== 'none' && (
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Horários Permitidos
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {timeSlots.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => toggleTimeSlot(t)}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      allowedTimes.includes(t)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Week Days Selection (for weekly_days) */}
+          {recurrence === 'weekly_days' && (
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Dias da Semana</label>
+              <div className="flex flex-wrap gap-2">
+                {weekDays.map(day => (
+                  <button
+                    key={day.value}
+                    onClick={() => toggleWeekDay(day.value)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      allowedWeekDays.includes(day.value)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground">
             Será enviado para <strong className="text-foreground">{contactCount}</strong> contatos com <strong className="text-foreground">{messageCount}</strong> mensagem(ns)

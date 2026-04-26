@@ -55,26 +55,28 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
   const [s3Region, setS3Region] = useState(DEFAULT_S3_CONFIG.region);
   const [showS3Secret, setShowS3Secret] = useState(false);
 
-  useEffect(() => {
-    const creds = loadUnoApiCredentials();
-    if (creds) {
-      setBaseUrl(creds.baseUrl);
-      setToken(creds.token);
-      setIsConnected(true);
-      onConnectionChange(true);
-      checkOnline(creds);
-      loadInstancesFromApi(creds);
+useEffect(() => {
+    async function load() {
+      const creds = await loadUnoApiCredentials();
+      if (creds) {
+        setBaseUrl(creds.baseUrl);
+        setToken(creds.token);
+        setIsConnected(true);
+        onConnectionChange(true);
+        checkOnline(creds);
+        loadInstancesFromApi(creds);
       
-      // Load S3 config if saved
-      if (creds.s3Enabled) {
-        setS3Enabled(true);
-        setS3Endpoint(creds.s3Endpoint || DEFAULT_S3_CONFIG.endpoint);
-        setS3AccessKey(creds.s3AccessKey || DEFAULT_S3_CONFIG.accessKey);
-        setS3SecretKey(creds.s3SecretKey || DEFAULT_S3_CONFIG.secretKey);
-        setS3Bucket(creds.s3Bucket || DEFAULT_S3_CONFIG.bucket);
-        setS3Region(creds.s3Region || DEFAULT_S3_CONFIG.region);
+        if (creds.s3Enabled) {
+          setS3Enabled(true);
+          setS3Endpoint(creds.s3Endpoint || DEFAULT_S3_CONFIG.endpoint);
+          setS3AccessKey(creds.s3AccessKey || DEFAULT_S3_CONFIG.accessKey);
+          setS3SecretKey(creds.s3SecretKey || DEFAULT_S3_CONFIG.secretKey);
+          setS3Bucket(creds.s3Bucket || DEFAULT_S3_CONFIG.bucket);
+          setS3Region(creds.s3Region || DEFAULT_S3_CONFIG.region);
+        }
       }
     }
+    load();
   }, []);
 
   const checkOnline = async (creds: UnoApiCredentials) => {
@@ -147,7 +149,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
 
     try {
       const online = await testConnection(creds);
-      saveUnoApiCredentials(creds);
+      await saveUnoApiCredentials(creds);
       setIsConnected(true);
       setIsOnline(online);
       setInstances([]); // Clear any old instances
@@ -167,8 +169,8 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     }
   };
 
-  const handleDisconnect = () => {
-    clearUnoApiCredentials();
+  const handleDisconnect = async () => {
+    await clearUnoApiCredentials();
     clearManualInstances();
     setIsConnected(false);
     setIsOnline(false);
@@ -178,8 +180,8 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     toast.success('Desconectado da UnoAPI');
   };
 
-  const handleCheckStatus = async () => {
-    const creds = loadUnoApiCredentials();
+  async function handleCheckStatus() {
+    const creds = await loadUnoApiCredentials();
     if (!creds) return;
     setIsLoading(true);
     const online = await testConnection(creds);
@@ -360,9 +362,9 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
               <CheckCircle2 className="w-6 h-6 text-success" />
               <h3 className="font-semibold">Números Conectados</h3>
             </div>
-            <button onClick={() => { 
+            <button onClick={async () => { 
                 clearManualInstances(); // Clear cache first
-                const c = loadUnoApiCredentials(); 
+                const c = await loadUnoApiCredentials(); 
                 if (c) loadInstancesFromApi(c); 
               }}
               disabled={loadingInstances}

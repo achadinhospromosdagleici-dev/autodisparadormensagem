@@ -19,18 +19,45 @@ export interface EvolutionInstance {
 
 const STORAGE_KEY = 'evolution_credentials';
 
-export function saveEvolutionCredentials(creds: EvolutionCredentials): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
+async function saveEvoToDb(creds: EvolutionCredentials): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').upsert({
+    user_id: user.id,
+    key: 'evolution',
+    value: creds as unknown as object
+  }, { onConflict: 'user_id,key' });
 }
 
-export function loadEvolutionCredentials(): EvolutionCredentials | null {
+async function loadEvoFromDb(): Promise<EvolutionCredentials | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'evolution').single();
+  return (data?.value ?? null) as EvolutionCredentials | null;
+}
+
+export async function saveEvolutionCredentials(creds: EvolutionCredentials): Promise<void> {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
+  await saveEvoToDb(creds);
+}
+
+export async function loadEvolutionCredentials(): Promise<EvolutionCredentials | null> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
 }
 
-export function clearEvolutionCredentials(): void {
+export async function loadEvolutionCredentialsWithFallback(): Promise<EvolutionCredentials | null> {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) { try { return JSON.parse(stored); } catch { return null; } }
+  return loadEvoFromDb();
+}
+
+export async function clearEvolutionCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'evolution');
 }
 
 // ── Shared Evolution (fallback for trial users) ──

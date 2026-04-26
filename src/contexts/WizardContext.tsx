@@ -79,7 +79,7 @@ interface WizardState {
   abTests: ABTest[];
   metrics: CampaignMetrics;
   activeCampaigns: ActiveCampaign[];
-  selectedApi: 'unoapi' | 'evolution' | 'evolution-go' | null;
+  selectedApi: 'unoapi' | 'evolution' | 'evolution-go' | 'chatwoot' | null;
 }
 
 interface WizardContextType extends WizardState {

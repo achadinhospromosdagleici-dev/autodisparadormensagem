@@ -9,21 +9,42 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const BLACKLIST_KEY = 'messageflow_blacklist';
 const OPT_OUT_KEYWORDS = ['SAIR', 'PARAR', 'CANCELAR', 'STOP', 'REMOVER', 'NAO QUERO', 'NÃO QUERO'];
 
-export function loadBlacklist(): string[] {
-  try {
-    const stored = localStorage.getItem(BLACKLIST_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
+async function saveBlacklistToDb(list: string[]): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('blacklist').delete().eq('user_id', user.id);
+  for (const phone of list) {
+    await supabase.from('blacklist').upsert({
+      user_id: user.id,
+      phone,
+      reason: 'manual',
+    }, { onConflict: 'user_id,phone' });
   }
 }
 
-export function saveBlacklist(list: string[]): void {
+async function loadBlacklistFromDb(): Promise<string[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase.from('blacklist').select('phone').eq('user_id', user.id);
+  return data?.map((t: any) => t.phone) ?? [];
+}
+
+export async function loadBlacklist(): Promise<string[]> {
+  try {
+    const stored = localStorage.getItem(BLACKLIST_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return loadBlacklistFromDb();
+}
+
+export async function saveBlacklist(list: string[]): Promise<void> {
   localStorage.setItem(BLACKLIST_KEY, JSON.stringify(list));
+  await saveBlacklistToDb(list);
 }
 
 export function isBlacklisted(phone: string): boolean {

@@ -12,6 +12,7 @@ import {
   WifiOff,
   Phone,
   Zap,
+  MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -32,6 +33,11 @@ import {
   fetchEvolutionGoInstances,
   EvolutionGoInstance,
 } from '@/services/evolutionGo';
+import {
+  loadChatwootCredentials,
+  fetchInboxes,
+  ChatwootInbox,
+} from '@/services/chatwoot';
 import { useSharedEvolution } from '@/hooks/useSharedEvolution';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +60,7 @@ export function StepInstances() {
   const [unoInstances, setUnoInstances] = useState<UnoApiInstance[]>([]);
   const [evoInstances, setEvoInstances] = useState<EvolutionInstance[]>([]);
   const [evoGoInstances, setEvoGoInstances] = useState<EvolutionGoInstance[]>([]);
+  const [chatwootInboxes, setChatwootInboxes] = useState<ChatwootInbox[]>([]);
   const [userInstances, setUserInstances] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef(false);
@@ -61,7 +68,8 @@ export function StepInstances() {
   const hasEvolution = !!loadEvolutionCredentials();
   const hasSharedEvolution = useSharedEvolution();
   const hasEvolutionGo = isEvolutionGoConnected();
-  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution || hasEvolutionGo;
+  const hasChatwoot = !!loadChatwootCredentials();
+  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution || hasEvolutionGo || hasChatwoot;
 
   // Fetch user's registered instances (for filtering when using shared Evolution)
   useEffect(() => {
@@ -192,6 +200,24 @@ export function StepInstances() {
       }
     }
 
+    // Chatwoot
+    if (hasChatwoot) {
+      const cwCreds = loadChatwootCredentials();
+      if (cwCreds) {
+        promises.push(
+          fetchInboxes(cwCreds)
+            .then((fetched) => {
+              console.log('[StepInstances] Chatwoot inboxes fetched:', fetched);
+              setChatwootInboxes(fetched);
+            })
+            .catch((err) => {
+              console.error('[StepInstances] Chatwoot fetch error:', err);
+              setChatwootInboxes([]);
+            })
+        );
+      }
+    }
+
     await Promise.all(promises);
     console.log('[StepInstances] All instances loaded, unoApiConnected:', unoApiConnected);
     setLoading(false);
@@ -226,6 +252,15 @@ export function StepInstances() {
           source: 'unoapi' as const,
         }))
       : []),
+    ...(hasChatwoot && chatwootInboxes.length > 0
+      ? chatwootInboxes.map((ib) => ({
+          id: `chatwoot_${ib.id}`,
+          name: ib.name || `Caixa ${ib.id}`,
+          status: 'active' as Instance['status'],
+          phoneNumber: ib.phone_number || undefined,
+          source: 'chatwoot' as const,
+        }))
+      : []),
   ];
 
   const displayInstances = mergedInstances.length > 0 ? mergedInstances : instances.map(i => ({ ...i, source: 'default' as const }));
@@ -251,6 +286,7 @@ export function StepInstances() {
     if (source === 'evolution-go') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 font-medium">EvoGo</span>;
     if (source === 'evolution') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Evolution</span>;
     if (source === 'unoapi') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">UnoAPI</span>;
+    if (source === 'chatwoot') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">Chatwoot</span>;
     return null;
   };
 

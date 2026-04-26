@@ -19,18 +19,45 @@ export interface EvolutionGoInstance {
 
 const STORAGE_KEY = 'evolution_go_credentials';
 
-export function saveEvolutionGoCredentials(creds: EvolutionGoCredentials): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
+async function saveEvoGoToDb(creds: EvolutionGoCredentials): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').upsert({
+    user_id: user.id,
+    key: 'evolution-go',
+    value: creds as unknown as object
+  }, { onConflict: 'user_id,key' });
 }
 
-export function loadEvolutionGoCredentials(): EvolutionGoCredentials | null {
+async function loadEvoGoFromDb(): Promise<EvolutionGoCredentials | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'evolution-go').single();
+  return (data?.value ?? null) as EvolutionGoCredentials | null;
+}
+
+export async function saveEvolutionGoCredentials(creds: EvolutionGoCredentials): Promise<void> {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
+  await saveEvoGoToDb(creds);
+}
+
+export async function loadEvolutionGoCredentials(): Promise<EvolutionGoCredentials | null> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
 }
 
-export function clearEvolutionGoCredentials(): void {
+export async function loadEvolutionGoCredentialsWithFallback(): Promise<EvolutionGoCredentials | null> {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) { try { return JSON.parse(stored); } catch { return null; } }
+  return loadEvoGoFromDb();
+}
+
+export async function clearEvolutionGoCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'evolution-go');
 }
 
 export function isEvolutionGoConnected(): boolean {

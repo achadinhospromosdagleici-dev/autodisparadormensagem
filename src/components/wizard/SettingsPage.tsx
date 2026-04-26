@@ -5,6 +5,7 @@ import { EvolutionConnection } from './EvolutionConnection';
 import { EvolutionGoConnection } from './EvolutionGoConnection';
 import { UnoApiSettings } from './UnoApiSettings';
 import { ChatwootInbox } from '@/services/chatwoot';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SettingsPageProps {
   onInboxesLoaded: (inboxes: ChatwootInbox[]) => void;
@@ -73,22 +74,31 @@ function AIGatewaySettings() {
   const [model, setModel] = useState('gpt-4o-mini');
   const [showKey, setShowKey] = useState(false);
 
-  const handleSave = () => {
-    localStorage.setItem('ai_gateway_config', JSON.stringify({ provider, apiKey, model }));
+  React.useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'ai_gateway').single();
+      if (data?.value) {
+        setProvider(data.value.provider || 'openai');
+        setApiKey(data.value.apiKey || '');
+        setModel(data.value.model || 'gpt-4o-mini');
+      }
+    }
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('user_settings').upsert({
+        user_id: user.id,
+        key: 'ai_gateway',
+        value: { provider, apiKey, model } as unknown as object
+      }, { onConflict: 'user_id,key' });
+    }
     import('sonner').then(({ toast }) => toast.success('Configuração salva!'));
   };
-
-  React.useEffect(() => {
-    const saved = localStorage.getItem('ai_gateway_config');
-    if (saved) {
-      try {
-        const config = JSON.parse(saved);
-        setProvider(config.provider || 'openai');
-        setApiKey(config.apiKey || '');
-        setModel(config.model || 'gpt-4o-mini');
-      } catch {}
-    }
-  }, []);
 
   return (
     <div className="glass-card p-6 space-y-4">

@@ -10,6 +10,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface MessageTemplate {
   id: string;
@@ -22,20 +23,50 @@ export interface MessageTemplate {
 
 const TEMPLATES_KEY = 'messageflow_templates';
 
-export function loadTemplates(): MessageTemplate[] {
-  try {
-    const stored = localStorage.getItem(TEMPLATES_KEY);
-    if (!stored) return defaultTemplates;
-    return JSON.parse(stored, (key, value) =>
-      key === 'createdAt' ? new Date(value) : value
-    );
-  } catch {
-    return defaultTemplates;
+async function saveTemplatesToDb(templates: MessageTemplate[]): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('message_templates').delete().eq('user_id', user.id);
+  for (const t of templates) {
+    await supabase.from('message_templates').upsert({
+      user_id: user.id,
+      name: t.name,
+      content: t.content,
+      media_type: 'text',
+    }, { onConflict: 'user_id,name' });
   }
 }
 
-export function saveTemplates(templates: MessageTemplate[]): void {
+async function loadTemplatesFromDb(): Promise<MessageTemplate[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return defaultTemplates;
+  const { data } = await supabase.from('message_templates').select('*').eq('user_id', user.id);
+  if (!data?.length) return defaultTemplates;
+  return data.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    content: t.content,
+    category: 'Personalizado',
+    isFavorite: false,
+    createdAt: new Date(t.created_at),
+  }));
+}
+
+export async function loadTemplates(): Promise<MessageTemplate[]> {
+  try {
+    const stored = localStorage.getItem(TEMPLATES_KEY);
+    if (stored) {
+      return JSON.parse(stored, (key, value) =>
+        key === 'createdAt' ? new Date(value) : value
+      );
+    }
+  } catch {}
+  return loadTemplatesFromDb();
+}
+
+export async function saveTemplates(templates: MessageTemplate[]): Promise<void> {
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  await saveTemplatesToDb(templates);
 }
 
 const defaultTemplates: MessageTemplate[] = [

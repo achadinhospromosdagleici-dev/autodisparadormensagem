@@ -1,6 +1,8 @@
 // Chatwoot API Service
 // Manages communication with Chatwoot API for message sending and inbox management
 
+import { supabase } from '@/integrations/supabase/client';
+
 export interface ChatwootCredentials {
   baseUrl: string; // e.g. https://app.chatwoot.com
   apiToken: string;
@@ -44,22 +46,45 @@ export interface ChatwootContact {
 
 const STORAGE_KEY = 'chatwoot_credentials';
 
-export function saveChatwootCredentials(credentials: ChatwootCredentials): void {
+async function saveChatwootToDb(creds: ChatwootCredentials): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').upsert({
+    user_id: user.id,
+    key: 'chatwoot',
+    value: creds as unknown as object
+  }, { onConflict: 'user_id,key' });
+}
+
+async function loadChatwootFromDb(): Promise<ChatwootCredentials | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'chatwoot').single();
+  return (data?.value ?? null) as ChatwootCredentials | null;
+}
+
+export async function saveChatwootCredentials(credentials: ChatwootCredentials): Promise<void> {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+  await saveChatwootToDb(credentials);
 }
 
 export function loadChatwootCredentials(): ChatwootCredentials | null {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(stored); } catch { return null; }
 }
 
-export function clearChatwootCredentials(): void {
+export async function loadChatwootCredentialsWithFallback(): Promise<ChatwootCredentials | null> {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) { try { return JSON.parse(stored); } catch { return null; } }
+  return loadChatwootFromDb();
+}
+
+export async function clearChatwootCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'chatwoot');
 }
 
 function getHeaders(apiToken: string) {
@@ -135,6 +160,56 @@ export async function createConversation(
   return await res.json();
 }
 
+export async function findOrCreateConversation(
+  creds: ChatwootCredentials,
+  phoneNumber: string,
+  inboxId: number,
+  contactName?: string
+): Promise<{ conversationId: number; contactId: number }> {
+  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+  
+  let contact = await searchContact(creds, normalizedPhone);
+  let contactId: number;
+  let conversationId: number;
+  
+  if (!contact) {
+    const newContact = await createContact(
+      creds,
+      contactName || `Contato ${normalizedPhone}`,
+      normalizedPhone,
+      inboxId
+    );
+    contactId = newContact.id;
+  } else {
+    contactId = contact.id;
+  }
+  
+  const conversations = await getContactConversations(creds, contactId);
+  const existingConv = conversations.find(c => c.inbox_id === inboxId);
+  
+  if (existingConv) {
+    conversationId = existingConv.id;
+  } else {
+    const newConv = await createConversation(creds, contactId, inboxId);
+    conversationId = newConv.id;
+  }
+  
+  return { conversationId, contactId };
+}
+
+export async function fetchContactsByLabel(
+  creds: ChatwootCredentials,
+  label: string
+): Promise<ChatwootContact[]> {
+  const res = await fetch(
+    `${creds.baseUrl}/api/v1/accounts/${creds.accountId}/contacts?labels[]=${encodeURIComponent(label)}`,
+    { headers: getHeaders(creds.apiToken) }
+  );
+  if (!res.ok) throw new Error(`Erro ao buscar contatos por etiqueta: ${res.status}`);
+  const data = await res.json();
+  return data.payload || [];
+}
+
 export async function sendMessage(
   creds: ChatwootCredentials,
   conversationId: number,
@@ -154,6 +229,97 @@ export async function sendMessage(
   );
   if (!res.ok) throw new Error(`Erro ao enviar mensagem: ${res.status}`);
   return await res.json();
+}
+
+export async function sendImageMessage(
+  creds: ChatwootCredentials,
+  conversationId: number,
+  imageUrl: string,
+  caption?: string
+): Promise<ChatwootMessage> {
+  const res = await fetch(
+    `${creds.baseUrl}/api/v1/accounts/${creds.accountId}/conversations/${conversationId}/messages`,
+    {
+      method: 'POST',
+      headers: getHeaders(creds.apiToken),
+      body: JSON.stringify({
+        content: caption || 'Imagem',
+        message_type: 'outgoing',
+        private: false,
+        attachments: [imageUrl],
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Erro ao enviar imagem: ${res.status}`);
+  return await res.json();
+}
+
+export async function sendVideoMessage(
+  creds: ChatwootCredentials,
+  conversationId: number,
+  videoUrl: string,
+  caption?: string
+): Promise<ChatwootMessage> {
+  const res = await fetch(
+    `${creds.baseUrl}/api/v1/accounts/${creds.accountId}/conversations/${conversationId}/messages`,
+    {
+      method: 'POST',
+      headers: getHeaders(creds.apiToken),
+      body: JSON.stringify({
+        content: caption || 'Vídeo',
+        message_type: 'outgoing',
+        private: false,
+        attachments: [videoUrl],
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Erro ao enviar vídeo: ${res.status}`);
+  return await res.json();
+}
+
+export async function sendDocumentMessage(
+  creds: ChatwootCredentials,
+  conversationId: number,
+  documentUrl: string,
+  filename: string
+): Promise<ChatwootMessage> {
+  const res = await fetch(
+    `${creds.baseUrl}/api/v1/accounts/${creds.accountId}/conversations/${conversationId}/messages`,
+    {
+      method: 'POST',
+      headers: getHeaders(creds.apiToken),
+      body: JSON.stringify({
+        content: filename,
+        message_type: 'outgoing',
+        private: false,
+        attachments: [documentUrl],
+      }),
+    }
+  );
+  if (!res.ok) throw new Error(`Erro ao enviar documento: ${res.status}`);
+  return await res.json();
+}
+
+export async function sendMediaMessage(
+  creds: ChatwootCredentials,
+  conversationId: number,
+  mediaType: 'text' | 'image' | 'audio' | 'video' | 'document',
+  mediaUrl?: string,
+  caption?: string,
+  filename?: string
+): Promise<ChatwootMessage> {
+  switch (mediaType) {
+    case 'image':
+      return sendImageMessage(creds, conversationId, mediaUrl!, caption);
+    case 'video':
+      return sendVideoMessage(creds, conversationId, mediaUrl!, caption);
+    case 'document':
+      return sendDocumentMessage(creds, conversationId, mediaUrl!, filename || 'documento');
+    case 'audio':
+      return sendImageMessage(creds, conversationId, mediaUrl!, caption);
+    default:
+      return sendMessage(creds, conversationId, mediaUrl || caption || '');
+  }
 }
 
 export async function getConversationMessages(
