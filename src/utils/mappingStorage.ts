@@ -30,9 +30,9 @@ async function loadMappingFromDb(): Promise<Record<string, string>> {
   return result;
 }
 
-export async function saveMappingHistory(mappings: Record<string, string>) {
+export function saveMappingHistory(mappings: Record<string, string>) {
   try {
-    const existing = await getMappingHistory();
+    const existing = getMappingHistory();
     Object.entries(mappings).forEach(([colName, mappedTo]) => {
       if (mappedTo === '_skip') return;
       const normalized = colName.toLowerCase().trim();
@@ -41,11 +41,11 @@ export async function saveMappingHistory(mappings: Record<string, string>) {
       else { existing.push({ columnName: normalized, mappedTo, count: 1 }); }
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-    await saveMappingToDb(mappings);
+    saveMappingToDb(mappings).catch(console.error);
   } catch {}
 }
 
-export async function getMappingHistory(): Promise<MappingEntry[]> {
+export function getMappingHistory(): MappingEntry[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
