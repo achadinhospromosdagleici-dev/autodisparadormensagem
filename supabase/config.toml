@@ -1,4 +1,16 @@
-project_id = "buuclhbchpysbcpnbsfb"
+project_id = "wbwpzsuxwwjplyzbjqmo"
 
 [functions.unoapi-proxy]
+verify_jwt = false
+
+[functions.evolution-proxy]
+verify_jwt = false
+
+[functions.evolution-go-proxy]
+verify_jwt = false
+
+[functions.s3-upload]
+verify_jwt = false
+
+[functions.webhook-receiver]
 verify_jwt = false
