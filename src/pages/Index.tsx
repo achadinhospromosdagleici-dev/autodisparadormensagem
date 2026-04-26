@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { WizardProvider } from '@/contexts/WizardContext';
 import { WizardLayout } from '@/components/wizard/WizardLayout';
+import { InstancesManager } from '@/components/wizard/InstancesManager';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthModal } from '@/components/AuthModal';
 import { TrialExpired } from '@/components/TrialExpired';
@@ -73,6 +74,7 @@ const Index = () => {
   return (
     <WizardProvider>
       <WizardLayout />
+      <InstancesManager />
     </WizardProvider>
   );
 };
