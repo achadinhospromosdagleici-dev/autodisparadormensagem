@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import {
   loadUnoApiCredentials,
+  loadUnoApiCredentialsWithFallback,
   fetchInstances as fetchUnoInstances,
   UnoApiInstance,
 } from '@/services/unoapi';
@@ -30,12 +31,14 @@ import {
 } from '@/services/evolution';
 import {
   loadEvolutionGoCredentials,
+  loadEvolutionGoCredentialsWithFallback,
   isEvolutionGoConnected,
   fetchEvolutionGoInstances,
   EvolutionGoInstance,
 } from '@/services/evolutionGo';
 import {
   loadChatwootCredentials,
+  loadChatwootCredentialsWithFallback,
   fetchInboxes,
   ChatwootInbox,
 } from '@/services/chatwoot';
@@ -66,11 +69,23 @@ export function StepInstances() {
   const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef(false);
 
-  const hasEvolution = !!loadEvolutionCredentials();
+  const [hasEvolution, setHasEvolution] = useState(false);
   const hasSharedEvolution = useSharedEvolution();
-  const hasEvolutionGo = isEvolutionGoConnected();
-  const hasChatwoot = !!loadChatwootCredentials();
-  const hasAnyApi = unoApiConnected || hasEvolution || hasSharedEvolution || hasEvolutionGo || hasChatwoot;
+  const [hasEvolutionGo, setHasEvolutionGo] = useState(false);
+  const [hasChatwoot, setHasChatwoot] = useState(false);
+  useEffect(() => {
+    async function checkApis() {
+      const evo = await loadEvolutionCredentialsWithFallback();
+      const evoGo = await loadEvolutionGoCredentialsWithFallback();
+      const cw = await loadChatwootCredentialsWithFallback();
+      setHasEvolution(!!evo);
+      setHasEvolutionGo(!!evoGo);
+      setHasChatwoot(!!cw);
+    }
+    checkApis();
+  }, []);
+
+  const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot;
 
   // Fetch user's registered instances (for filtering when using shared Evolution)
   useEffect(() => {
@@ -147,7 +162,7 @@ export function StepInstances() {
 
     // UnoAPI
     if (unoApiConnected) {
-      const creds = loadUnoApiCredentials();
+      const creds = await loadUnoApiCredentialsWithFallback();
       console.log('[StepInstances] UnoAPI connected, creds:', creds ? 'found' : 'not found');
       if (creds) {
         promises.push(
@@ -193,7 +208,7 @@ export function StepInstances() {
 
     // Evolution Go
     if (hasEvolutionGo) {
-      const evoGoCreds = loadEvolutionGoCredentials();
+      const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
       if (evoGoCreds) {
         promises.push(
           fetchEvolutionGoInstances(evoGoCreds)
@@ -211,7 +226,7 @@ export function StepInstances() {
 
     // Chatwoot
     if (hasChatwoot) {
-      const cwCreds = loadChatwootCredentials();
+      const cwCreds = await loadChatwootCredentialsWithFallback();
       if (cwCreds) {
         promises.push(
           fetchInboxes(cwCreds)
