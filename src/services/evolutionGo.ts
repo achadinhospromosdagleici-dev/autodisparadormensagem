@@ -22,18 +22,24 @@ const STORAGE_KEY = 'evolution_go_credentials';
 async function saveEvoGoToDb(creds: EvolutionGoCredentials): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').upsert({
+  await supabase.from('evolution_go_settings').upsert({
     user_id: user.id,
-    key: 'evolution-go',
-    value: creds as unknown as object
-  }, { onConflict: 'user_id,key' });
+    base_url: creds.baseUrl,
+    api_key: creds.apiKey,
+    instance_name: creds.instanceName,
+  }, { onConflict: 'user_id' });
 }
 
 async function loadEvoGoFromDb(): Promise<EvolutionGoCredentials | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'evolution-go').single();
-  return (data?.value ?? null) as EvolutionGoCredentials | null;
+  const { data } = await supabase.from('evolution_go_settings').select('*').eq('user_id', user.id).single();
+  if (!data) return null;
+  return {
+    baseUrl: data.base_url,
+    apiKey: data.api_key,
+    instanceName: data.instance_name,
+  };
 }
 
 export async function saveEvolutionGoCredentials(creds: EvolutionGoCredentials): Promise<void> {
@@ -41,7 +47,7 @@ export async function saveEvolutionGoCredentials(creds: EvolutionGoCredentials):
   await saveEvoGoToDb(creds);
 }
 
-export async function loadEvolutionGoCredentials(): Promise<EvolutionGoCredentials | null> {
+export function loadEvolutionGoCredentials(): EvolutionGoCredentials | null {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
@@ -57,7 +63,7 @@ export async function clearEvolutionGoCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'evolution-go');
+  await supabase.from('evolution_go_settings').delete().eq('user_id', user.id);
 }
 
 export function isEvolutionGoConnected(): boolean {
@@ -75,7 +81,7 @@ async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
   return data;
 }
 
-// ── ETAPA 1: Listar instâncias ──
+// ── Listar instâncias ──
 export async function fetchEvolutionGoInstances(creds: EvolutionGoCredentials): Promise<EvolutionGoInstance[]> {
   const data = await evolutionGoCall({
     action: 'fetchInstances',
@@ -85,7 +91,7 @@ export async function fetchEvolutionGoInstances(creds: EvolutionGoCredentials): 
   return data.instances || [];
 }
 
-// ── ETAPA 1: Encontrar ou criar instância (anti-duplicação) ──
+// ── Encontrar ou criar instância ──
 export async function findOrCreateEvolutionGoInstance(
   creds: EvolutionGoCredentials,
   instanceName: string
@@ -98,7 +104,7 @@ export async function findOrCreateEvolutionGoInstance(
   });
 }
 
-// ── ETAPA 2: Gerar QR Code ──
+// ── Gerar QR Code ──
 export async function getEvolutionGoQRCode(creds: EvolutionGoCredentials, instanceName: string): Promise<{ qrcode: string; pairingCode: string }> {
   return evolutionGoCall({
     action: 'connect',
@@ -108,20 +114,20 @@ export async function getEvolutionGoQRCode(creds: EvolutionGoCredentials, instan
   });
 }
 
-// ── ETAPA 2: Verificar status da conexão ──
+// ── Verificar status ──
 export async function getEvolutionGoInstanceStatus(
   creds: EvolutionGoCredentials,
   instanceName: string
-): Promise<{ instanceName: string; status: string; connected: boolean }> {
+): Promise<{ status: string; qrcode?: string; phone?: string }> {
   return evolutionGoCall({
-    action: 'connectionState',
+    action: 'status',
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
     instanceName,
   });
 }
 
-// ── ETAPA 2: Logout ──
+// ── Desconectar ──
 export async function logoutEvolutionGoInstance(creds: EvolutionGoCredentials, instanceName: string): Promise<void> {
   await evolutionGoCall({
     action: 'logout',
@@ -131,9 +137,9 @@ export async function logoutEvolutionGoInstance(creds: EvolutionGoCredentials, i
   });
 }
 
-// ── ETAPA 3: Enviar mensagem com validação de status ──
+// ── Enviar mensagem ──
 export interface EvolutionGoMessage {
-  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
+  type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'buttons' | 'list' | 'carousel';
   content: string;
   mediaUrl?: string;
   caption?: string;
@@ -142,24 +148,16 @@ export interface EvolutionGoMessage {
   footer?: string;
   btnTitle?: string;
   btnFooter?: string;
-  buttons?: { type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }>;
   linkUrl?: string;
-  // Para list:
-  sections?: { title: string; rows: { id?: string; title: string; description: string }[] }[];
-  // Para carousel:
-  cards?: {
-    image?: string;
-    title?: string;
-    description?: string;
-    footer?: string;
-    buttons?: { type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
-  }[];
+  sections?: Array<{ title: string; rows: Array<{ id?: string; title: string; description: string }> }>;
+  cards?: Array<{ image?: string; title?: string; description?: string; footer?: string; buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }> }>;
 }
 
 export async function sendEvolutionGoMessage(
   creds: EvolutionGoCredentials,
   instanceName: string,
-  to: string,
+  phoneNumber: string,
   message: EvolutionGoMessage
 ): Promise<any> {
   return evolutionGoCall({
@@ -167,33 +165,31 @@ export async function sendEvolutionGoMessage(
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
     instanceName,
-    to,
+    phoneNumber,
     message,
   });
 }
 
-// ── WEBHOOK: Configurar webhook ──
+// ── Webhook ──
 export async function setEvolutionGoWebhook(
   creds: EvolutionGoCredentials,
   instanceName: string,
   webhookUrl: string
-): Promise<{ success: boolean; webhookUrl: string }> {
-  return evolutionGoCall({
+): Promise<void> {
+  await evolutionGoCall({
     action: 'setWebhook',
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
     instanceName,
     webhookUrl,
-    events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE'],
   });
 }
 
-// ── WEBHOOK: Remover webhook ──
 export async function removeEvolutionGoWebhook(
   creds: EvolutionGoCredentials,
   instanceName: string
-): Promise<{ success: boolean }> {
-  return evolutionGoCall({
+): Promise<void> {
+  await evolutionGoCall({
     action: 'removeWebhook',
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
@@ -201,11 +197,10 @@ export async function removeEvolutionGoWebhook(
   });
 }
 
-// ── WEBHOOK: Buscar configuração atual ──
 export async function getEvolutionGoWebhook(
   creds: EvolutionGoCredentials,
   instanceName: string
-): Promise<{ enabled: boolean; url: string; events: string[] }> {
+): Promise<{ webhookUrl?: string }> {
   return evolutionGoCall({
     action: 'getWebhook',
     baseUrl: creds.baseUrl,

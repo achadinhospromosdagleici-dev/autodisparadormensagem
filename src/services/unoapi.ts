@@ -66,18 +66,34 @@ const STORAGE_KEY = 'unoapi_credentials';
 async function saveUnoApiToDb(creds: UnoApiCredentials): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').upsert({
+  await supabase.from('unoapi_settings').upsert({
     user_id: user.id,
-    key: 'unoapi',
-    value: creds as unknown as object
-  }, { onConflict: 'user_id,key' });
+    base_url: creds.baseUrl,
+    token: creds.token,
+    s3_enabled: creds.s3Enabled || false,
+    s3_endpoint: creds.s3Endpoint,
+    s3_access_key: creds.s3AccessKey,
+    s3_secret_key: creds.s3SecretKey,
+    s3_bucket: creds.s3Bucket,
+    s3_region: creds.s3Region,
+  }, { onConflict: 'user_id' });
 }
 
 async function loadUnoApiFromDb(): Promise<UnoApiCredentials | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'unoapi').single();
-  return (data?.value ?? null) as UnoApiCredentials | null;
+  const { data } = await supabase.from('unoapi_settings').select('*').eq('user_id', user.id).single();
+  if (!data) return null;
+  return {
+    baseUrl: data.base_url,
+    token: data.token,
+    s3Enabled: data.s3_enabled,
+    s3Endpoint: data.s3_endpoint,
+    s3AccessKey: data.s3_access_key,
+    s3SecretKey: data.s3_secret_key,
+    s3Bucket: data.s3_bucket,
+    s3Region: data.s3_region,
+  };
 }
 
 export async function saveUnoApiCredentials(credentials: UnoApiCredentials): Promise<void> {
@@ -88,9 +104,7 @@ export async function saveUnoApiCredentials(credentials: UnoApiCredentials): Pro
 export function loadUnoApiCredentials(): UnoApiCredentials | null {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
-  try {
-    return JSON.parse(stored);
-  } catch { return null; }
+  try { return JSON.parse(stored); } catch { return null; }
 }
 
 export async function loadUnoApiCredentialsWithFallback(): Promise<UnoApiCredentials | null> {
@@ -103,7 +117,7 @@ export async function clearUnoApiCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'unoapi');
+  await supabase.from('unoapi_settings').delete().eq('user_id', user.id);
 }
 
 // Upload file to S3 via edge function

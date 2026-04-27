@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Ban,
   Plus,
@@ -7,6 +7,8 @@ import {
   Shield,
   Search,
   AlertTriangle,
+  FileText,
+  Clipboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,21 +49,6 @@ export async function saveBlacklist(list: string[]): Promise<void> {
   await saveBlacklistToDb(list);
 }
 
-export function isBlacklisted(phone: string): boolean {
-  const list = loadBlacklist();
-  const normalized = phone.replace(/\D/g, '');
-  return list.some((p) => p.replace(/\D/g, '') === normalized);
-}
-
-export function addToBlacklist(phone: string): void {
-  const list = loadBlacklist();
-  const normalized = phone.replace(/\D/g, '');
-  if (!list.some((p) => p.replace(/\D/g, '') === normalized)) {
-    list.push(phone);
-    saveBlacklist(list);
-  }
-}
-
 export function isOptOutMessage(content: string): boolean {
   const upper = content.toUpperCase().trim();
   return OPT_OUT_KEYWORDS.some((kw) => upper.includes(kw));
@@ -72,9 +59,19 @@ interface BlacklistManagerProps {
 }
 
 export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
-  const [blacklist, setBlacklist] = useState<string[]>(loadBlacklist());
+  const [blacklist, setBlacklist] = useState<string[]>([]);
   const [newNumber, setNewNumber] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const list = await loadBlacklist();
+      setBlacklist(list);
+      setLoading(false);
+    }
+    load();
+  }, []);
 
   const updateBlacklist = (newList: string[]) => {
     setBlacklist(newList);
@@ -82,7 +79,7 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
     onBlacklistChange?.(newList);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!newNumber.trim()) {
       toast.error('Digite um número');
       return;
@@ -95,6 +92,41 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
     updateBlacklist([...blacklist, newNumber.trim()]);
     setNewNumber('');
     toast.success('Número adicionado à blacklist');
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const phones = text.split(/[\n,\t;]+/).map(p => p.replace(/\D/g, '')).filter(p => p.length > 8);
+      const newPhones = phones.filter(p => !blacklist.some((b) => b.replace(/\D/g, '') === p));
+      if (newPhones.length === 0) {
+        toast.error('Nenhum número válido encontrado');
+        return;
+      }
+      updateBlacklist([...blacklist, ...newPhones]);
+      toast.success(`${newPhones.length} números adicionados`);
+    } catch {
+      toast.error('Erro ao colar números');
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const phones = text.split(/[\n,\t;,]+/).map(p => p.replace(/\D/g, '')).filter(p => p.length > 8);
+      const newPhones = phones.filter(p => !blacklist.some((b) => b.replace(/\D/g, '') === p));
+      if (newPhones.length === 0) {
+        toast.error('Nenhum número válido encontrado');
+        return;
+      }
+      updateBlacklist([...blacklist, ...newPhones]);
+      toast.success(`${newPhones.length} números importados`);
+    };
+    reader.readAsText(file);
   };
 
   const handleRemove = (phone: string) => {
@@ -153,6 +185,19 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
           <Ban className="w-4 h-4" />
           Bloquear
         </button>
+        <button
+          onClick={handlePaste}
+          className="px-3 py-3 rounded-lg bg-muted/50 border border-border/50 hover:bg-muted text-sm flex items-center gap-2"
+          title="Colar números da clipboard"
+        >
+          <Clipboard className="w-4 h-4" />
+          Colar
+        </button>
+        <label className="px-3 py-3 rounded-lg bg-muted/50 border border-border/50 hover:bg-muted text-sm cursor-pointer flex items-center gap-2">
+          <FileText className="w-4 h-4" />
+          Importar
+          <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" />
+        </label>
       </div>
 
       {/* Search */}
@@ -170,7 +215,11 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
       )}
 
       {/* Blacklist */}
-      {filteredList.length > 0 ? (
+      {loading ? (
+        <div className="text-center py-8 text-muted-foreground">
+          Carregando blacklist...
+        </div>
+      ) : filteredList.length > 0 ? (
         <div className="glass-card p-4 space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
           {filteredList.map((phone) => (
             <div key={phone} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors">

@@ -22,18 +22,24 @@ const STORAGE_KEY = 'evolution_credentials';
 async function saveEvoToDb(creds: EvolutionCredentials): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').upsert({
+  await supabase.from('evolution_settings').upsert({
     user_id: user.id,
-    key: 'evolution',
-    value: creds as unknown as object
-  }, { onConflict: 'user_id,key' });
+    base_url: creds.baseUrl,
+    api_key: creds.apiKey,
+    instance_name: creds.instanceName,
+  }, { onConflict: 'user_id' });
 }
 
 async function loadEvoFromDb(): Promise<EvolutionCredentials | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'evolution').single();
-  return (data?.value ?? null) as EvolutionCredentials | null;
+  const { data } = await supabase.from('evolution_settings').select('*').eq('user_id', user.id).single();
+  if (!data) return null;
+  return {
+    baseUrl: data.base_url,
+    apiKey: data.api_key,
+    instanceName: data.instance_name,
+  };
 }
 
 export async function saveEvolutionCredentials(creds: EvolutionCredentials): Promise<void> {
@@ -41,7 +47,7 @@ export async function saveEvolutionCredentials(creds: EvolutionCredentials): Pro
   await saveEvoToDb(creds);
 }
 
-export async function loadEvolutionCredentials(): Promise<EvolutionCredentials | null> {
+export function loadEvolutionCredentials(): EvolutionCredentials | null {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
@@ -57,7 +63,7 @@ export async function clearEvolutionCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'evolution');
+  await supabase.from('evolution_settings').delete().eq('user_id', user.id);
 }
 
 // ── Shared Evolution (fallback for trial users) ──
