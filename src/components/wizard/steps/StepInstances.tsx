@@ -22,6 +22,7 @@ import {
 } from '@/services/unoapi';
 import {
   loadEvolutionCredentials,
+  loadEvolutionCredentialsWithFallback,
   loadSharedEvolutionCredentials,
   resolveEvolutionCredentials,
   fetchInstances as fetchEvoInstances,
@@ -166,8 +167,16 @@ export function StepInstances() {
     }
 
     // Evolution - try user's own first, then shared (for trial users)
-    const evoCreds = await resolveEvolutionCredentials();
+    let evoCreds = await resolveEvolutionCredentials();
     console.log('[StepInstances] Evolution creds (resolved):', evoCreds ? 'found' : 'not found');
+    if (!evoCreds) {
+      // Try loading from database as fallback
+      const credsFromDb = await loadEvolutionCredentialsWithFallback();
+      if (credsFromDb) {
+        console.log('[StepInstances] Evolution creds from DB found, using...');
+        evoCreds = credsFromDb;
+      }
+    }
     if (evoCreds) {
       promises.push(
         fetchEvoInstances(evoCreds)
