@@ -81,7 +81,7 @@ export async function loadSharedEvolutionCredentials(): Promise<EvolutionCredent
 
 /** Returns user's own creds if set, otherwise the shared system creds (if enabled). */
 export async function resolveEvolutionCredentials(): Promise<EvolutionCredentials | null> {
-  const own = loadEvolutionCredentials();
+  const own = await loadEvolutionCredentialsWithFallback();
   if (own?.baseUrl && own?.apiKey) return own;
   return loadSharedEvolutionCredentials();
 }

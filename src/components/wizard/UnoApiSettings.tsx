@@ -21,6 +21,7 @@ import {
   UnoApiInstance,
   saveUnoApiCredentials,
   loadUnoApiCredentials,
+  loadUnoApiCredentialsWithFallback,
   clearUnoApiCredentials,
   testConnection,
   fetchInstances,
@@ -57,7 +58,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
 
 useEffect(() => {
     async function load() {
-      const creds = await loadUnoApiCredentials();
+      const creds = await loadUnoApiCredentialsWithFallback();
       if (creds) {
         setBaseUrl(creds.baseUrl);
         setToken(creds.token);
@@ -181,7 +182,7 @@ useEffect(() => {
   };
 
   async function handleCheckStatus() {
-    const creds = await loadUnoApiCredentials();
+    const creds = await loadUnoApiCredentialsWithFallback();
     if (!creds) return;
     setIsLoading(true);
     const online = await testConnection(creds);

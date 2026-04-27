@@ -49,18 +49,24 @@ const STORAGE_KEY = 'chatwoot_credentials';
 async function saveChatwootToDb(creds: ChatwootCredentials): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').upsert({
+  await supabase.from('chatwoot_settings').upsert({
     user_id: user.id,
-    key: 'chatwoot',
-    value: creds as unknown as object
-  }, { onConflict: 'user_id,key' });
+    base_url: creds.baseUrl,
+    api_token: creds.apiToken,
+    account_id: creds.accountId,
+  }, { onConflict: 'user_id' });
 }
 
 async function loadChatwootFromDb(): Promise<ChatwootCredentials | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data } = await supabase.from('user_settings').select('value').eq('user_id', user.id).eq('key', 'chatwoot').single();
-  return (data?.value ?? null) as ChatwootCredentials | null;
+  const { data } = await supabase.from('chatwoot_settings').select('*').eq('user_id', user.id).single();
+  if (!data) return null;
+  return {
+    baseUrl: data.base_url,
+    apiToken: data.api_token,
+    accountId: data.account_id,
+  };
 }
 
 export async function saveChatwootCredentials(credentials: ChatwootCredentials): Promise<void> {
@@ -84,7 +90,7 @@ export async function clearChatwootCredentials(): Promise<void> {
   localStorage.removeItem(STORAGE_KEY);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await supabase.from('user_settings').delete().eq('user_id', user.id).eq('key', 'chatwoot');
+  await supabase.from('chatwoot_settings').delete().eq('user_id', user.id);
 }
 
 function getHeaders(apiToken: string) {

@@ -71,6 +71,11 @@ export function isEvolutionGoConnected(): boolean {
   return !!(creds?.baseUrl && creds?.apiKey);
 }
 
+export async function isEvolutionGoConnectedAsync(): Promise<boolean> {
+  const creds = await loadEvolutionGoCredentialsWithFallback();
+  return !!(creds?.baseUrl && creds?.apiKey);
+}
+
 // ── Generic proxy call ──
 async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
   const { data, error } = await supabase.functions.invoke('evolution-go-proxy', {

@@ -36,15 +36,18 @@ export function ChatwootSettings({ onInboxesLoaded, onConnectionChange }: Chatwo
   const [inboxes, setInboxes] = useState<ChatwootInbox[]>([]);
 
   useEffect(() => {
-    const creds = loadChatwootCredentials();
-    if (creds) {
-      setBaseUrl(creds.baseUrl);
-      setApiToken(creds.apiToken);
-      setAccountId(String(creds.accountId));
-      setIsConnected(true);
-      onConnectionChange(true);
-      handleLoadInboxes(creds);
+    async function load() {
+      const creds = await loadChatwootCredentialsWithFallback();
+      if (creds) {
+        setBaseUrl(creds.baseUrl);
+        setApiToken(creds.apiToken);
+        setAccountId(String(creds.accountId));
+        setIsConnected(true);
+        onConnectionChange(true);
+        handleLoadInboxes(creds);
+      }
     }
+    load();
   }, []);
 
   const handleLoadInboxes = async (creds: ChatwootCredentials) => {

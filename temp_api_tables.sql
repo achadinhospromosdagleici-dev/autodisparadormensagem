@@ -80,6 +80,56 @@ TO authenticated
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
+-- Chatwoot Settings
+CREATE TABLE IF NOT EXISTS public.chatwoot_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  base_url TEXT NOT NULL,
+  api_token TEXT NOT NULL,
+  account_id INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id)
+);
+
+ALTER TABLE public.chatwoot_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own chatwoot settings"
+ON public.chatwoot_settings FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
+CREATE POLICY "Users can manage own chatwoot settings"
+ON public.chatwoot_settings FOR ALL
+TO authenticated
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
+
+-- AI Settings
+CREATE TABLE IF NOT EXISTS public.ai_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  model TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id)
+);
+
+ALTER TABLE public.ai_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own ai settings"
+ON public.ai_settings FOR SELECT
+TO authenticated
+USING (user_id = auth.uid());
+
+CREATE POLICY "Users can manage own ai settings"
+ON public.ai_settings FOR ALL
+TO authenticated
+USING (user_id = auth.uid())
+WITH CHECK (user_id = auth.uid());
+
 -- Triggers
 CREATE OR REPLACE FUNCTION public.touch_api_settings_updated_at()
 RETURNS TRIGGER
@@ -102,4 +152,12 @@ FOR EACH ROW EXECUTE FUNCTION public.touch_api_settings_updated_at();
 
 CREATE TRIGGER evolution_go_settings_touch_updated_at
 BEFORE UPDATE ON public.evolution_go_settings
+FOR EACH ROW EXECUTE FUNCTION public.touch_api_settings_updated_at();
+
+CREATE TRIGGER chatwoot_settings_touch_updated_at
+BEFORE UPDATE ON public.chatwoot_settings
+FOR EACH ROW EXECUTE FUNCTION public.touch_api_settings_updated_at();
+
+CREATE TRIGGER ai_settings_touch_updated_at
+BEFORE UPDATE ON public.ai_settings
 FOR EACH ROW EXECUTE FUNCTION public.touch_api_settings_updated_at();
