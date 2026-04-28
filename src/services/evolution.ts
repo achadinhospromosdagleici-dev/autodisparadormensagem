@@ -34,7 +34,12 @@ async function loadEvoFromDb(): Promise<EvolutionCredentials | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
-    const { data } = await supabase.from('evolution_settings').select('*').eq('user_id', user.id).single();
+    const { data, error } = await supabase.from('evolution_settings').select('*').eq('user_id', user.id).single();
+    if (error) {
+      if (error.status === 406 || error.code === 'PGRST116') return null;
+      console.error('Error loading evolution from DB:', error);
+      return null;
+    }
     if (!data) return null;
     return {
       baseUrl: data.base_url,
