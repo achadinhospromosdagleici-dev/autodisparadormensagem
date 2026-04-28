@@ -75,10 +75,24 @@ export function StepInstances() {
   const [hasChatwoot, setHasChatwoot] = useState(false);
   useEffect(() => {
     async function checkApis() {
+      // Try localStorage first (faster, doesn't require DB)
+      const evoLocal = loadEvolutionCredentials();
+      const evoGoLocal = loadEvolutionGoCredentials();
+      const cwLocal = loadChatwootCredentials();
+      
+      if (evoLocal || evoGoLocal || cwLocal) {
+        console.log('[StepInstances] Credentials from localStorage:', { evo: !!evoLocal, evoGo: !!evoGoLocal, cw: !!cwLocal });
+        setHasEvolution(!!evoLocal);
+        setHasEvolutionGo(!!evoGoLocal);
+        setHasChatwoot(!!cwLocal);
+        return;
+      }
+      
+      // Fallback to DB
       const evo = await loadEvolutionCredentialsWithFallback();
       const evoGo = await loadEvolutionGoCredentialsWithFallback();
       const cw = await loadChatwootCredentialsWithFallback();
-      console.log('[StepInstances] Credentials check:', { evo: !!evo, evoGo: !!evoGo, cw: !!cw, evoGoCreds: evoGo });
+      console.log('[StepInstances] Credentials from DB:', { evo: !!evo, evoGo: !!evoGo, cw: !!cw });
       setHasEvolution(!!evo);
       setHasEvolutionGo(!!evoGo);
       setHasChatwoot(!!cw);
