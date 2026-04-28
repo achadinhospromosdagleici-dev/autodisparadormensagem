@@ -83,7 +83,11 @@ async function loadUnoApiFromDb(): Promise<UnoApiCredentials | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
-    const { data } = await supabase.from('unoapi_settings').select('*').eq('user_id', user.id).single();
+    const { data, error } = await supabase.from('unoapi_settings').select('*').eq('user_id', user.id).maybeSingle();
+    if (error) {
+      console.error('Error loading unoapi from DB:', error);
+      return null;
+    }
     if (!data) return null;
     return {
       baseUrl: data.base_url,
