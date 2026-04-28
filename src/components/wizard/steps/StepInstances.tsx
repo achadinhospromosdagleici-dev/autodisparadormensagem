@@ -78,6 +78,7 @@ export function StepInstances() {
       const evo = await loadEvolutionCredentialsWithFallback();
       const evoGo = await loadEvolutionGoCredentialsWithFallback();
       const cw = await loadChatwootCredentialsWithFallback();
+      console.log('[StepInstances] Credentials check:', { evo: !!evo, evoGo: !!evoGo, cw: !!cw, evoGoCreds: evoGo });
       setHasEvolution(!!evo);
       setHasEvolutionGo(!!evoGo);
       setHasChatwoot(!!cw);

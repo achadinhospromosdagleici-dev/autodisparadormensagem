@@ -31,11 +31,11 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { cn } from '@/lib/utils';
 
 const campaignSections = [
-  { id: 'data-entry', title: 'Importar Dados', description: 'Cole ou importe sua lista de contatos' },
-  { id: 'data-review', title: 'Revisar e Corrigir', description: 'Valide e edite os dados importados' },
-  { id: 'messages', title: 'Mensagens', description: 'Crie o conteúdo das mensagens' },
-  { id: 'instances', title: 'Instâncias', description: 'Escolha os canais de envio' },
-  { id: 'settings', title: 'Configurações', description: 'Defina intervalos e opções de envio' },
+  { id: 'data-entry', title: '1. Importar Dados', description: 'Cole ou importe sua lista de contatos' },
+  { id: 'data-review', title: '2. Revisar Dados', description: 'Valide e edite os dados importados' },
+  { id: 'settings', title: '3. Configurações', description: 'Nome, recurrence e opções de envio' },
+  { id: 'instances', title: '4. Nº de Disparo', description: 'Escolha API e instâncias para envio' },
+  { id: 'messages', title: '5. Mensagens', description: 'Crie o conteúdo das mensagens' },
 ];
 
 export function WizardLayout() {
@@ -160,28 +160,28 @@ export function WizardLayout() {
 
             {/* Sections */}
             <section ref={el => sectionRefs.current['data-entry'] = el} className="scroll-mt-24">
-              <SectionHeader title="Importar Dados" description="Cole ou importe sua lista de contatos" isComplete={data.length > 0} onNext={() => scrollToSection('data-review')} />
+              <SectionHeader title="1. Importar Dados" description="Cole ou importe sua lista de contatos" isComplete={data.length > 0} onNext={() => scrollToSection('data-review')} />
               <div className="mt-4"><StepDataEntry /></div>
             </section>
 
             <section ref={el => sectionRefs.current['data-review'] = el} className="scroll-mt-24">
-              <SectionHeader title="Revisar e Corrigir" description="Valide e edite os dados importados" isComplete={data.some(r => r.isValid)} onNext={() => scrollToSection('settings')} disabled={data.length === 0} />
+              <SectionHeader title="2. Revisar Dados" description="Valide e edite os dados importados" isComplete={data.some(r => r.isValid)} onNext={() => scrollToSection('settings')} disabled={data.length === 0} />
               <div className={`mt-4 ${data.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepDataReview /></div>
             </section>
 
-            <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">
-              <SectionHeader title="Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('instances')} />
-              <div className="mt-4"><StepMessages /></div>
+            <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
+              <SectionHeader title="3. Configurações" description="Nome, recurrence e opções de envio" isComplete onNext={() => scrollToSection('instances')} disabled={data.length === 0} />
+              <div className={`mt-4 ${data.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepSettings /></div>
             </section>
 
             <section ref={el => sectionRefs.current['instances'] = el} className="scroll-mt-24">
-              <SectionHeader title="Instâncias" description="Escolha os canais de envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('settings')} />
-              <div className="mt-4"><StepInstances /></div>
+              <SectionHeader title="4. Nº de Disparo" description="Escolha API e instâncias para envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('messages')} disabled={data.length === 0 || !data.some(r => r.isValid)} />
+              <div className={`mt-4 ${data.length === 0 || !data.some(r => r.isValid) ? 'opacity-50 pointer-events-none' : ''}`}><StepInstances /></div>
             </section>
 
-            <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
-              <SectionHeader title="Configurações de Envio" description="Defina intervalos e opções" isComplete onNext={() => scrollToSection('send')} />
-              <div className="mt-4"><StepSettings /></div>
+            <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">
+              <SectionHeader title="5. Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('send')} disabled={selectedInstances.length === 0} />
+              <div className={`mt-4 ${selectedInstances.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepMessages /></div>
             </section>
 
             <section ref={el => sectionRefs.current['send'] = el} className="scroll-mt-24">
