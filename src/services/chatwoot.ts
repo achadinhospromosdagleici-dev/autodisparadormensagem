@@ -88,7 +88,11 @@ export function loadChatwootCredentials(): ChatwootCredentials | null {
 export async function loadChatwootCredentialsWithFallback(): Promise<ChatwootCredentials | null> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) { try { return JSON.parse(stored); } catch { return null; } }
-  return loadChatwootFromDb();
+  try {
+    return await loadChatwootFromDb();
+  } catch {
+    return null;
+  }
 }
 
 export async function clearChatwootCredentials(): Promise<void> {

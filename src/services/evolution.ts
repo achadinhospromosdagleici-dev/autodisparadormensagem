@@ -61,7 +61,11 @@ export function loadEvolutionCredentials(): EvolutionCredentials | null {
 export async function loadEvolutionCredentialsWithFallback(): Promise<EvolutionCredentials | null> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) { try { return JSON.parse(stored); } catch { return null; } }
-  return loadEvoFromDb();
+  try {
+    return await loadEvoFromDb();
+  } catch {
+    return null;
+  }
 }
 
 export async function clearEvolutionCredentials(): Promise<void> {
