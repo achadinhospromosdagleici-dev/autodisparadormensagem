@@ -50,7 +50,11 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
         setApiKey(own.apiKey);
         setIsConnected(true);
         setUsingShared(false);
-        handleFetchInstances(own);
+        try {
+          const list = await fetchInstances(own);
+          setInstances(list);
+          onInstancesLoaded?.(list);
+        } catch { /* silent on init */ }
         return;
       }
       const shared = await loadSharedEvolutionCredentials();
@@ -59,7 +63,11 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
         setApiKey(shared.apiKey);
         setIsConnected(true);
         setUsingShared(true);
-        handleFetchInstances(shared);
+        try {
+          const list = await fetchInstances(shared);
+          setInstances(list);
+          onInstancesLoaded?.(list);
+        } catch { /* silent on init */ }
       }
     })();
     return () => {

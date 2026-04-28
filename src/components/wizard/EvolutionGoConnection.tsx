@@ -46,7 +46,11 @@ export function EvolutionGoConnection({ onInstancesLoaded }: EvolutionGoConnecti
         setBaseUrl(creds.baseUrl);
         setApiKey(creds.apiKey);
         setIsConnected(true);
-        handleFetchInstances(creds);
+        try {
+          const list = await fetchEvolutionGoInstances(creds);
+          setInstances(list);
+          onInstancesLoaded?.(list);
+        } catch { /* silent on init */ }
       }
     })();
     return () => {
