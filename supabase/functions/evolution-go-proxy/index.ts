@@ -33,26 +33,52 @@ Deno.serve(async (req) => {
     switch (action) {
       // ── ETAPA 1: Listar instâncias ──
       case 'fetchInstances': {
-        const res = await fetch(`${base}/instance/fetchInstances`, { headers });
-        if (!res.ok) {
-          const text = await res.text();
-          return jsonResponse({ error: `Erro ao buscar instâncias: ${res.status}`, detail: text }, res.status);
+        const endpoints = [
+          `${base}/instance/all`,
+          `${base}/manager/api/instance/list`,
+          `${base}/api/instance/list`,
+        ];
+        
+        let lastError = '';
+        let data: any = null;
+        
+        for (const endpoint of endpoints) {
+          try {
+            const res = await fetch(endpoint, { headers, method: 'GET' });
+            if (res.ok) {
+              data = await res.json();
+              break;
+            }
+            lastError = await res.text();
+          } catch (e) {
+            lastError = String(e);
+          }
         }
-        const instances = await res.json();
+        
+        if (!data) {
+          return jsonResponse({ 
+            error: 'Nenhuma instância encontrada', 
+            detail: lastError,
+            tried: endpoints,
+            baseUrl: base 
+          }, 200);
+        }
+
+        const instances = data?.data || data?.instances || data || [];
 
         const normalized = (Array.isArray(instances) ? instances : []).map((inst: any) => ({
-          instanceName: inst.instance?.instanceName || inst.instanceName || inst.name || '',
-          status: inst.instance?.status || inst.status || 'close',
-          phone: inst.instance?.owner || inst.owner || inst.phone || '',
-          profileName: inst.instance?.profileName || inst.profileName || '',
-          profilePictureUrl: inst.instance?.profilePictureUrl || inst.profilePictureUrl || '',
+          instanceName: inst.name || '',
+          status: inst.connected ? 'open' : 'close',
+          phone: inst.jid ? inst.jid.split('@')[0] : '',
+          profileName: inst.profileName || '',
+          profilePictureUrl: inst.profilePicUrl || '',
         }));
 
         const enriched = await Promise.all(
           normalized.map(async (inst: any) => {
             if (!inst.instanceName) return inst;
             try {
-              const stateRes = await fetch(`${base}/instance/connectionState/${inst.instanceName}`, { headers });
+              const stateRes = await fetch(`${base}/manager/api/instance/connectionState/${inst.instanceName}`, { headers });
               if (stateRes.ok) {
                 const stateData = await stateRes.json();
                 const state = stateData?.instance?.state || stateData?.state || inst.status;
@@ -76,36 +102,35 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName is required' }, 400);
         }
 
-        const listRes = await fetch(`${base}/instance/fetchInstances`, { headers });
+        // Verificar se instância já existe
+        const listRes = await fetch(`${base}/instance/all`, { headers, method: 'GET' });
         let existingInstances: any[] = [];
         if (listRes.ok) {
-          existingInstances = await listRes.json();
+          const data = await listRes.json();
+          existingInstances = data?.data || data?.instances || data || [];
           if (!Array.isArray(existingInstances)) existingInstances = [];
         }
 
         const existing = existingInstances.find((inst: any) => {
-          const name = inst.instance?.instanceName || inst.instanceName || inst.name || '';
-          return name === instanceName;
+          return inst.name === instanceName;
         });
 
         if (existing) {
-          const status = existing.instance?.status || existing.status || 'close';
           return jsonResponse({
             action: 'existing',
-            instanceName: existing.instance?.instanceName || existing.instanceName,
-            status,
-            phone: existing.instance?.owner || existing.owner || '',
+            instanceName: existing.name,
+            status: existing.connected ? 'open' : 'close',
+            phone: existing.jid ? existing.jid.split('@')[0] : '',
             message: 'Instância já existe, reutilizando.',
           });
         }
 
+        // Criar nova instância
         const createRes = await fetch(`${base}/instance/create`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             instanceName,
-            integration: 'WHATSAPP-BAILEYS',
-            qrcode: true,
           }),
         });
 
@@ -118,8 +143,8 @@ Deno.serve(async (req) => {
         return jsonResponse({
           action: 'created',
           instanceName,
-          qrcode: created.qrcode?.base64 || created.base64 || '',
-          pairingCode: created.qrcode?.pairingCode || created.pairingCode || '',
+          qrcode: created.qrcode?.base64 || created.base64 || created.qrcode || '',
+          pairingCode: created.pairingCode || '',
           status: 'close',
         });
       }
@@ -130,7 +155,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName is required' }, 400);
         }
 
-        const connectRes = await fetch(`${base}/instance/connect/${instanceName}`, {
+        const connectRes = await fetch(`${base}/manager/api/instance/connect/${instanceName}`, {
           headers,
         });
 
@@ -152,7 +177,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName is required' }, 400);
         }
 
-        const stateRes = await fetch(`${base}/instance/connectionState/${instanceName}`, { headers });
+        const stateRes = await fetch(`${base}/manager/api/instance/connectionState/${instanceName}`, { headers });
         if (!stateRes.ok) {
           const text = await stateRes.text();
           return jsonResponse({ error: `Erro ao verificar status: ${stateRes.status}`, detail: text }, stateRes.status);
@@ -173,7 +198,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName is required' }, 400);
         }
 
-        await fetch(`${base}/instance/logout/${instanceName}`, {
+        await fetch(`${base}/manager/api/instance/logout/${instanceName}`, {
           method: 'DELETE',
           headers,
         });
@@ -187,7 +212,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName, to, and message are required' }, 400);
         }
 
-        const statusRes = await fetch(`${base}/instance/connectionState/${instanceName}`, { headers });
+        const statusRes = await fetch(`${base}/manager/api/instance/connectionState/${instanceName}`, { headers });
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           const state = statusData?.instance?.state || statusData?.state || 'close';
