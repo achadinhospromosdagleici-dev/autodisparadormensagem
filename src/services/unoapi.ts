@@ -80,20 +80,25 @@ async function saveUnoApiToDb(creds: UnoApiCredentials): Promise<void> {
 }
 
 async function loadUnoApiFromDb(): Promise<UnoApiCredentials | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from('unoapi_settings').select('*').eq('user_id', user.id).single();
-  if (!data) return null;
-  return {
-    baseUrl: data.base_url,
-    token: data.token,
-    s3Enabled: data.s3_enabled,
-    s3Endpoint: data.s3_endpoint,
-    s3AccessKey: data.s3_access_key,
-    s3SecretKey: data.s3_secret_key,
-    s3Bucket: data.s3_bucket,
-    s3Region: data.s3_region,
-  };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase.from('unoapi_settings').select('*').eq('user_id', user.id).single();
+    if (!data) return null;
+    return {
+      baseUrl: data.base_url,
+      token: data.token,
+      s3Enabled: data.s3_enabled,
+      s3Endpoint: data.s3_endpoint,
+      s3AccessKey: data.s3_access_key,
+      s3SecretKey: data.s3_secret_key,
+      s3Bucket: data.s3_bucket,
+      s3Region: data.s3_region,
+    };
+  } catch (error) {
+    console.error('Error loading unoapi from DB:', error);
+    return null;
+  }
 }
 
 export async function saveUnoApiCredentials(credentials: UnoApiCredentials): Promise<void> {

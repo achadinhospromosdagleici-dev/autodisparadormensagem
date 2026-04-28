@@ -31,15 +31,20 @@ async function saveEvoGoToDb(creds: EvolutionGoCredentials): Promise<void> {
 }
 
 async function loadEvoGoFromDb(): Promise<EvolutionGoCredentials | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase.from('evolution_go_settings').select('*').eq('user_id', user.id).single();
-  if (!data) return null;
-  return {
-    baseUrl: data.base_url,
-    apiKey: data.api_key,
-    instanceName: data.instance_name,
-  };
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase.from('evolution_go_settings').select('*').eq('user_id', user.id).single();
+    if (!data) return null;
+    return {
+      baseUrl: data.base_url,
+      apiKey: data.api_key,
+      instanceName: data.instance_name,
+    };
+  } catch (error) {
+    console.error('Error loading evolution-go from DB:', error);
+    return null;
+  }
 }
 
 export async function saveEvolutionGoCredentials(creds: EvolutionGoCredentials): Promise<void> {

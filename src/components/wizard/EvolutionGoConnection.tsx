@@ -6,7 +6,7 @@ import {
   EvolutionGoCredentials,
   EvolutionGoInstance,
   saveEvolutionGoCredentials,
-  loadEvolutionGoCredentials,
+  loadEvolutionGoCredentialsWithFallback,
   clearEvolutionGoCredentials,
   fetchEvolutionGoInstances,
   findOrCreateEvolutionGoInstance,
@@ -41,7 +41,7 @@ export function EvolutionGoConnection({ onInstancesLoaded }: EvolutionGoConnecti
 
   useEffect(() => {
     (async () => {
-      const creds = loadEvolutionGoCredentials();
+      const creds = await loadEvolutionGoCredentialsWithFallback();
       if (creds) {
         setBaseUrl(creds.baseUrl);
         setApiKey(creds.apiKey);

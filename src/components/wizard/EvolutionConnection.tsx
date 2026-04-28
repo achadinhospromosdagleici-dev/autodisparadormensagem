@@ -6,7 +6,7 @@ import {
   EvolutionCredentials,
   EvolutionInstance,
   saveEvolutionCredentials,
-  loadEvolutionCredentials,
+  loadEvolutionCredentialsWithFallback,
   clearEvolutionCredentials,
   fetchInstances,
   findOrCreateInstance,
@@ -44,7 +44,7 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
 
   useEffect(() => {
     (async () => {
-      const own = loadEvolutionCredentials();
+      const own = await loadEvolutionCredentialsWithFallback();
       if (own) {
         setBaseUrl(own.baseUrl);
         setApiKey(own.apiKey);
@@ -53,7 +53,6 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
         handleFetchInstances(own);
         return;
       }
-      // No own creds — try shared (trial fallback)
       const shared = await loadSharedEvolutionCredentials();
       if (shared) {
         setBaseUrl(shared.baseUrl);
