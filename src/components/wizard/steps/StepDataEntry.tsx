@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { SpreadsheetPasteArea } from '../SpreadsheetPasteArea';
 
 export function StepDataEntry() {
-  const { setData, setColumns, data, columns, settings, setSettings } = useWizard();
+  const { setData, setColumns, data, columns, settings, setSettings, nextStep } = useWizard();
   const [pasteData, setPasteData] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showPasteArea, setShowPasteArea] = useState(false);
@@ -121,7 +121,10 @@ export function StepDataEntry() {
     setData(prev => isAppending ? [...prev, ...validRows] : validRows);
     const validCount = validRows.filter(r => r && r.isValid).length;
     toast.success(`${validRows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
-  }, [setData, setColumns, data.length, columns]);
+    
+    // Auto-avançar para próximo passo
+    nextStep();
+  }, [setData, setColumns, data.length, columns, nextStep]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
