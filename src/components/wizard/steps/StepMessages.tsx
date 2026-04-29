@@ -68,6 +68,7 @@ export function StepMessages() {
   const isApiUno = selectedApi === 'unoapi';
   const isApiEvo = selectedApi === 'evolution';
   const isApiEvoGo = selectedApi === 'evolution-go';
+  const showAllOptions = !selectedApi;
 
   const handleAddMessage = () => {
     if (mediaType === 'text' && !newMessage.trim()) {
