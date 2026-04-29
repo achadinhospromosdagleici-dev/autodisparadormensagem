@@ -165,9 +165,7 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
       focusInput(lastPastedRow, lastPastedCol);
       setFocusedCell({ row: lastPastedRow, col: lastPastedCol });
     }, 0);
-
-    onDataPaste(text);
-  }, [focusedCell, columnWidths.length, onDataPaste]);
+  }, [focusedCell, columnWidths.length]);
 
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
     const newCells = [...cells];

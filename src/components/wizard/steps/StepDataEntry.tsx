@@ -35,7 +35,7 @@ export function StepDataEntry() {
       const shouldHaveHeader = hasHeader && lines.length > 1;
       
       cols = shouldHaveHeader
-        ? firstLineNormalized
+        ? headerLine
         : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
 
       setColumns(cols);
