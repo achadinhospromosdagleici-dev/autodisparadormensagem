@@ -263,7 +263,7 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
     }
   };
 
-  const hasData = cells.some(row => row.some(cell => cell.trim() !== ''));
+  const hasData = Array.isArray(cells) && cells.some((row: string[]) => Array.isArray(row) && row.some(cell => cell.trim() !== ''));
 
   return (
     <div 
@@ -330,7 +330,6 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
                       value={cell}
                       onChange={(e) => handleCellChange(rowIndex, colIndex, e.target.value)}
                       onKeyDown={(e) => handleInputKeyDown(e, rowIndex, colIndex)}
-                      onPaste={(e) => handleInputPaste(e, rowIndex, colIndex)}
                       onFocus={() => setFocusedCell({ row: rowIndex, col: colIndex })}
                       className={`w-full px-3 py-2 text-sm bg-transparent outline-none font-mono transition-colors ${
                         focusedCell?.row === rowIndex && focusedCell?.col === colIndex 
