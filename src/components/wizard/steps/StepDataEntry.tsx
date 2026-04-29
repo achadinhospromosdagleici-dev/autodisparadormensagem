@@ -105,10 +105,7 @@ export function StepDataEntry() {
     setData(prev => isAppending ? [...prev, ...rows] : rows);
     const validCount = rows.filter(r => r.isValid).length;
     toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
-    
-    // Auto-avançar para próximo passo
-    nextStep();
-  }, [setData, setColumns, data.length, columns, nextStep]);
+  }, [setData, setColumns, data.length, columns]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
@@ -243,12 +240,22 @@ export function StepDataEntry() {
               setPasteData(text);
               processData(text, settings.hasHeader);
             }}
+            onProcess={() => nextStep()}
           />
 
           {data.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Dados carregados! Clique em <strong>Avançar</strong> para continuar.</span>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Dados carregados! Verifique abaixo ou clique no botão para mapear.</span>
+              </div>
+              <button
+                onClick={() => nextStep()}
+                className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 group"
+              >
+                Ir para Mapeamento (Passo 2)
+                <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+              </button>
             </div>
           )}
         </div>

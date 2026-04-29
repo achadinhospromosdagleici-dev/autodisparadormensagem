@@ -4,9 +4,10 @@ import { Grid3X3 } from 'lucide-react';
 interface SpreadsheetPasteAreaProps {
   onDataPaste?: (text: string) => void;
   onDataChange?: (hasData: boolean, rawText: string) => void;
+  onProcess?: () => void;
 }
 
-export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps) {
+export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPasteAreaProps) {
   const [cells, setCells] = useState<string[][]>([['']]);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const [columnWidths, setColumnWidths] = useState<number[]>([]);
@@ -354,7 +355,8 @@ export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps)
           <button
             onClick={() => {
               const text = cells.map(row => row.join('\t')).join('\n');
-              onDataPaste(text);
+              if (onDataPaste) onDataPaste(text);
+              if (onProcess) onProcess();
             }}
             className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
           >
