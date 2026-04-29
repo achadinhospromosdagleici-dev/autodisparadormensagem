@@ -13,21 +13,6 @@ export function StepDataEntry() {
 
   // NÃO auto-ocultar - área só fecha quando usuário clica em Processar ou Fechar
 
-  // Listen for Ctrl+V globally when paste area is shown
-  useEffect(() => {
-    if (!showPasteArea) return;
-
-    const handleGlobalPaste = (e: ClipboardEvent) => {
-      const text = e.clipboardData.getData('text');
-      if (text && text.trim()) {
-        processData(text, settings.hasHeader);
-        // NÃO fecha automaticamente - mantém aberto para adicionar mais
-      }
-    };
-
-    document.addEventListener('paste', handleGlobalPaste);
-    return () => document.removeEventListener('paste', handleGlobalPaste);
-  }, [showPasteArea, settings.hasHeader]);
 
   const processData = useCallback((text: string, hasHeader: boolean = true) => {
     const lines = text.trim().split('\n').filter(line => line.trim());
@@ -43,32 +28,31 @@ export function StepDataEntry() {
     let cols = columns;
     let dataLines = lines;
 
+    const headerLine = parseCSVLine(lines[0], delimiter);
+    const firstLineNormalized = headerLine.map(c => c.toLowerCase().replace(/\s+/g, '_'));
+    
     if (!isAppending) {
-      const headerLine = parseCSVLine(lines[0], delimiter);
       const shouldHaveHeader = hasHeader && lines.length > 1;
       
       cols = shouldHaveHeader
-        ? headerLine.map(col => col.toLowerCase().replace(/\s+/g, '_'))
+        ? firstLineNormalized
         : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
 
+      // Auto-detect phone column if not present
       if (!cols.includes('numero')) {
         const phoneColIndex = headerLine.findIndex(col => 
           /phone|telefone|numero|number|celular|whatsapp/i.test(col)
         );
-        
-        if (phoneColIndex >= 0) {
-          cols[phoneColIndex] = 'numero';
-        } else {
-          cols[0] = 'numero';
-        }
+        cols[phoneColIndex >= 0 ? phoneColIndex : 0] = 'numero';
       }
 
       setColumns(cols);
       dataLines = shouldHaveHeader ? lines.slice(1) : lines;
     } else {
-      const firstLine = parseCSVLine(lines[0], delimiter).map(c => c.toLowerCase().replace(/\s+/g, '_'));
-      const isHeader = firstLine.some(c => columns.includes(c));
-      dataLines = isHeader ? lines.slice(1) : lines;
+      // If appending, check if user says there is a header or if it matches existing columns
+      const matchesExisting = firstLineNormalized.some(c => columns.includes(c));
+      const shouldSkipFirst = hasHeader || matchesExisting;
+      dataLines = shouldSkipFirst ? lines.slice(1) : lines;
     }
     
     if (dataLines.length === 0) {
@@ -107,13 +91,13 @@ export function StepDataEntry() {
     toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
   }, [setData, setColumns, data.length, columns]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const text = e.clipboardData.getData('text');
     if (text) {
       setPasteData(text);
-      processData(text);
+      processData(text, settings.hasHeader);
     }
-  }, [processData]);
+  }, [processData, settings.hasHeader]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -150,7 +134,7 @@ export function StepDataEntry() {
   }, [processData, settings.hasHeader]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onPaste={handlePaste}>
       {/* Toggle between paste areas */}
       {!showPasteArea && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
