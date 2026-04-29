@@ -234,6 +234,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       metrics: defaultMetrics,
       activeCampaigns: [],
       selectedApi: null,
+      unoApiConnected: !!localStorage.getItem('unoapi_credentials'),
     };
   });
 

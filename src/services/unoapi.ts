@@ -236,15 +236,30 @@ async function fetchEvolutionInstances(creds: UnoApiCredentials): Promise<{ inst
   }
 }
 
-// Test connection by sending a ping
+// Test connection by checking if API is reachable
 export async function testConnection(creds: UnoApiCredentials): Promise<boolean> {
   localStorage.setItem('api_type_detected', 'unoapi'); // Force UnoAPI mode
-  const result = await proxyCall(creds, 'ping');
-  if (result.ok && result.data) {
-    const text = typeof result.data === 'string' ? result.data : (result.data.text || JSON.stringify(result.data));
-    return text.includes('pong');
+  
+  try {
+    // Try ping first
+    const pingResult = await proxyCall(creds, 'ping');
+    if (pingResult.ok && pingResult.data) {
+      const text = typeof pingResult.data === 'string' ? pingResult.data : (pingResult.data.text || JSON.stringify(pingResult.data));
+      if (text.toLowerCase().includes('pong')) return true;
+    }
+
+    // Fallback: Try fetching sessions (the actual endpoint we use)
+    const sessionsResult = await proxyCall(creds, 'sessions');
+    if (sessionsResult.ok && sessionsResult.data) {
+      // If we got a valid JSON response from the proxy, the API is reachable
+      return true;
+    }
+    
+    return false;
+  } catch (err) {
+    console.error('[UnoAPI] Connection test failed:', err);
+    return false;
   }
-  return false;
 }
 
 // Force set API type (for testing)
