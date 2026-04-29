@@ -86,8 +86,8 @@ interface WizardContextType extends WizardState {
   setCurrentStep: (step: number) => void;
   nextStep: () => void;
   prevStep: () => void;
-  setData: (data: DataRow[]) => void;
-  setColumns: (columns: string[]) => void;
+  setData: (data: DataRow[] | ((prev: DataRow[]) => DataRow[])) => void;
+  setColumns: (columns: string[] | ((prev: string[]) => string[])) => void;
   updateRow: (id: string, updates: Partial<DataRow>) => void;
   deleteRow: (id: string) => void;
   deleteRows: (ids: string[]) => void;
@@ -227,11 +227,18 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
   const nextStep = () => setCurrentStep(state.currentStep + 1);
   const prevStep = () => setCurrentStep(state.currentStep - 1);
-  const setData = (data: DataRow[]) => {
-    const validData = Array.isArray(data) ? data : [];
-    setState(prev => ({ ...prev, data: validData }));
+  const setData = (data: DataRow[] | ((prev: DataRow[]) => DataRow[])) => {
+    setState(prev => ({
+      ...prev,
+      data: typeof data === 'function' ? data(prev.data) : (Array.isArray(data) ? data : [])
+    }));
   };
-  const setColumns = (columns: string[]) => setState(prev => ({ ...prev, columns: Array.isArray(columns) ? columns : [] }));
+  const setColumns = (columns: string[] | ((prev: string[]) => string[])) => {
+    setState(prev => ({
+      ...prev,
+      columns: typeof columns === 'function' ? columns(prev.columns) : (Array.isArray(columns) ? columns : [])
+    }));
+  };
   const updateRow = (id: string, updates: Partial<DataRow>) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.map(row => (row.id === id ? { ...row, ...updates } : row)) : [] }));
   const deleteRow = (id: string) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.filter(row => row.id !== id) : [] }));
   const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.filter(row => !ids.includes(row.id)) : [] }));
