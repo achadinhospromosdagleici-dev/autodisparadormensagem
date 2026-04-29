@@ -38,14 +38,6 @@ export function StepDataEntry() {
         ? firstLineNormalized
         : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
 
-      // Auto-detect phone column if not present
-      if (!cols.includes('numero')) {
-        const phoneColIndex = headerLine.findIndex(col => 
-          /phone|telefone|numero|number|celular|whatsapp/i.test(col)
-        );
-        cols[phoneColIndex >= 0 ? phoneColIndex : 0] = 'numero';
-      }
-
       setColumns(cols);
       dataLines = shouldHaveHeader ? lines.slice(1) : lines;
     } else {
