@@ -98,6 +98,7 @@ interface WizardContextType extends WizardState {
   deleteMessage: (id: string) => void;
   moveMessage: (fromIndex: number, toIndex: number) => void;
   setSettings: (settings: Partial<WizardSettings>) => void;
+  clearWizard: () => void;
   addInstance: (instance: Instance) => void;
   toggleInstanceSelection: (id: string) => void;
   selectAllInstances: () => void;
@@ -203,26 +204,43 @@ const sampleCampaignHistory: Campaign[] = [
 const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
 export function WizardProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<WizardState>({
-    currentStep: 1,
-    data: [],
-    columns: ['numero'],
-    messages: [],
-    instances: defaultInstances,
-    selectedInstances: ['1'],
-    settings: defaultSettings,
-    campaignHistory: sampleCampaignHistory,
-    chatwootConnected: false,
-    unoApiConnected: false,
-    chatwootInboxes: [],
-    selectedInboxId: null,
-    followUpConfig: defaultFollowUpConfig,
-    scheduledCampaigns: [],
-    abTests: [],
-    metrics: defaultMetrics,
-    activeCampaigns: [],
-    selectedApi: null,
+  const [state, setState] = useState<WizardState>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('wizard_state');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Error loading wizard state:', e);
+        }
+      }
+    }
+    return {
+      currentStep: 1,
+      data: [],
+      columns: ['numero'],
+      messages: [],
+      instances: defaultInstances,
+      selectedInstances: ['1'],
+      settings: defaultSettings,
+      campaignHistory: sampleCampaignHistory,
+      chatwootConnected: false,
+      unoApiConnected: false,
+      chatwootInboxes: [],
+      selectedInboxId: null,
+      followUpConfig: defaultFollowUpConfig,
+      scheduledCampaigns: [],
+      abTests: [],
+      metrics: defaultMetrics,
+      activeCampaigns: [],
+      selectedApi: null,
+    };
   });
+
+  // Persistir estado no localStorage
+  useEffect(() => {
+    localStorage.setItem('wizard_state', JSON.stringify(state));
+  }, [state]);
 
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
   const nextStep = () => setCurrentStep(state.currentStep + 1);
@@ -299,6 +317,17 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const getValidCount = () => (Array.isArray(state.data) ? state.data.filter(row => row.isValid).length : 0);
   const getInvalidCount = () => (Array.isArray(state.data) ? state.data.filter(row => !row.isValid).length : 0);
   const addCampaign = (campaign: Campaign) => setState(prev => ({ ...prev, campaignHistory: [campaign, ...prev.campaignHistory] }));
+  const clearWizard = () => {
+    setState(prev => ({
+      ...prev,
+      currentStep: 1,
+      data: [],
+      columns: ['numero'],
+      messages: [],
+      selectedInstances: [],
+    }));
+  };
+
   const reuseCampaign = (campaign: Campaign) => {
     const restoredMessages = campaign.messages.map(content => ({ id: crypto.randomUUID(), content }));
     setState(prev => ({ ...prev, messages: restoredMessages, currentStep: 4 }));
@@ -326,6 +355,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
       addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
+      clearWizard,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig, setSelectedApi,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
       addActiveCampaign, updateActiveCampaign, removeActiveCampaign,

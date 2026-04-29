@@ -13,6 +13,7 @@ import { BlacklistManager } from './BlacklistManager';
 import { AppSidebar, AppView } from '@/components/AppSidebar';
 import { CampaignHistory } from './CampaignHistory';
 import { ActiveCampaigns } from './ActiveCampaigns';
+import { CampaignsHome } from './CampaignsHome';
 import { SuperAdminPanel } from './SuperAdminPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { Crown, Clock } from 'lucide-react';
@@ -45,10 +46,10 @@ export function WizardLayout() {
     scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
     metrics, getValidCount, addMessage, campaignHistory,
     activeCampaigns, updateActiveCampaign, removeActiveCampaign,
-    currentStep,
+    currentStep, clearWizard
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [currentView, setCurrentView] = useState<AppView>('campaign');
+  const [currentView, setCurrentView] = useState<AppView>('home');
   const { isSuperadmin, trialDaysLeft, profile } = useAuth();
 
   const scrollToSection = (id: string) => {
@@ -159,6 +160,16 @@ export function WizardLayout() {
             </div>
             <BlacklistManager />
           </div>
+        );
+
+      case 'home':
+        return (
+          <CampaignsHome 
+            onNewCampaign={() => {
+              clearWizard();
+              setCurrentView('campaign');
+            }} 
+          />
         );
 
       case 'campaign':

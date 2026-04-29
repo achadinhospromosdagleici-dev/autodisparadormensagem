@@ -10,6 +10,8 @@ import {
   User,
   LogIn,
   Crown,
+  BarChart3,
+  Home,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -33,6 +35,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AuthModal } from './AuthModal';
 
 export type AppView =
+  | 'home'
   | 'dashboard'
   | 'campaign'
   | 'settings'
@@ -46,8 +49,8 @@ interface AppSidebarProps {
 }
 
 const mainItems = [
-  { id: 'dashboard' as AppView, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'campaign' as AppView, label: 'Nova Campanha', icon: Send },
+  { id: 'home' as AppView, label: 'Campanhas', icon: Home },
+  { id: 'dashboard' as AppView, label: 'Dashboard', icon: BarChart3 },
   { id: 'history' as AppView, label: 'Histórico', icon: History },
   { id: 'blacklist' as AppView, label: 'Blacklist', icon: Shield },
 ];
