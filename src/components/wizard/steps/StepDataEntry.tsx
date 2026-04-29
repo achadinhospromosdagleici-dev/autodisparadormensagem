@@ -85,10 +85,13 @@ export function StepDataEntry() {
     const rows: DataRow[] = dataLines
       .filter(line => {
         const values = parseCSVLine(line, delimiter);
-        return values.some(v => v.trim() !== '');
+        return Array.isArray(values) && values.some(v => v.trim() !== '');
       })
       .map((line) => {
         const values = parseCSVLine(line, delimiter);
+        if (!Array.isArray(values)) {
+          return null;
+        }
         const row: DataRow = {
           id: crypto.randomUUID(),
           numero: '',
@@ -108,7 +111,7 @@ export function StepDataEntry() {
         return row;
       });
 
-    setData(prev => isAppending ? [...prev, ...rows] : rows);
+    setData(prev => isAppending ? [...prev, ...rows.filter(r => r !== null)] : rows.filter(r => r !== null));
     const validCount = rows.filter(r => r.isValid).length;
     toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
   }, [setData, setColumns, data.length, columns]);

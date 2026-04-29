@@ -245,6 +245,7 @@ export function StepDataReview() {
 
   const filteredData = useMemo(() => {
     let result = data;
+    if (!Array.isArray(result)) return [];
     if (filter === 'valid') result = result.filter(row => row.isValid);
     else if (filter === 'invalid') result = result.filter(row => !row.isValid);
     if (searchQuery) {
@@ -259,8 +260,8 @@ export function StepDataReview() {
     return result;
   }, [data, filter, searchQuery, columns]);
 
-  const validCount = data.filter(r => r.isValid).length;
-  const invalidCount = data.filter(r => !r.isValid).length;
+  const validCount = Array.isArray(data) ? data.filter(r => r.isValid).length : 0;
+  const invalidCount = Array.isArray(data) ? data.filter(r => !r.isValid).length : 0;
 
   const handleSelectAll = () => {
     if (selectedRows.size === filteredData.length) setSelectedRows(new Set());
