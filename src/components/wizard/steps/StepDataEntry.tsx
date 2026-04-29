@@ -38,7 +38,7 @@ export function StepDataEntry() {
     }
 
     const delimiter = detectDelimiter(text);
-    const isAppending = data.length > 0;
+    const isAppending = Array.isArray(data) && data.length > 0;
     
     let cols = columns;
     let dataLines = lines;
@@ -68,7 +68,7 @@ export function StepDataEntry() {
       }
 
       setColumns(cols);
-      dataLines = shouldHaveHeader ? lines.slice(1) : lines;
+      dataLines = shouldHaveHeader && Array.isArray(lines) ? lines.slice(1) : lines;
     } else {
       // If appending, we might still have a header in the new text if it's a full paste
       // We'll try to skip it if the first line matches our columns
@@ -77,8 +77,8 @@ export function StepDataEntry() {
         dataLines = lines;
       } else {
         const firstLine = parsedFirstLine.map((c: string) => c.toLowerCase().replace(/\s+/g, '_'));
-        const isHeader = firstLine.some((c: string) => (columns || []).includes(c));
-        dataLines = isHeader ? lines.slice(1) : lines;
+        const isHeader = Array.isArray(columns) && firstLine.some((c: string) => columns.includes(c));
+        dataLines = isHeader && Array.isArray(lines) ? lines.slice(1) : lines;
       }
     }
     
@@ -116,9 +116,11 @@ export function StepDataEntry() {
         return row;
       });
 
-    setData(prev => isAppending ? [...prev, ...rows.filter(r => r !== null)] : rows.filter(r => r !== null));
-    const validCount = rows.filter(r => r.isValid).length;
-    toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
+    const validRows = rows.filter(r => r !== null) as DataRow[];
+    
+    setData(prev => isAppending ? [...prev, ...validRows] : validRows);
+    const validCount = validRows.filter(r => r && r.isValid).length;
+    toast.success(`${validRows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
   }, [setData, setColumns, data.length, columns]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
