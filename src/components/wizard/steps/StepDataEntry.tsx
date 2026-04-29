@@ -38,24 +38,20 @@ export function StepDataEntry() {
     }
 
     const delimiter = detectDelimiter(text);
-    const isAppending = Array.isArray(data) && data.length > 0;
+    const isAppending = data.length > 0;
     
     let cols = columns;
     let dataLines = lines;
 
     if (!isAppending) {
       const headerLine = parseCSVLine(lines[0], delimiter);
-      // Se só há uma linha, trata como dados sem cabeçalho
       const shouldHaveHeader = hasHeader && lines.length > 1;
       
-      // Normalize column names
       cols = shouldHaveHeader
         ? headerLine.map(col => col.toLowerCase().replace(/\s+/g, '_'))
         : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
 
-      // Ensure 'numero' column exists
       if (!cols.includes('numero')) {
-        // Try to find a column that looks like phone numbers
         const phoneColIndex = headerLine.findIndex(col => 
           /phone|telefone|numero|number|celular|whatsapp/i.test(col)
         );
@@ -68,18 +64,11 @@ export function StepDataEntry() {
       }
 
       setColumns(cols);
-      dataLines = shouldHaveHeader && Array.isArray(lines) ? lines.slice(1) : lines;
+      dataLines = shouldHaveHeader ? lines.slice(1) : lines;
     } else {
-      // If appending, we might still have a header in the new text if it's a full paste
-      // We'll try to skip it if the first line matches our columns
-      const parsedFirstLine = parseCSVLine(lines[0], delimiter);
-      if (!Array.isArray(parsedFirstLine)) {
-        dataLines = lines;
-      } else {
-        const firstLine = parsedFirstLine.map((c: string) => c.toLowerCase().replace(/\s+/g, '_'));
-        const isHeader = Array.isArray(columns) && firstLine.some((c: string) => columns.includes(c));
-        dataLines = isHeader && Array.isArray(lines) ? lines.slice(1) : lines;
-      }
+      const firstLine = parseCSVLine(lines[0], delimiter).map(c => c.toLowerCase().replace(/\s+/g, '_'));
+      const isHeader = firstLine.some(c => columns.includes(c));
+      dataLines = isHeader ? lines.slice(1) : lines;
     }
     
     if (dataLines.length === 0) {
@@ -90,13 +79,10 @@ export function StepDataEntry() {
     const rows: DataRow[] = dataLines
       .filter(line => {
         const values = parseCSVLine(line, delimiter);
-        return Array.isArray(values) && values.some(v => v.trim() !== '');
+        return values.some(v => v.trim() !== '');
       })
       .map((line) => {
         const values = parseCSVLine(line, delimiter);
-        if (!Array.isArray(values)) {
-          return null;
-        }
         const row: DataRow = {
           id: crypto.randomUUID(),
           numero: '',
@@ -116,11 +102,9 @@ export function StepDataEntry() {
         return row;
       });
 
-    const validRows = rows.filter(r => r !== null) as DataRow[];
-    
-    setData(prev => isAppending ? [...prev, ...validRows] : validRows);
-    const validCount = validRows.filter(r => r && r.isValid).length;
-    toast.success(`${validRows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
+    setData(prev => isAppending ? [...prev, ...rows] : rows);
+    const validCount = rows.filter(r => r.isValid).length;
+    toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
     
     // Auto-avançar para próximo passo
     nextStep();
@@ -131,11 +115,10 @@ export function StepDataEntry() {
     if (text) {
       setPasteData(text);
       processData(text);
-      // NÃO fecha a área após colar - mantém aberta para adicionar mais
     }
   }, [processData]);
 
-const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -145,12 +128,9 @@ const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
       if (text) {
         setPasteData(text);
         processData(text, settings.hasHeader);
-        // NÃO fecha a área após carregar arquivo - mantém abierta
       }
     };
     reader.readAsText(file);
-    
-    // Limpar o input para poder seleccionar o mesmo arquivo novamente
     e.target.value = '';
   }, [processData, settings.hasHeader]);
 
@@ -166,222 +146,164 @@ const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
         if (text) {
           setPasteData(text);
           processData(text, settings.hasHeader);
-          // NÃO fecha após drag and drop - mantém aberta
         }
       };
       reader.readAsText(file);
     }
   }, [processData, settings.hasHeader]);
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setPasteData(e.target.value);
-  };
-
-  const handleProcessClick = () => {
-    if (pasteData.trim()) {
-      processData(pasteData);
-    }
-  };
-
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="space-y-4">
+      {/* Toggle between paste areas */}
+      {!showPasteArea && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Textarea paste area */}
+          <div 
+            className={`relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${
+              isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => setShowPasteArea(true)}
+          >
+            <div className="text-center space-y-2">
+              <Table className="w-8 h-8 mx-auto text-muted-foreground" />
+              <div className="font-medium">Planilha</div>
+              <p className="text-xs text-muted-foreground">Cole ou arraste dados no formato de planilha</p>
+            </div>
+          </div>
 
-      {/* Upload Area */}
-      <div
-        className={`glass-card p-8 transition-all duration-300 ${
-          isDragging ? 'border-primary bg-primary/5' : ''
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-      >
-        <div className="flex flex-col items-center gap-6">
-          {/* File Upload */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Upload className="w-8 h-8 text-primary" />
+          {/* Textarea paste area (simple) */}
+          <div 
+            className={`relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${
+              isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+            }`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file && (file.type === 'text/plain' || file.name.endsWith('.csv') || file.name.endsWith('.txt'))) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const text = event.target?.result as string;
+                  if (text) {
+                    setPasteData(text);
+                    processData(text);
+                  }
+                };
+                reader.readAsText(file);
+              }
+            }}
+          >
+            <div className="text-center space-y-2">
+              <FileText className="w-8 h-8 mx-auto text-muted-foreground" />
+              <div className="font-medium">Texto simples</div>
+              <p className="text-xs text-muted-foreground">Cole dados de texto delimitados</p>
             </div>
-            <div className="text-center">
-              <p className="font-medium">Arraste um arquivo aqui</p>
-              <p className="text-sm text-muted-foreground">ou clique para selecionar</p>
-            </div>
-            <input
-              type="file"
-              accept=".csv,.xls,.xlsx,.txt"
+          </div>
+
+          {/* File upload */}
+          <label className="relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer hover:border-primary/50 block">
+            <input 
+              type="file" 
+              accept=".csv,.txt,.xls,.xlsx"
               onChange={handleFileUpload}
               className="hidden"
-              id="file-upload"
             />
-            <button
-              onClick={() => {
-                console.log('[StepDataEntry] CLICK: Selecionar Arquivo');
-                const input = document.getElementById('file-upload');
-                console.log('[StepDataEntry] Input element:', input);
-                if (input) {
-                  input.click();
-                } else {
-                  console.log('[StepDataEntry] ERROR: Input not found');
-                }
-              }}
-              className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors"
-              style={{ pointerEvents: 'all' }}
-            >
-              <FileSpreadsheet className="w-4 h-4 inline-block mr-2" />
-              Selecionar Arquivo
-            </button>
-            <button
-              onClick={() => {
-                console.log('[StepDataEntry] CLICK: Planilha button, current showPasteArea:', showPasteArea);
-                setShowPasteArea(true);
-                console.log('[StepDataEntry] After setShowPasteArea(true)');
-              }}
-              className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              style={{ pointerEvents: 'all' }}
-            >
-              <Table className="w-4 h-4 inline-block mr-2" />
-              Planilha
-            </button>
-            <button
-              onClick={() => {
-                console.log('[StepDataEntry] CLICK: Adicionar Mais button, current showPasteArea:', showPasteArea);
-                setShowPasteArea(true);
-              }}
-              className="px-4 py-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
-              style={{ pointerEvents: 'all' }}
-            >
-              <Plus className="w-4 h-4 inline-block mr-2" />
-              Adicionar Mais
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4 w-full">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-sm text-muted-foreground">ou</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* Header Option Toggle */}
-          <div className="w-full glass-card p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  {settings.hasHeader ? <FileText className="w-5 h-5 text-primary" /> : <ListOrdered className="w-5 h-5 text-primary" />}
-                </div>
-                <div>
-                  <p className="font-medium">Primeira linha é cabeçalho?</p>
-                  <p className="text-xs text-muted-foreground">
-                    {settings.hasHeader 
-                      ? 'Ex: numero, nome, empresa (usará como nomes das colunas)' 
-                      : 'Dados começam na primeira linha (colunas serão nomeadas automaticamente)'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setSettings({ hasHeader: true });
-                    if (pasteData) processData(pasteData, true);
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    settings.hasHeader 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  Sim
-                </button>
-                <button
-                  onClick={() => {
-                    setSettings({ hasHeader: false });
-                    if (pasteData) processData(pasteData, false);
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    !settings.hasHeader 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  Não
-                </button>
-              </div>
+            <div className="text-center space-y-2">
+              <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+              <div className="font-medium">Upload</div>
+              <p className="text-xs text-muted-foreground">Envie um arquivo CSV ou TXT</p>
             </div>
+          </label>
+        </div>
+      )}
+
+      {/* Show paste area when toggled */}
+      {showPasteArea && (
+        <div className="relative">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              <span className="text-sm">Cole dados da planilha (Ctrl+V)</span>
+            </div>
+            <button
+              onClick={() => setShowPasteArea(false)}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              ✕ Fechar
+            </button>
           </div>
+          
+          <SpreadsheetPasteArea 
+            onDataPaste={(text) => {
+              setPasteData(text);
+              processData(text, settings.hasHeader);
+            }}
+          />
 
-          {/* Spreadsheet-style Paste Area - Only shown when activated */}
-          {showPasteArea && (
-            <div className="w-full space-y-3 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Table className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">
-                    Cole dados da planilha (Ctrl+V)
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowPasteArea(false)}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  ✕ Fechar
-                </button>
-              </div>
-              
-              <SpreadsheetPasteArea 
-                onDataPaste={(text) => {
-                  setPasteData(text);
-                  processData(text, settings.hasHeader);
-                }}
-              />
-
-              {data.length > 0 && (
-                <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Dados carregados! Clique em <strong>Avançar</strong> para continuar.</span>
-                </div>
-              )}
+          {data.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-success bg-success/10 px-4 py-2 rounded-lg">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Dados carregados! Clique em <strong>Avançar</strong> para continuar.</span>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Quick Stats - Simple summary after data is loaded */}
-      {data.length > 0 && (
-        <div className="glass-card p-4 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-success">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="font-medium">{Array.isArray(data) ? data.filter(r => r.isValid).length : 0} válidos</span>
-              </div>
-              {Array.isArray(data) && data.filter(r => !r.isValid).length > 0 && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-medium">{data.filter(r => !r.isValid).length} com erro</span>
-                </div>
-              )}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {Array.isArray(data) ? data.length : 0} contatos • {Array.isArray(columns) ? columns.length : 0} colunas
-            </div>
-          </div>
         </div>
       )}
 
       {/* Instructions - Collapsible */}
-      {(!Array.isArray(data) || data.length === 0) && (
-        <div className="glass-card p-4">
-          <div className="flex items-start gap-3 text-sm text-muted-foreground">
-            <AlertCircle className="w-4 h-4 text-primary mt-0.5" />
-            <div>
-              <span className="font-medium text-foreground">Dica: </span>
-              A coluna <code className="variable-tag">numero</code> é obrigatória. 
-              Colunas como <code className="variable-tag">nome</code> podem ser usadas como variáveis nas mensagens.
-            </div>
+      {data.length === 0 && !showPasteArea && (
+        <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <AlertCircle className="w-4 h-4" />
+            Como importar dados:
           </div>
+          <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
+            <li>Escolha uma das opções acima (Planilha, Texto Simples ou Upload)</li>
+            <li>Cole ou arraste dados no formato: <strong>telefone, nome, empresa...</strong></li>
+            <li>A primeira linha será usada como cabeçalho</li>
+            <li>O sistema detectará automaticamente números de telefone</li>
+          </ul>
         </div>
       )}
+
+      {/* Show current data summary when we have data */}
+      {(data.length > 0 && !showPasteArea) && (
+        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-medium">{data.length} contatos</span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {columns.length} colunas
+            </div>
+          </div>
+          <button
+            onClick={() => setShowPasteArea(true)}
+            className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+          >
+            <Plus className="w-4 h-4" />
+            Adicionar mais
+          </button>
+        </div>
+      )}
+
+      {/* Format options */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.hasHeader}
+            onChange={(e) => setSettings({ hasHeader: e.target.checked })}
+            className="rounded border-border"
+          />
+          Primeira linha é cabeçalho
+        </label>
+      </div>
     </div>
   );
 }
