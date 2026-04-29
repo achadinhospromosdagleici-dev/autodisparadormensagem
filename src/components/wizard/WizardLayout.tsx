@@ -169,6 +169,9 @@ export function WizardLayout() {
               clearWizard();
               setCurrentView('campaign');
             }} 
+            onResume={() => {
+              setCurrentView('campaign');
+            }}
           />
         );
 

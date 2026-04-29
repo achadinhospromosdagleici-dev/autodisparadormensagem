@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useWizard } from '@/contexts/WizardContext';
 
-export function CampaignsHome({ onNewCampaign }: { onNewCampaign: () => void }) {
+export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () => void; onResume: () => void }) {
   const { 
     activeCampaigns, 
     campaignHistory, 
@@ -72,11 +72,18 @@ export function CampaignsHome({ onNewCampaign }: { onNewCampaign: () => void }) 
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2.5 rounded-xl hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                <button 
+                  onClick={() => {
+                    if (confirm('Deseja realmente excluir este rascunho?')) {
+                      clearWizard();
+                    }
+                  }}
+                  className="p-2.5 rounded-xl hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <button 
-                  onClick={onNewCampaign}
+                  onClick={onResume}
                   className="p-2.5 rounded-xl bg-warning text-warning-foreground shadow-lg shadow-warning/20 hover:scale-110 transition-all"
                 >
                   <Play className="w-4 h-4 fill-current" />
