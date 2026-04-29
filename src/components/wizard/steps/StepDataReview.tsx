@@ -191,7 +191,7 @@ export function StepDataReview() {
     const activeData = data.filter(row => {
       if (skippedRows.has(row.id)) return false;
       // Check if row has any non-empty value in mapped columns
-      return originalColumns.some((col, i) => {
+      return (originalColumns || []).some((col, i) => {
         if (columnMapping[i] === '_skip') return false;
         const val = String(row[col] || '').trim();
         return val !== '';
@@ -250,7 +250,7 @@ export function StepDataReview() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(row =>
-        columns.some(col => {
+        (columns || []).some(col => {
           const value = row[col];
           return typeof value === 'string' && value.toLowerCase().includes(query);
         })

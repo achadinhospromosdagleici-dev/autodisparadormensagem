@@ -112,7 +112,7 @@ export function StepInstances() {
           .select('instance_name')
           .eq('user_id', user.id)
           .eq('status', 'connected');
-        if (data) {
+        if (data && Array.isArray(data)) {
           setUserInstances(data.map((r: any) => r.instance_name));
         }
       } catch (err) {
