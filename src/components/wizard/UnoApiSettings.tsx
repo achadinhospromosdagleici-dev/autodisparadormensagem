@@ -29,6 +29,7 @@ import {
   loadManualInstances,
   clearManualInstances,
   DEFAULT_S3_CONFIG,
+  uploadToS3,
 } from '@/services/unoapi';
 
 interface UnoApiSettingsProps {
@@ -190,6 +191,32 @@ useEffect(() => {
     await loadInstancesFromApi(creds);
     toast[online ? 'success' : 'error'](online ? 'UnoAPI online!' : 'UnoAPI offline');
     setIsLoading(false);
+  }
+
+  const handleTestS3 = async () => {
+    if (!s3Endpoint || !s3AccessKey || !s3SecretKey || !s3Bucket) {
+      toast.error('Preencha os campos do S3');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const blob = new Blob(['test connection'], { type: 'text/plain' });
+      const file = new File([blob], 'test-connection.txt', { type: 'text/plain' });
+      const url = await uploadToS3(file, {
+        endpoint: s3Endpoint,
+        accessKey: s3AccessKey,
+        secretKey: s3SecretKey,
+        bucket: s3Bucket,
+        region: s3Region
+      });
+      if (url) {
+        toast.success('S3 conectado com sucesso! ✅');
+      }
+    } catch (err: any) {
+      toast.error(`Falha no S3: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -338,6 +365,16 @@ useEffect(() => {
                     />
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleTestS3}
+                  disabled={isLoading}
+                  className="w-full mt-2 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-medium hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
+                >
+                  {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <HardDrive className="w-3 h-3" />}
+                  Testar Conexão S3
+                </button>
               </div>
             )}
           </div>
@@ -479,7 +516,7 @@ useEffect(() => {
               { label: '🎵 Áudio', desc: 'Mensagens de voz' },
               { label: '📹 Vídeo', desc: 'Vídeos com legenda' },
               { label: '📄 Documento', desc: 'PDFs e arquivos' },
-              { label: '🔗 Contato', desc: 'Verificação de contatos' },
+              { label: '🔗 Contato', desc: 'Cartão de Contato' },
             ].map(item => (
               <div key={item.label} className="p-2 rounded-lg bg-muted/30 border border-border/20">
                 <p className="font-medium text-xs">{item.label}</p>

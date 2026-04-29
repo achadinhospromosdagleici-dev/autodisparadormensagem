@@ -122,7 +122,7 @@ export function StepInstances() {
     fetchUserInstances();
   }, [user]);
 
-  const handleSelectApi = (api: 'unoapi' | 'evolution') => {
+  const handleSelectApi = (api: 'unoapi' | 'evolution' | 'evolution-go') => {
     setSelectedApi(api);
   };
 
@@ -266,23 +266,23 @@ export function StepInstances() {
   // When using shared Evolution, only show user's own registered instances
   const shouldFilterByUser = hasSharedEvolution && userInstances.length > 0;
   const mergedInstances: Instance[] = [
-    ...evoGoInstances.map((ei) => ({
+    ...(Array.isArray(evoGoInstances) ? evoGoInstances.map((ei) => ({
       id: `evogo_${ei.instanceName}`,
       name: ei.profileName || ei.instanceName,
       status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
       phoneNumber: ei.phone || undefined,
       source: 'evolution-go' as const,
-    })),
-    ...evoInstances
-      .filter((ei) => !shouldFilterByUser || userInstances.includes(ei.instanceName))
+    })) : []),
+    ...(Array.isArray(evoInstances) ? evoInstances
+      .filter((ei) => !shouldFilterByUser || (Array.isArray(userInstances) && userInstances.includes(ei.instanceName)))
       .map((ei) => ({
         id: `evo_${ei.instanceName}`,
         name: ei.profileName || ei.instanceName,
         status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
         phoneNumber: ei.phone || undefined,
         source: 'evolution' as const,
-      })),
-    ...(unoApiConnected && unoInstances.length > 0
+      })) : []),
+    ...(unoApiConnected && Array.isArray(unoInstances) && unoInstances.length > 0
       ? unoInstances.map((ui) => ({
           id: `uno_${ui.phone}`,
           name: ui.name || ui.phone,
@@ -291,7 +291,7 @@ export function StepInstances() {
           source: 'unoapi' as const,
         }))
       : []),
-    ...(hasChatwoot && chatwootInboxes.length > 0
+    ...(hasChatwoot && Array.isArray(chatwootInboxes) && chatwootInboxes.length > 0
       ? chatwootInboxes.map((ib) => ({
           id: `chatwoot_${ib.id}`,
           name: ib.name || `Caixa ${ib.id}`,
@@ -344,6 +344,8 @@ export function StepInstances() {
               <p className="text-sm text-muted-foreground">
                 {selectedApi === 'unoapi' && 'Usando UnoAPI'}
                 {selectedApi === 'evolution' && 'Usando Evolution'}
+                {selectedApi === 'evolution-go' && 'Usando Evolution Go'}
+                {selectedApi === 'chatwoot' && 'Usando Chatwoot'}
                 {!selectedApi && loading ? 'Detectando...' : (!selectedApi && 'Automático')}
               </p>
             </div>
@@ -365,9 +367,13 @@ export function StepInstances() {
                   {loading ? 'Buscando...' : (
                     <>
                       {evoInstances.length > 0 && <span>{evoInstances.length} Evolution</span>}
-                      {evoInstances.length > 0 && unoInstances.length > 0 && ' · '}
+                      {evoInstances.length > 0 && (unoInstances.length > 0 || evoGoInstances.length > 0 || chatwootInboxes.length > 0) && ' · '}
                       {unoInstances.length > 0 && <span>{unoInstances.length} UnoAPI</span>}
-                      {evoInstances.length === 0 && unoInstances.length === 0 && 'Nenhum número encontrado'}
+                      {unoInstances.length > 0 && (evoGoInstances.length > 0 || chatwootInboxes.length > 0) && ' · '}
+                      {evoGoInstances.length > 0 && <span>{evoGoInstances.length} Evo Go</span>}
+                      {evoGoInstances.length > 0 && chatwootInboxes.length > 0 && ' · '}
+                      {chatwootInboxes.length > 0 && <span>{chatwootInboxes.length} Chatwoot</span>}
+                      {evoInstances.length === 0 && unoInstances.length === 0 && evoGoInstances.length === 0 && chatwootInboxes.length === 0 && 'Nenhum número encontrado'}
                     </>
                   )}
                 </p>

@@ -322,7 +322,7 @@ export async function sendDocumentMessage(
 export async function sendMediaMessage(
   creds: ChatwootCredentials,
   conversationId: number,
-  mediaType: 'text' | 'image' | 'audio' | 'video' | 'document',
+  mediaType: 'text' | 'image' | 'audio' | 'video' | 'document' | 'contact',
   mediaUrl?: string,
   caption?: string,
   filename?: string
@@ -336,6 +336,11 @@ export async function sendMediaMessage(
       return sendDocumentMessage(creds, conversationId, mediaUrl!, filename || 'documento');
     case 'audio':
       return sendImageMessage(creds, conversationId, mediaUrl!, caption);
+    case 'contact': {
+      const contactInfo = caption ? `👤 Contato: ${caption}` : '👤 Contato';
+      const phoneInfo = filename ? `\n📞 Telefone: ${filename}` : '';
+      return sendMessage(creds, conversationId, `${contactInfo}${phoneInfo}`);
+    }
     default:
       return sendMessage(creds, conversationId, mediaUrl || caption || '');
   }

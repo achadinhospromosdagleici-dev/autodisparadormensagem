@@ -1,4 +1,4 @@
--- Tabelas separadas para cada API
+-- 9. TABELAS DE CONFIGURAÇÃO DE API (UNOAPI, EVOLUTION, ETC)
 
 -- UnoAPI Settings
 CREATE TABLE IF NOT EXISTS public.unoapi_settings (
@@ -130,7 +130,7 @@ TO authenticated
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
--- Triggers
+-- Triggers para Updated At
 CREATE OR REPLACE FUNCTION public.touch_api_settings_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql

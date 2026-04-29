@@ -23,7 +23,7 @@ interface EvolutionConnectionProps {
 }
 
 export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionProps) {
-  const { isSuperadmin } = useAuth();
+  const { isSuperadmin, user } = useAuth();
   const [usingShared, setUsingShared] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');

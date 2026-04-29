@@ -20,7 +20,7 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;

@@ -30,7 +30,7 @@ export interface S3Config {
   region?: string;
 }
 
-export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document';
+export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'contact';
 
 export interface MediaAttachment {
   type: MediaType;
@@ -479,6 +479,51 @@ export async function sendDocumentMessage(
   }
 }
 
+// Send contact (vCard) message
+export async function sendContactMessage(
+  creds: UnoApiCredentials,
+  phoneNumberId: string,
+  to: string,
+  contactName: string,
+  contactNumber: string
+): Promise<any> {
+  const payload = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'contacts',
+    contacts: [
+      {
+        name: {
+          first_name: contactName,
+          formatted_name: contactName,
+        },
+        phones: [
+          {
+            phone: contactNumber,
+            type: 'MOBILE',
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for contact, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar contato: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
+  }
+}
+
 // Send interactive buttons message
 export async function sendInteractiveButtons(
   creds: UnoApiCredentials,
@@ -686,6 +731,8 @@ export async function sendUnoApiMessage(
       return sendVideoMessage(creds, phoneNumberId, to, url, caption || message.content);
     case 'document':
       return sendDocumentMessage(creds, phoneNumberId, to, url, filename, caption || message.content);
+    case 'contact':
+      return sendContactMessage(creds, phoneNumberId, to, message.buttons?.[0]?.contactName || message.content, message.buttons?.[0]?.phone || '');
     default:
       return sendTextMessage(creds, phoneNumberId, to, message.content);
   }

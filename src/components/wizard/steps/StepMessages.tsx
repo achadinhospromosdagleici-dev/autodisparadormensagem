@@ -31,7 +31,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
 
-type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
+type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
 
 export function StepMessages() {
   const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig, selectedApi } =
@@ -56,31 +56,18 @@ export function StepMessages() {
   const [carouselCards, setCarouselCards] = useState<{ image?: string; title: string; description: string; footer?: string; buttons: MessageButton[] }[]>([]);
   const [showFollowUp, setShowFollowUp] = useState(false);
 
-
-  const isApiUno = selectedApi === 'unoapi';
-  const isApiEvo = selectedApi === 'evolution';
-  const isApiEvoGo = selectedApi === 'evolution-go';
-
-  // Check if feature is supported by current API
-  const isFeatureSupported = (type: EditorMediaType) => {
-    // Buttons & Link - supported by all (unoapi, evo, evogo)
-    if (type === 'buttons') return !isApiEvo;
-    if (type === 'link') return !isApiEvo;
-    // List & Carousel - only Evolution Go
-    if (type === 'list' || type === 'carousel') return isApiEvoGo;
-    return true;
-  };
-
-  const variables = columns.map((col) => `{{${col}}}`);
-  // Add dynamic {{primeiro_nome}} variable if 'nome' column exists
-  const hasNome = columns.some((col) => col.toLowerCase() === 'nome');
-  if (hasNome && !variables.includes('{{primeiro_nome}}')) {
+  const variables = [...columns];
+  if (columns.find((c) => c.toLowerCase() === 'nome')) {
     variables.push('{{primeiro_nome}}');
   }
 
   const insertVariable = (variable: string) => {
     setNewMessage((prev) => prev + variable);
   };
+
+  const isApiUno = selectedApi === 'unoapi';
+  const isApiEvo = selectedApi === 'evolution';
+  const isApiEvoGo = selectedApi === 'evolution-go';
 
   const handleAddMessage = () => {
     if (mediaType === 'text' && !newMessage.trim()) {
@@ -100,6 +87,10 @@ export function StepMessages() {
     if (mediaType === 'link') {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
+    }
+    if (mediaType === 'contact') {
+      if (!btnTitle.trim()) { toast.error('Digite o nome do contato'); return; }
+      if (!btnFooter.trim()) { toast.error('Digite o número do contato'); return; }
     }
     if (mediaType === 'list') {
       if (!newMessage.trim()) { toast.error('Digite a descrição da lista'); return; }
@@ -144,6 +135,13 @@ export function StepMessages() {
           content: newMessage.trim(),
           mediaType: 'link',
           linkUrl: linkUrl.trim(),
+        });
+      } else if (mediaType === 'contact') {
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'contact',
+          btnTitle: btnTitle.trim(),
+          btnFooter: btnFooter.trim(),
         });
       } else if (mediaType === 'list' && isApiEvoGo) {
         addRichMessage({
@@ -203,7 +201,6 @@ export function StepMessages() {
       result = result.replace(regex, (row[col] as string) || `[${col}]`);
     });
 
-    // Handle {{primeiro_nome}} - extract first name from 'nome' column
     const nomeKey = columns.find((col) => col.toLowerCase() === 'nome');
     if (nomeKey) {
       const nomeValue = (row[nomeKey] as string) || '';
@@ -211,9 +208,28 @@ export function StepMessages() {
       result = result.replace(/\{\{primeiro_nome\}\}/gi, primeiroNome);
     }
 
-    return result;
+return result;
   };
 
+  // Check if feature is supported by current API
+  const isFeatureSupported = (type: EditorMediaType) => {
+    // Se não há API seleccionada, permitir todas as opções
+    if (showAllOptions) return true;
+    // Buttons - UNOAPI and Evolution Go only (NOT Evolution API Node)
+    if (type === 'buttons') return isApiUno || isApiEvoGo;
+    // List - only Evolution Go
+    if (type === 'list') return isApiEvoGo;
+    // Carousel - only Evolution Go
+    if (type === 'carousel') return isApiEvoGo;
+    // Contact (vCard) - only UNOAPI
+    if (type === 'contact') return isApiUno;
+    // Link - supported by all
+    if (type === 'link') return true;
+    // Media - supported by all
+    return true;
+  };
+
+  // Media type config - show based on API (mostrar todas se não há API seleccionada)
   const mediaTypeConfig = [
     { type: 'text' as EditorMediaType, icon: MessageSquare, label: 'Texto' },
     { type: 'image' as EditorMediaType, icon: Image, label: 'Imagem' },
@@ -221,8 +237,16 @@ export function StepMessages() {
     { type: 'video' as EditorMediaType, icon: Video, label: 'Vídeo' },
     { type: 'document' as EditorMediaType, icon: FileText, label: 'Documento' },
     { type: 'link' as EditorMediaType, icon: ExternalLink, label: 'Link' },
-    { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
-    ...(isApiEvoGo ? [
+    // Botões - UNOAPI e Evolution Go (ou todas se não hay API)
+    ...((showAllOptions || isApiUno || isApiEvoGo) ? [
+      { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
+    ] : []),
+    // Contato (vCard) - só UNOAPI (ou todas se não hay API)
+    ...(showAllOptions || isApiUno ? [
+      { type: 'contact' as EditorMediaType, icon: Phone, label: 'Contato' },
+    ] : []),
+    // Lista e Carrossel - só Evolution Go (ou todas se não hay API)
+    ...(showAllOptions || isApiEvoGo ? [
       { type: 'list' as EditorMediaType, icon: List, label: 'Lista' },
       { type: 'carousel' as EditorMediaType, icon: LayoutGrid, label: 'Carrossel' },
     ] : []),
@@ -284,7 +308,8 @@ export function StepMessages() {
                       key={type}
                       onClick={() => {
                         if (!supported) {
-                          toast.warning(`${label} não disponível com ${isApiUno ? 'UnoAPI' : 'Evolution'}. Configure em Configurações para habilitar.`);
+                          const apiName = isApiUno ? 'UnoAPI' : isApiEvoGo ? 'Evolution Go' : 'Evolution API';
+                          toast.warning(`${label} não disponível com ${apiName}`);
                           return;
                         }
                         setMediaType(type);
@@ -901,6 +926,37 @@ export function StepMessages() {
               </div>
             )}
 
+            {/* Contact editor */}
+            {mediaType === 'contact' && (
+              <div className="space-y-3 animate-fade-in">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Nome do Contato</label>
+                    <input
+                      type="text"
+                      value={btnTitle}
+                      onChange={(e) => setBtnTitle(e.target.value)}
+                      placeholder="Ex: Suporte BemCash"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground font-medium">Número do Contato</label>
+                    <input
+                      type="text"
+                      value={btnFooter}
+                      onChange={(e) => setBtnFooter(e.target.value)}
+                      placeholder="Ex: {{numero}} ou +5511999999999"
+                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  💡 Envia um cartão de contato (vCard) que o usuário pode salvar facilmente.
+                </p>
+              </div>
+            )}
+
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -911,7 +967,9 @@ export function StepMessages() {
                     ? `Olá {{primeiro_nome}}, escolha uma opção abaixo:`
                     : mediaType === 'link'
                       ? `Olá {{primeiro_nome}}! Clique no link abaixo e finalize sua compra com 10% OFF 👇`
-                      : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
+                      : mediaType === 'contact'
+                        ? `Olá {{primeiro_nome}}, segue o contato que você solicitou:`
+                        : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
               }
               className="w-full h-36 p-4 rounded-xl bg-muted/50 border border-border/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 scrollbar-thin"
             />
@@ -1103,6 +1161,19 @@ export function StepMessages() {
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(newMessage, previewIndex)}
                     </p>
+                    {mediaType === 'contact' && (
+                      <div className="mb-3 p-3 rounded-lg bg-muted/50 border border-border/50 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Phone className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{replaceVariables(btnTitle || 'Nome do Contato', previewIndex)}</p>
+                          <p className="text-xs text-muted-foreground truncate">{replaceVariables(btnFooter || 'Número', previewIndex)}</p>
+                        </div>
+                        <div className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">vCard</div>
+                      </div>
+                    )}
+
                     {mediaType === 'link' && linkUrl && (
                       <a href={linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">
                         {linkUrl}
@@ -1180,6 +1251,19 @@ export function StepMessages() {
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(msg.content, previewIndex)}
                     </p>
+                    {msg.mediaType === 'contact' && (
+                      <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border/50 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{replaceVariables(msg.btnTitle || 'Contato', previewIndex)}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{replaceVariables(msg.btnFooter || '', previewIndex)}</p>
+                        </div>
+                        <div className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-medium uppercase">vCard</div>
+                      </div>
+                    )}
+
                     {msg.mediaType === 'link' && msg.linkUrl && (
                       <a href={msg.linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">
                         {msg.linkUrl}

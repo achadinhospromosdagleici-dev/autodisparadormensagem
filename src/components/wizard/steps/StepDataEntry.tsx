@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useWizard, DataRow } from '@/contexts/WizardContext';
 import { validatePhoneNumber, parseCSVLine, detectDelimiter } from '@/utils/phoneValidation';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Table, FileText, ListOrdered } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Table, FileText, ListOrdered, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { SpreadsheetPasteArea } from '../SpreadsheetPasteArea';
 
@@ -11,12 +11,7 @@ export function StepDataEntry() {
   const [isDragging, setIsDragging] = useState(false);
   const [showPasteArea, setShowPasteArea] = useState(false);
 
-  // Auto-hide paste area when data is processed
-  useEffect(() => {
-    if (data.length > 0 && showPasteArea) {
-      setShowPasteArea(false);
-    }
-  }, [data.length, showPasteArea]);
+  // NÃO auto-ocultar - área só fecha quando usuário clica em Processar ou Fechar
 
   // Listen for Ctrl+V globally when paste area is shown
   useEffect(() => {
@@ -26,7 +21,7 @@ export function StepDataEntry() {
       const text = e.clipboardData.getData('text');
       if (text && text.trim()) {
         processData(text, settings.hasHeader);
-        setShowPasteArea(false);
+        // NÃO fecha automaticamente - mantém aberto para adicionar mais
       }
     };
 
@@ -43,46 +38,56 @@ export function StepDataEntry() {
     }
 
     const delimiter = detectDelimiter(text);
-    const headerLine = parseCSVLine(lines[0], delimiter);
+    const isAppending = data.length > 0;
     
-    // Se só há uma linha, trata como dados sem cabeçalho
-    const shouldHaveHeader = hasHeader && lines.length > 1;
-    
-    // Normalize column names
-    const cols = shouldHaveHeader
-      ? headerLine.map(col => col.toLowerCase().replace(/\s+/g, '_'))
-      : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
+    let cols = columns;
+    let dataLines = lines;
 
-    // Ensure 'numero' column exists
-    if (!cols.includes('numero')) {
-      // Try to find a column that looks like phone numbers
-      const phoneColIndex = headerLine.findIndex(col => 
-        /phone|telefone|numero|number|celular|whatsapp/i.test(col)
-      );
+    if (!isAppending) {
+      const headerLine = parseCSVLine(lines[0], delimiter);
+      // Se só há uma linha, trata como dados sem cabeçalho
+      const shouldHaveHeader = hasHeader && lines.length > 1;
       
-      if (phoneColIndex >= 0) {
-        cols[phoneColIndex] = 'numero';
-      } else {
-        cols[0] = 'numero';
+      // Normalize column names
+      cols = shouldHaveHeader
+        ? headerLine.map(col => col.toLowerCase().replace(/\s+/g, '_'))
+        : headerLine.map((_, i) => i === 0 ? 'numero' : `coluna_${i + 1}`);
+
+      // Ensure 'numero' column exists
+      if (!cols.includes('numero')) {
+        // Try to find a column that looks like phone numbers
+        const phoneColIndex = headerLine.findIndex(col => 
+          /phone|telefone|numero|number|celular|whatsapp/i.test(col)
+        );
+        
+        if (phoneColIndex >= 0) {
+          cols[phoneColIndex] = 'numero';
+        } else {
+          cols[0] = 'numero';
+        }
       }
+
+      setColumns(cols);
+      dataLines = shouldHaveHeader ? lines.slice(1) : lines;
+    } else {
+      // If appending, we might still have a header in the new text if it's a full paste
+      // We'll try to skip it if the first line matches our columns
+      const firstLine = parseCSVLine(lines[0], delimiter).map(c => c.toLowerCase().replace(/\s+/g, '_'));
+      const isHeader = firstLine.some(c => columns.includes(c));
+      dataLines = isHeader ? lines.slice(1) : lines;
     }
-
-    setColumns(cols);
-
-    const dataLines = shouldHaveHeader ? lines.slice(1) : lines;
     
     if (dataLines.length === 0) {
-      toast.error('Nenhum registro de dados encontrado. Adicione linhas de dados abaixo do cabeçalho.');
+      toast.error('Nenhum registro de dados novo encontrado.');
       return;
     }
     
     const rows: DataRow[] = dataLines
       .filter(line => {
-        // Skip empty lines or lines where all cells are empty
         const values = parseCSVLine(line, delimiter);
         return values.some(v => v.trim() !== '');
       })
-      .map((line, index) => {
+      .map((line) => {
         const values = parseCSVLine(line, delimiter);
         const row: DataRow = {
           id: crypto.randomUUID(),
@@ -94,7 +99,6 @@ export function StepDataEntry() {
           row[col] = values[i] || '';
         });
 
-        // Validate phone number
         const phoneValue = row.numero as string;
         const validation = validatePhoneNumber(phoneValue, true);
         row.isValid = validation.isValid;
@@ -104,20 +108,21 @@ export function StepDataEntry() {
         return row;
       });
 
-    setData(rows);
+    setData(prev => isAppending ? [...prev, ...rows] : rows);
     const validCount = rows.filter(r => r.isValid).length;
-    toast.success(`${rows.length} registros importados (${validCount} válidos)`);
-  }, [setData, setColumns]);
+    toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
+  }, [setData, setColumns, data.length, columns]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
     if (text) {
       setPasteData(text);
       processData(text);
+      // NÃO fecha a área após colar - mantém aberta para adicionar mais
     }
   }, [processData]);
 
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -127,9 +132,13 @@ export function StepDataEntry() {
       if (text) {
         setPasteData(text);
         processData(text, settings.hasHeader);
+        // NÃO fecha a área após carregar arquivo - mantém abierta
       }
     };
     reader.readAsText(file);
+    
+    // Limpar o input para poder seleccionar o mesmo arquivo novamente
+    e.target.value = '';
   }, [processData, settings.hasHeader]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -144,6 +153,7 @@ export function StepDataEntry() {
         if (text) {
           setPasteData(text);
           processData(text, settings.hasHeader);
+          // NÃO fecha após drag and drop - mantém aberta
         }
       };
       reader.readAsText(file);
@@ -192,20 +202,45 @@ export function StepDataEntry() {
               className="hidden"
               id="file-upload"
             />
-            <label
-              htmlFor="file-upload"
+            <button
+              onClick={() => {
+                console.log('[StepDataEntry] CLICK: Selecionar Arquivo');
+                const input = document.getElementById('file-upload');
+                console.log('[StepDataEntry] Input element:', input);
+                if (input) {
+                  input.click();
+                } else {
+                  console.log('[StepDataEntry] ERROR: Input not found');
+                }
+              }}
               className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors"
+              style={{ pointerEvents: 'all' }}
             >
               <FileSpreadsheet className="w-4 h-4 inline-block mr-2" />
               Selecionar Arquivo
-            </label>
+            </button>
             <button
-              onClick={() => setShowPasteArea(true)}
+              onClick={() => {
+                console.log('[StepDataEntry] CLICK: Planilha button, current showPasteArea:', showPasteArea);
+                setShowPasteArea(true);
+                console.log('[StepDataEntry] After setShowPasteArea(true)');
+              }}
               className="px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-              title="Colar dados diretamente da planilha (Ctrl+V)"
+              style={{ pointerEvents: 'all' }}
             >
               <Table className="w-4 h-4 inline-block mr-2" />
               Planilha
+            </button>
+            <button
+              onClick={() => {
+                console.log('[StepDataEntry] CLICK: Adicionar Mais button, current showPasteArea:', showPasteArea);
+                setShowPasteArea(true);
+              }}
+              className="px-4 py-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+              style={{ pointerEvents: 'all' }}
+            >
+              <Plus className="w-4 h-4 inline-block mr-2" />
+              Adicionar Mais
             </button>
           </div>
 

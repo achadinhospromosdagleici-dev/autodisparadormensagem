@@ -293,6 +293,18 @@ Deno.serve(async (req) => {
             body = { number: to, text: linkText, linkPreview: true };
             break;
           }
+          case 'contact':
+            endpoint = `${base}/message/sendContact/${instanceName}`;
+            body = {
+              number: to,
+              contact: [
+                {
+                  fullName: message.contactName || message.content,
+                  phoneNumber: message.contactNumber || '',
+                }
+              ]
+            };
+            break;
           case 'list': {
             endpoint = `${base}/message/sendList/${instanceName}`;
             const sections = Array.isArray(message.sections) ? message.sections : [];

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Grid3X3 } from 'lucide-react';
 
 interface SpreadsheetPasteAreaProps {
-  onDataPaste: (text: string) => void;
+  onDataPaste?: (text: string) => void;
   onDataChange?: (hasData: boolean, rawText: string) => void;
 }
 

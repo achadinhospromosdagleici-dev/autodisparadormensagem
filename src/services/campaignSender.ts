@@ -18,6 +18,11 @@ import {
   getEvolutionGoInstanceStatus,
   EvolutionGoMessage,
 } from './evolutionGo';
+import {
+  loadChatwootCredentialsWithFallback,
+  findOrCreateConversation,
+  sendMediaMessage as sendCwMediaMessage,
+} from './chatwoot';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
 
 export interface SendProgress {
@@ -105,7 +110,7 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
 
 export interface CampaignMessage {
   content: string;
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
@@ -130,10 +135,11 @@ export interface CampaignMessage {
 }
 
 // Detect which API to use based on selected instance ID prefix
-function getInstanceSource(instanceId: string): 'evolution-go' | 'evolution' | 'unoapi' | 'default' {
+function getInstanceSource(instanceId: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' | 'default' {
   if (instanceId.startsWith('evogo_')) return 'evolution-go';
   if (instanceId.startsWith('evo_')) return 'evolution';
   if (instanceId.startsWith('uno_')) return 'unoapi';
+  if (instanceId.startsWith('chatwoot_')) return 'chatwoot';
   return 'default';
 }
 
@@ -141,6 +147,7 @@ function getInstanceName(instanceId: string): string {
   if (instanceId.startsWith('evogo_')) return instanceId.slice(7);
   if (instanceId.startsWith('evo_')) return instanceId.slice(4);
   if (instanceId.startsWith('uno_')) return instanceId.slice(4);
+  if (instanceId.startsWith('chatwoot_')) return instanceId.slice(9);
   return instanceId;
 }
 
@@ -164,15 +171,17 @@ export async function sendCampaign(
   const unoCredsEarly = loadUnoApiCredentials();
   const evoCredsEarly = loadEvolutionCredentials();
 
+  const cwCredsEarly = await loadChatwootCredentialsWithFallback();
+
   // Filter out instances that have no matching API credentials.
-  // Instances without prefix ('default') are kept ONLY if creds for the resolved API exist.
   const validInstances = selectedPhoneNumbers.filter(id => {
     const src = getInstanceSource(id);
     if (src === 'evolution-go') return !!loadEvolutionGoCredentials();
     if (src === 'evolution') return !!evoCredsEarly;
     if (src === 'unoapi') return !!unoCredsEarly;
+    if (src === 'chatwoot') return !!cwCredsEarly;
     // default → use whichever API is configured
-    return !!evoCredsEarly || !!unoCredsEarly || !!loadEvolutionGoCredentials();
+    return !!evoCredsEarly || !!unoCredsEarly || !!loadEvolutionGoCredentials() || !!cwCredsEarly;
   });
 
   if (validInstances.length === 0) {
@@ -200,15 +209,19 @@ export async function sendCampaign(
   const evoCreds = evoCredsEarly;
   const evoGoCreds = loadEvolutionGoCredentials();
 
-  // Resolve API source per-instance (default → evolution → evolution-go → unoapi)
-  const resolveSource = (id: string): 'evolution-go' | 'evolution' | 'unoapi' => {
+  const cwCreds = cwCredsEarly;
+
+  // Resolve API source per-instance (default → evolution → evolution-go → unoapi → chatwoot)
+  const resolveSource = (id: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' => {
     const s = getInstanceSource(id);
     if (s === 'evolution-go') return 'evolution-go';
     if (s === 'evolution') return 'evolution';
     if (s === 'unoapi') return 'unoapi';
+    if (s === 'chatwoot') return 'chatwoot';
     // default → any available
     if (evoCreds) return 'evolution';
     if (evoGoCreds) return 'evolution-go';
+    if (cwCreds) return 'chatwoot';
     return 'unoapi';
   };
 
@@ -217,7 +230,7 @@ export async function sendCampaign(
   }
 
   const primarySource = resolveSource(validInstances[0]);
-  const sourceLabel = primarySource === 'evolution-go' ? 'Evolution Go' : primarySource === 'evolution' ? 'Evolution API' : 'UnoAPI';
+  const sourceLabel = primarySource === 'evolution-go' ? 'Evolution Go' : primarySource === 'evolution' ? 'Evolution API' : primarySource === 'chatwoot' ? 'Chatwoot' : 'UnoAPI';
   addLog(`🚀 Iniciando campanha via ${sourceLabel}...`, 'info');
 
   // For Evolution: validate all instances (non-blocking — warn but continue)
@@ -287,6 +300,8 @@ export async function sendCampaign(
             footer: msg.footer,
             buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
             linkUrl: msg.linkUrl,
+            contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
+            contactNumber: msg.mediaType === 'contact' ? replaceVariables(msg.btnFooter || '', contact) : undefined,
           };
           const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
           console.log('[campaignSender] Evolution send result:', result);
@@ -306,6 +321,8 @@ export async function sendCampaign(
             linkUrl: msg.linkUrl,
             sections: msg.sections as EvolutionGoMessage['sections'],
             cards: msg.cards as EvolutionGoMessage['cards'],
+            contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
+            contactNumber: msg.mediaType === 'contact' ? replaceVariables(msg.btnFooter || '', contact) : undefined,
           };
           const result = await sendEvolutionGoMessage(evoGoCreds, senderName, phoneNumber, evoGoMsg);
           console.log('[campaignSender] Evolution Go send result:', result);
@@ -369,6 +386,21 @@ export async function sendCampaign(
               ? `${personalizedContent}\n\n🔗 Link: ${msg.linkUrl}`
               : personalizedContent;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
+          } else if (msg.mediaType === 'contact') {
+            // Contact (vCard) - send as interactive with contact data
+            const contactName = replaceVariables(msg.btnTitle || 'Contato', contact);
+            const contactNumber = replaceVariables(msg.btnFooter || '', contact);
+            
+            unoMsg.buttons = [{
+              id: crypto.randomUUID(),
+              title: contactName,
+              phone: contactNumber,
+              contactName: contactName,
+            }];
+            
+            // For UnoAPI, media.type = 'contact' triggers sendContactMessage
+            unoMsg.media = { type: 'contact' };
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
             const hasButtons = msg.buttons && msg.buttons.length > 0;
@@ -405,6 +437,27 @@ export async function sendCampaign(
             // Text only
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           }
+        } else if (source === 'chatwoot' && cwCreds) {
+          // Chatwoot sending
+          const inboxId = parseInt(senderName);
+          const { conversationId } = await findOrCreateConversation(cwCreds, phoneNumber, inboxId, contactName);
+          
+          const mt = msg.mediaType === 'contact' ? 'contact' : (msg.mediaType as any) || 'text';
+          const filename = msg.mediaType === 'contact' 
+            ? replaceVariables(msg.btnFooter || '', contact) // phone number as filename/meta
+            : msg.mediaFilename;
+          const caption = msg.mediaType === 'contact'
+            ? replaceVariables(msg.btnTitle || 'Contato', contact) // name as caption
+            : personalizedCaption || personalizedContent;
+
+          await sendCwMediaMessage(
+            cwCreds,
+            conversationId,
+            mt,
+            msg.mediaUrl,
+            caption,
+            filename
+          );
         } else {
           throw new Error(`Nenhuma API disponível para a instância "${senderName}"`);
         }

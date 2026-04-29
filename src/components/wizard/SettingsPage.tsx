@@ -78,7 +78,7 @@ function AIGatewaySettings() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from('ai_settings').select('*').eq('user_id', user.id).single();
+      const { data } = await supabase.from('ai_settings').select('*').eq('user_id', user.id).maybeSingle();
       if (data) {
         setProvider(data.provider || 'openai');
         setApiKey(data.api_key || '');

@@ -157,7 +157,7 @@ export async function logoutEvolutionGoInstance(creds: EvolutionGoCredentials, i
 
 // ── Enviar mensagem ──
 export interface EvolutionGoMessage {
-  type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'buttons' | 'list' | 'carousel';
+  type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'buttons' | 'list' | 'carousel' | 'contact';
   content: string;
   mediaUrl?: string;
   caption?: string;
@@ -170,6 +170,9 @@ export interface EvolutionGoMessage {
   linkUrl?: string;
   sections?: Array<{ title: string; rows: Array<{ id?: string; title: string; description: string }> }>;
   cards?: Array<{ image?: string; title?: string; description?: string; footer?: string; buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }> }>;
+  // Para contact:
+  contactName?: string;
+  contactNumber?: string;
 }
 
 export async function sendEvolutionGoMessage(

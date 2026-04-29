@@ -277,6 +277,18 @@ Deno.serve(async (req) => {
             body = { number: to, text: linkText, linkPreview: true };
             break;
           }
+          case 'contact':
+            endpoint = `${base}/message/sendContact/${instanceName}`;
+            body = {
+              number: to,
+              contact: [
+                {
+                  fullName: message.contactName || message.content,
+                  phoneNumber: message.contactNumber || '',
+                }
+              ]
+            };
+            break;
           default:
             body = { number: to, text: message.content };
         }
