@@ -39,8 +39,8 @@ export function StepConfirmation() {
   const abortRef = useRef<AbortController | null>(null);
 
   const validContacts = getValidCount();
-  const validData = data.filter(r => r.isValid);
-  const selectedInstancesData = instances.filter(i => selectedInstances.includes(i.id));
+  const validData = Array.isArray(data) ? data.filter(r => r.isValid) : [];
+  const selectedInstancesData = Array.isArray(instances) ? instances.filter(i => selectedInstances.includes(i.id)) : [];
 
   // Detect API source from selected instances (evo_ → Evolution, uno_ → UnoAPI)
   const usesEvolution = selectedInstances.some(id => id.startsWith('evo_'));

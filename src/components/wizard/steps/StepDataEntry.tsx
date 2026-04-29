@@ -348,9 +348,9 @@ const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-success">
                 <CheckCircle2 className="w-5 h-5" />
-                <span className="font-medium">{data.filter(r => r.isValid).length} válidos</span>
+                <span className="font-medium">{Array.isArray(data) ? data.filter(r => r.isValid).length : 0} válidos</span>
               </div>
-              {data.filter(r => !r.isValid).length > 0 && (
+              {Array.isArray(data) && data.filter(r => !r.isValid).length > 0 && (
                 <div className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="w-5 h-5" />
                   <span className="font-medium">{data.filter(r => !r.isValid).length} com erro</span>
@@ -358,14 +358,14 @@ const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
               )}
             </div>
             <div className="text-sm text-muted-foreground">
-              {data.length} contatos • {columns.length} colunas
+              {Array.isArray(data) ? data.length : 0} contatos • {Array.isArray(columns) ? columns.length : 0} colunas
             </div>
           </div>
         </div>
       )}
 
       {/* Instructions - Collapsible */}
-      {data.length === 0 && (
+      {(!Array.isArray(data) || data.length === 0) && (
         <div className="glass-card p-4">
           <div className="flex items-start gap-3 text-sm text-muted-foreground">
             <AlertCircle className="w-4 h-4 text-primary mt-0.5" />

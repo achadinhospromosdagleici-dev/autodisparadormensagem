@@ -227,11 +227,14 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
   const nextStep = () => setCurrentStep(state.currentStep + 1);
   const prevStep = () => setCurrentStep(state.currentStep - 1);
-  const setData = (data: DataRow[]) => setState(prev => ({ ...prev, data }));
-  const setColumns = (columns: string[]) => setState(prev => ({ ...prev, columns }));
-  const updateRow = (id: string, updates: Partial<DataRow>) => setState(prev => ({ ...prev, data: prev.data.map(row => (row.id === id ? { ...row, ...updates } : row)) }));
-  const deleteRow = (id: string) => setState(prev => ({ ...prev, data: prev.data.filter(row => row.id !== id) }));
-  const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: prev.data.filter(row => !ids.includes(row.id)) }));
+  const setData = (data: DataRow[]) => {
+    const validData = Array.isArray(data) ? data : [];
+    setState(prev => ({ ...prev, data: validData }));
+  };
+  const setColumns = (columns: string[]) => setState(prev => ({ ...prev, columns: Array.isArray(columns) ? columns : [] }));
+  const updateRow = (id: string, updates: Partial<DataRow>) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.map(row => (row.id === id ? { ...row, ...updates } : row)) : [] }));
+  const deleteRow = (id: string) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.filter(row => row.id !== id) : [] }));
+  const deleteRows = (ids: string[]) => setState(prev => ({ ...prev, data: Array.isArray(prev.data) ? prev.data.filter(row => !ids.includes(row.id)) : [] }));
 
   // Auto-check UnoAPI connection on mount and periodically
   const checkUnoApiConnection = useRef(false);
@@ -286,8 +289,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const toggleInstanceSelection = (id: string) => setState(prev => ({ ...prev, selectedInstances: prev.selectedInstances.includes(id) ? prev.selectedInstances.filter(i => i !== id) : [...prev.selectedInstances, id] }));
   const selectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: prev.instances.filter(i => i.status === 'active').map(i => i.id) }));
   const deselectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: [] }));
-  const getValidCount = () => state.data.filter(row => row.isValid).length;
-  const getInvalidCount = () => state.data.filter(row => !row.isValid).length;
+  const getValidCount = () => (Array.isArray(state.data) ? state.data.filter(row => row.isValid).length : 0);
+  const getInvalidCount = () => (Array.isArray(state.data) ? state.data.filter(row => !row.isValid).length : 0);
   const addCampaign = (campaign: Campaign) => setState(prev => ({ ...prev, campaignHistory: [campaign, ...prev.campaignHistory] }));
   const reuseCampaign = (campaign: Campaign) => {
     const restoredMessages = campaign.messages.map(content => ({ id: crypto.randomUUID(), content }));

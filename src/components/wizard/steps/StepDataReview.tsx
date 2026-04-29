@@ -188,7 +188,7 @@ export function StepDataReview() {
     });
 
     // Remove skipped rows and empty rows
-    const activeData = data.filter(row => {
+    const activeData = (Array.isArray(data) ? data : []).filter(row => {
       if (skippedRows.has(row.id)) return false;
       // Check if row has any non-empty value in mapped columns
       return (originalColumns || []).some((col, i) => {
@@ -290,7 +290,7 @@ export function StepDataReview() {
   };
 
   const handleDeleteInvalid = () => {
-    const invalidIds = data.filter(row => !row.isValid).map(row => row.id);
+    const invalidIds = (Array.isArray(data) ? data : []).filter(row => !row.isValid).map(row => row.id);
     deleteRows(invalidIds);
     toast.success(`${invalidIds.length} registros inválidos removidos`);
   };
