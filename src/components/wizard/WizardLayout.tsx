@@ -45,6 +45,7 @@ export function WizardLayout() {
     scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
     metrics, getValidCount, addMessage, campaignHistory,
     activeCampaigns, updateActiveCampaign, removeActiveCampaign,
+    currentStep,
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [currentView, setCurrentView] = useState<AppView>('campaign');
@@ -53,6 +54,16 @@ export function WizardLayout() {
   const scrollToSection = (id: string) => {
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  // Sincronizar scroll com o passo atual do Wizard
+  React.useEffect(() => {
+    if (currentView === 'campaign') {
+      const sectionId = campaignSections[currentStep - 1]?.id;
+      if (sectionId) {
+        scrollToSection(sectionId);
+      }
+    }
+  }, [currentStep, currentView]);
 
   const isSectionComplete = (id: string) => {
     const dataArray = Array.isArray(data) ? data : [];
