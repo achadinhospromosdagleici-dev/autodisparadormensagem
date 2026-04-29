@@ -55,9 +55,10 @@ export function WizardLayout() {
   };
 
   const isSectionComplete = (id: string) => {
+    const dataArray = Array.isArray(data) ? data : [];
     switch (id) {
-      case 'data-entry': return data.length > 0;
-      case 'data-review': return data.some(row => row.isValid);
+      case 'data-entry': return dataArray.length > 0;
+      case 'data-review': return dataArray.some(row => row && row.isValid);
       case 'messages': return messages.length > 0;
       case 'instances': return selectedInstances.length > 0;
       case 'settings': return true;
@@ -151,6 +152,9 @@ export function WizardLayout() {
 
       case 'campaign':
       default:
+        const hasData = Array.isArray(data) && data.length > 0;
+        const hasValidData = Array.isArray(data) && data.some(r => r && r.isValid);
+
         return (
           <div className="space-y-8">
             <div>
@@ -160,23 +164,23 @@ export function WizardLayout() {
 
             {/* Sections */}
             <section ref={el => sectionRefs.current['data-entry'] = el} className="scroll-mt-24">
-              <SectionHeader title="1. Importar Dados" description="Cole ou importe sua lista de contatos" isComplete={data.length > 0} onNext={() => scrollToSection('data-review')} />
+              <SectionHeader title="1. Importar Dados" description="Cole ou importe sua lista de contatos" isComplete={hasData} onNext={() => scrollToSection('data-review')} />
               <div className="mt-4"><StepDataEntry /></div>
             </section>
 
             <section ref={el => sectionRefs.current['data-review'] = el} className="scroll-mt-24">
-              <SectionHeader title="2. Revisar Dados" description="Valide e edite os dados importados" isComplete={data.some(r => r.isValid)} onNext={() => scrollToSection('settings')} disabled={data.length === 0} />
-              <div className={`mt-4 ${data.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepDataReview /></div>
+              <SectionHeader title="2. Revisar Dados" description="Valide e edite os dados importados" isComplete={hasValidData} onNext={() => scrollToSection('settings')} disabled={!hasData} />
+              <div className={`mt-4 ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}><StepDataReview /></div>
             </section>
 
             <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
-              <SectionHeader title="3. Configurações" description="Nome, recurrence e opções de envio" isComplete onNext={() => scrollToSection('instances')} disabled={data.length === 0} />
-              <div className={`mt-4 ${data.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepSettings /></div>
+              <SectionHeader title="3. Configurações" description="Nome, recurrence e opções de envio" isComplete onNext={() => scrollToSection('instances')} disabled={!hasData} />
+              <div className={`mt-4 ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}><StepSettings /></div>
             </section>
 
             <section ref={el => sectionRefs.current['instances'] = el} className="scroll-mt-24">
-              <SectionHeader title="4. Nº de Disparo" description="Escolha API e instâncias para envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('messages')} disabled={data.length === 0 || !data.some(r => r.isValid)} />
-              <div className={`mt-4 ${data.length === 0 || !data.some(r => r.isValid) ? 'opacity-50 pointer-events-none' : ''}`}><StepInstances /></div>
+              <SectionHeader title="4. Nº de Disparo" description="Escolha API e instâncias para envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('messages')} disabled={!hasData || !hasValidData} />
+              <div className={`mt-4 ${!hasData || !hasValidData ? 'opacity-50 pointer-events-none' : ''}`}><StepInstances /></div>
             </section>
 
             <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">

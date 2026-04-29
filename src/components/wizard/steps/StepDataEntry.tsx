@@ -72,9 +72,14 @@ export function StepDataEntry() {
     } else {
       // If appending, we might still have a header in the new text if it's a full paste
       // We'll try to skip it if the first line matches our columns
-      const firstLine = parseCSVLine(lines[0], delimiter).map(c => c.toLowerCase().replace(/\s+/g, '_'));
-      const isHeader = firstLine.some(c => (columns || []).includes(c));
-      dataLines = isHeader ? lines.slice(1) : lines;
+      const parsedFirstLine = parseCSVLine(lines[0], delimiter);
+      if (!Array.isArray(parsedFirstLine)) {
+        dataLines = lines;
+      } else {
+        const firstLine = parsedFirstLine.map((c: string) => c.toLowerCase().replace(/\s+/g, '_'));
+        const isHeader = firstLine.some((c: string) => (columns || []).includes(c));
+        dataLines = isHeader ? lines.slice(1) : lines;
+      }
     }
     
     if (dataLines.length === 0) {
