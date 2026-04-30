@@ -476,17 +476,20 @@ export function StepInstances() {
             const isActive = instance.status === 'active';
             const source = (instance as any).source || 'default';
             const isSourceDisabled = Boolean(selectedSource && selectedSource !== source);
-            const isDisabled = !isActive || isSourceDisabled;
+            const showDisabledVisuals = !isActive || isSourceDisabled;
 
             return (
               <div
                 key={instance.id}
                 onClick={() => {
-                  if (!isDisabled) {
-                    toggleInstanceSelection(instance.id);
+                  if (!isActive) return;
+                  if (isSourceDisabled) {
+                    import('sonner').then(({ toast }) => toast.error('Você não pode misturar instâncias de APIs diferentes.'));
+                    return;
                   }
+                  toggleInstanceSelection(instance.id);
                 }}
-                className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${showDisabledVisuals ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
