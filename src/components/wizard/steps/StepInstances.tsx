@@ -171,7 +171,7 @@ export function StepInstances() {
       orphans.forEach(id => toggleInstanceSelection(id));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evoInstances, unoInstances, loading]);
+  }, [evoInstances, unoInstances, evoGoInstances, chatwootInboxes, loading]);
 
   const loadAllInstances = async () => {
     console.log('[StepInstances] loadAllInstances called');
@@ -475,13 +475,17 @@ export function StepInstances() {
             const isSelected = selectedInstances.includes(instance.id);
             const isActive = instance.status === 'active';
             const source = (instance as any).source || 'default';
-            const isSourceDisabled = selectedSource && selectedSource !== source;
+            const isSourceDisabled = Boolean(selectedSource && selectedSource !== source);
             const isDisabled = !isActive || isSourceDisabled;
 
             return (
               <div
                 key={instance.id}
-                onClick={() => { if (!isDisabled) toggleInstanceSelection(instance.id); }}
+                onClick={() => {
+                  if (!isDisabled) {
+                    toggleInstanceSelection(instance.id);
+                  }
+                }}
                 className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-start justify-between mb-4">
