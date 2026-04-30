@@ -75,27 +75,29 @@ export function StepInstances() {
   const [hasChatwoot, setHasChatwoot] = useState(false);
   useEffect(() => {
     async function checkApis() {
-      // Try localStorage first (faster, doesn't require DB)
+      // Evolution
       const evoLocal = loadEvolutionCredentials();
-      const evoGoLocal = loadEvolutionGoCredentials();
-      const cwLocal = loadChatwootCredentials();
-      
-      if (evoLocal || evoGoLocal || cwLocal) {
-        console.log('[StepInstances] Credentials from localStorage:', { evo: !!evoLocal, evoGo: !!evoGoLocal, cw: !!cwLocal });
-        setHasEvolution(!!evoLocal);
-        setHasEvolutionGo(!!evoGoLocal);
-        setHasChatwoot(!!cwLocal);
-        return;
+      if (evoLocal) setHasEvolution(true);
+      else {
+        const evoDb = await loadEvolutionCredentialsWithFallback();
+        setHasEvolution(!!evoDb);
       }
-      
-      // Fallback to DB
-      const evo = await loadEvolutionCredentialsWithFallback();
-      const evoGo = await loadEvolutionGoCredentialsWithFallback();
-      const cw = await loadChatwootCredentialsWithFallback();
-      console.log('[StepInstances] Credentials from DB:', { evo: !!evo, evoGo: !!evoGo, cw: !!cw });
-      setHasEvolution(!!evo);
-      setHasEvolutionGo(!!evoGo);
-      setHasChatwoot(!!cw);
+
+      // Evolution Go
+      const evoGoLocal = loadEvolutionGoCredentials();
+      if (evoGoLocal) setHasEvolutionGo(true);
+      else {
+        const evoGoDb = await loadEvolutionGoCredentialsWithFallback();
+        setHasEvolutionGo(!!evoGoDb);
+      }
+
+      // Chatwoot
+      const cwLocal = loadChatwootCredentials();
+      if (cwLocal) setHasChatwoot(true);
+      else {
+        const cwDb = await loadChatwootCredentialsWithFallback();
+        setHasChatwoot(!!cwDb);
+      }
     }
     checkApis();
   }, []);
@@ -222,39 +224,35 @@ export function StepInstances() {
     }
 
     // Evolution Go
-    if (hasEvolutionGo) {
-      const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
-      if (evoGoCreds) {
-        promises.push(
-          fetchEvolutionGoInstances(evoGoCreds)
-            .then((fetched) => {
-              console.log('[StepInstances] Evolution Go instances fetched:', fetched);
-              setEvoGoInstances(fetched);
-            })
-            .catch((err) => {
-              console.error('[StepInstances] Evolution Go fetch error:', err);
-              setEvoGoInstances([]);
-            })
-        );
-      }
+    const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
+    if (evoGoCreds) {
+      promises.push(
+        fetchEvolutionGoInstances(evoGoCreds)
+          .then((fetched) => {
+            console.log('[StepInstances] Evolution Go instances fetched:', fetched);
+            setEvoGoInstances(fetched);
+          })
+          .catch((err) => {
+            console.error('[StepInstances] Evolution Go fetch error:', err);
+            setEvoGoInstances([]);
+          })
+      );
     }
 
     // Chatwoot
-    if (hasChatwoot) {
-      const cwCreds = await loadChatwootCredentialsWithFallback();
-      if (cwCreds) {
-        promises.push(
-          fetchInboxes(cwCreds)
-            .then((fetched) => {
-              console.log('[StepInstances] Chatwoot inboxes fetched:', fetched);
-              setChatwootInboxes(fetched);
-            })
-            .catch((err) => {
-              console.error('[StepInstances] Chatwoot fetch error:', err);
-              setChatwootInboxes([]);
-            })
-        );
-      }
+    const cwCreds = await loadChatwootCredentialsWithFallback();
+    if (cwCreds) {
+      promises.push(
+        fetchInboxes(cwCreds)
+          .then((fetched) => {
+            console.log('[StepInstances] Chatwoot inboxes fetched:', fetched);
+            setChatwootInboxes(fetched);
+          })
+          .catch((err) => {
+            console.error('[StepInstances] Chatwoot fetch error:', err);
+            setChatwootInboxes([]);
+          })
+      );
     }
 
     await Promise.all(promises);
