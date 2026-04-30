@@ -101,6 +101,7 @@ interface WizardContextType extends WizardState {
   clearWizard: () => void;
   addInstance: (instance: Instance) => void;
   toggleInstanceSelection: (id: string) => void;
+  setSelectedInstances: (ids: string[] | ((prev: string[]) => string[])) => void;
   selectAllInstances: () => void;
   deselectAllInstances: () => void;
   getValidCount: () => number;
@@ -313,6 +314,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setSettings = (settings: Partial<WizardSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }));
   const addInstance = (instance: Instance) => setState(prev => ({ ...prev, instances: [...prev.instances, instance] }));
   const toggleInstanceSelection = (id: string) => setState(prev => ({ ...prev, selectedInstances: prev.selectedInstances.includes(id) ? prev.selectedInstances.filter(i => i !== id) : [...prev.selectedInstances, id] }));
+  const setSelectedInstances = (ids: string[] | ((prev: string[]) => string[])) => setState(prev => ({ ...prev, selectedInstances: typeof ids === 'function' ? ids(prev.selectedInstances) : ids }));
   const selectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: prev.instances.filter(i => i.status === 'active').map(i => i.id) }));
   const deselectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: [] }));
   const getValidCount = () => (Array.isArray(state.data) ? state.data.filter(row => row.isValid).length : 0);
@@ -355,6 +357,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       ...state,
       setCurrentStep, nextStep, prevStep, setData, setColumns, updateRow, deleteRow, deleteRows,
       addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, setSettings, addInstance, toggleInstanceSelection,
+      setSelectedInstances,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       clearWizard,
       setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig, setSelectedApi,

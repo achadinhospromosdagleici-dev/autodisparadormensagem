@@ -58,6 +58,7 @@ export function StepInstances() {
     unoApiConnected,
     selectedApi,
     setSelectedApi,
+    setSelectedInstances,
   } = useWizard();
   const { user } = useAuth();
 
@@ -302,6 +303,25 @@ export function StepInstances() {
 
   const displayInstances = mergedInstances.length > 0 ? mergedInstances : instances.map(i => ({ ...i, source: 'default' as const }));
   const activeInstances = displayInstances.filter((i) => i.status === 'active');
+  
+  const selectedSource = selectedInstances.length > 0 
+    ? (displayInstances.find(i => i.id === selectedInstances[0]) as any)?.source 
+    : null;
+
+  const handleSelectAll = () => {
+    if (selectedSource) {
+      // If already selecting a specific source, only select others from that same source
+      const ids = displayInstances.filter(i => i.status === 'active' && (i as any).source === selectedSource).map(i => i.id);
+      setSelectedInstances(ids);
+    } else {
+      // If none selected, find the first available source and select its active instances
+      if (activeInstances.length > 0) {
+        const firstSource = (activeInstances[0] as any).source;
+        const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
+        setSelectedInstances(ids);
+      }
+    }
+  };
 
   const getStatusIcon = (status: Instance['status']) => {
     switch (status) {
@@ -429,7 +449,7 @@ export function StepInstances() {
       {/* Actions */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <button onClick={selectAllInstances}
+          <button onClick={handleSelectAll}
             className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-secondary/80 transition-colors">
             Selecionar Ativos
           </button>
@@ -455,12 +475,14 @@ export function StepInstances() {
             const isSelected = selectedInstances.includes(instance.id);
             const isActive = instance.status === 'active';
             const source = (instance as any).source || 'default';
+            const isSourceDisabled = selectedSource && selectedSource !== source;
+            const isDisabled = !isActive || isSourceDisabled;
 
             return (
               <div
                 key={instance.id}
-                onClick={() => { if (isActive) toggleInstanceSelection(instance.id); }}
-                className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${!isActive ? 'cursor-not-allowed' : ''}`}
+                onClick={() => { if (!isDisabled) toggleInstanceSelection(instance.id); }}
+                className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
