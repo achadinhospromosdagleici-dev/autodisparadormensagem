@@ -195,22 +195,22 @@ export function WizardLayout() {
 
             <section ref={el => sectionRefs.current['data-review'] = el} className="scroll-mt-24">
               <SectionHeader title="2. Revisar Dados" description="Valide e edite os dados importados" isComplete={hasValidData} onNext={() => scrollToSection('settings')} disabled={!hasData} />
-              <div className={`mt-4 ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}><StepDataReview /></div>
+              <div className={`mt-4 ${!hasData ? 'opacity-50' : ''}`}><StepDataReview /></div>
             </section>
 
             <section ref={el => sectionRefs.current['settings'] = el} className="scroll-mt-24">
               <SectionHeader title="3. Configurações" description="Nome, recurrence e opções de envio" isComplete onNext={() => scrollToSection('instances')} disabled={!hasData} />
-              <div className={`mt-4 ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}><StepSettings /></div>
+              <div className={`mt-4 ${!hasData ? 'opacity-50' : ''}`}><StepSettings /></div>
             </section>
 
             <section ref={el => sectionRefs.current['instances'] = el} className="scroll-mt-24">
               <SectionHeader title="4. Nº de Disparo" description="Escolha API e instâncias para envio" isComplete={selectedInstances.length > 0} onNext={() => scrollToSection('messages')} disabled={!hasData || !hasValidData} />
-              <div className={`mt-4 ${!hasData || !hasValidData ? 'opacity-50 pointer-events-none' : ''}`}><StepInstances /></div>
+              <div className={`mt-4 ${!hasData || !hasValidData ? 'opacity-50' : ''}`}><StepInstances /></div>
             </section>
 
             <section ref={el => sectionRefs.current['messages'] = el} className="scroll-mt-24">
               <SectionHeader title="5. Mensagens" description="Crie o conteúdo das mensagens" isComplete={messages.length > 0} onNext={() => scrollToSection('send')} disabled={selectedInstances.length === 0} />
-              <div className={`mt-4 ${selectedInstances.length === 0 ? 'opacity-50 pointer-events-none' : ''}`}><StepMessages /></div>
+              <div className={`mt-4 ${selectedInstances.length === 0 ? 'opacity-50' : ''}`}><StepMessages /></div>
             </section>
 
             <section ref={el => sectionRefs.current['send'] = el} className="scroll-mt-24">

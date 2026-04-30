@@ -478,17 +478,19 @@ export function StepInstances() {
             const isSelected = selectedInstances.includes(instance.id);
             const isActive = instance.status === 'active';
             const source = (instance as any).source || 'default';
-            // Lock disabled for debugging
-            const showDisabledVisuals = !isActive;
+            const isSourceDisabled = Boolean(selectedSource && selectedSource !== source);
+            const showDisabledVisuals = !isActive || isSourceDisabled;
 
             return (
               <div
                 key={instance.id}
                 onClick={() => {
-                  if (isActive) {
-                    import('sonner').then(({ toast }) => toast.success(`Clicado! ID: ${instance.id}`));
-                    toggleInstanceSelection(instance.id);
+                  if (!isActive) return;
+                  if (isSourceDisabled) {
+                    import('sonner').then(({ toast }) => toast.error('Você não pode misturar instâncias de APIs diferentes.'));
+                    return;
                   }
+                  toggleInstanceSelection(instance.id);
                 }}
                 className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${showDisabledVisuals ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
