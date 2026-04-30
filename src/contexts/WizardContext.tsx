@@ -344,7 +344,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
   const reuseCampaign = (campaign: Campaign) => {
     const restoredMessages = campaign.messages.map(content => ({ id: crypto.randomUUID(), content }));
-    setState(prev => ({ ...prev, messages: restoredMessages, currentStep: 4 }));
+    // Reset to step 1 so the user can input the spreadsheet data required for the new dispatch
+    setState(prev => ({ ...prev, messages: restoredMessages, currentStep: 1 }));
   };
 
   // New functions
