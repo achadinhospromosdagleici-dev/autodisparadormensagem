@@ -209,15 +209,20 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('wizard_state');
       if (saved) {
-        try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          return {
+            ...defaultState,
+            ...parsed,
+            selectedInstances: Array.isArray(parsed.selectedInstances) ? parsed.selectedInstances : [],
+            unoApiConnected: !!localStorage.getItem('unoapi_credentials'),
+          };
         } catch (e) {
           console.error('Error loading wizard state:', e);
         }
       }
     }
     return {
-      currentStep: 1,
+      ...defaultState,
       data: [],
       columns: ['numero'],
       messages: [],
@@ -313,8 +318,14 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   });
   const setSettings = (settings: Partial<WizardSettings>) => setState(prev => ({ ...prev, settings: { ...prev.settings, ...settings } }));
   const addInstance = (instance: Instance) => setState(prev => ({ ...prev, instances: [...prev.instances, instance] }));
-  const toggleInstanceSelection = (id: string) => setState(prev => ({ ...prev, selectedInstances: prev.selectedInstances.includes(id) ? prev.selectedInstances.filter(i => i !== id) : [...prev.selectedInstances, id] }));
-  const setSelectedInstances = (ids: string[] | ((prev: string[]) => string[])) => setState(prev => ({ ...prev, selectedInstances: typeof ids === 'function' ? ids(prev.selectedInstances) : ids }));
+  const toggleInstanceSelection = (id: string) => setState(prev => {
+    const current = Array.isArray(prev.selectedInstances) ? prev.selectedInstances : [];
+    return { ...prev, selectedInstances: current.includes(id) ? current.filter(i => i !== id) : [...current, id] };
+  });
+  const setSelectedInstances = (ids: string[] | ((prev: string[]) => string[])) => setState(prev => {
+    const current = Array.isArray(prev.selectedInstances) ? prev.selectedInstances : [];
+    return { ...prev, selectedInstances: typeof ids === 'function' ? ids(current) : ids };
+  });
   const selectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: prev.instances.filter(i => i.status === 'active').map(i => i.id) }));
   const deselectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: [] }));
   const getValidCount = () => (Array.isArray(state.data) ? state.data.filter(row => row.isValid).length : 0);
