@@ -350,16 +350,39 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
           <span className="text-xs text-muted-foreground">
             {cells.length} linhas × {cells[0]?.length || 0} colunas
           </span>
-          <button
-            onClick={() => {
-              const text = cells.map(row => row.join('\t')).join('\n');
-              if (onDataPaste) onDataPaste(text);
-              if (onProcess) onProcess();
-            }}
-            className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
-          >
-            Processar Dados
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const text = cells.map(row => row.join('\t')).join('\n');
+                navigator.clipboard.writeText(text);
+                import('sonner').then(({ toast }) => toast.success('Dados copiados!'));
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors"
+            >
+              Copiar
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Deseja realmente limpar toda a planilha?')) {
+                  setCells([['']]);
+                  setColumnWidths([]);
+                }
+              }}
+              className="text-xs text-destructive hover:text-destructive/80 font-medium transition-colors"
+            >
+              Limpar
+            </button>
+            <button
+              onClick={() => {
+                const text = cells.map(row => row.join('\t')).join('\n');
+                if (onDataPaste) onDataPaste(text);
+                if (onProcess) onProcess();
+              }}
+              className="text-xs text-primary hover:text-primary/80 font-medium transition-colors px-2 py-1 bg-primary/10 rounded-md"
+            >
+              Processar Dados
+            </button>
+          </div>
         </div>
       )}
     </div>
