@@ -309,6 +309,7 @@ export function StepInstances() {
     : null;
 
   const handleSelectAll = () => {
+    import('sonner').then(({ toast }) => toast.info('Executando Selecionar Ativos...'));
     if (selectedSource) {
       // If already selecting a specific source, only select others from that same source
       const ids = displayInstances.filter(i => i.status === 'active' && (i as any).source === selectedSource).map(i => i.id);
@@ -319,6 +320,8 @@ export function StepInstances() {
         const firstSource = (activeInstances[0] as any).source;
         const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
         setSelectedInstances(ids);
+      } else {
+        import('sonner').then(({ toast }) => toast.error('Nenhuma instância ativa encontrada.'));
       }
     }
   };
@@ -483,6 +486,7 @@ export function StepInstances() {
                 key={instance.id}
                 onClick={() => {
                   if (isActive) {
+                    import('sonner').then(({ toast }) => toast.success(`Clicado! ID: ${instance.id}`));
                     toggleInstanceSelection(instance.id);
                   }
                 }}
