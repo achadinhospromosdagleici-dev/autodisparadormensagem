@@ -91,21 +91,81 @@ export async function isEvolutionGoConnectedAsync(): Promise<boolean> {
 
 // ── Generic proxy call ──
 async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
+  // ATTEMPT DIRECT CALL BYPASSING PROXY
+  if (payload.action === 'sendMessage' && payload.baseUrl && payload.apiKey && payload.to && payload.message) {
+    try {
+      const base = payload.baseUrl.replace(/\/$/, '');
+      
+      // Tentar endpoint /send/text primeiro (EvoGo customizado) se for texto
+      if (payload.message.type === 'text' || !payload.message.type) {
+        try {
+          const directRes = await fetch(`${base}/send/text`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': payload.apiKey
+            },
+            body: JSON.stringify({
+              number: payload.to,
+              text: payload.message.content,
+              delay: 1200
+            })
+          });
+          
+          if (directRes.ok) {
+            console.log('[Evolution Go] Direct /send/text succeeded!');
+            return await directRes.json();
+          }
+        } catch (e) {
+          console.log('[Evolution Go] Direct /send/text failed (CORS or network):', e);
+        }
+      }
+
+      // Fallback para endpoint padrão Evolution
+      const endpoint = `${base}/message/sendText/${payload.instanceName}`;
+      try {
+        const directRes2 = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': payload.apiKey
+          },
+          body: JSON.stringify({
+            number: payload.to,
+            text: payload.message.content
+          })
+        });
+        
+        if (directRes2.ok) {
+          console.log('[Evolution Go] Direct standard endpoint succeeded!');
+          return await directRes2.json();
+        }
+      } catch (e) {
+        console.log('[Evolution Go] Direct standard endpoint failed:', e);
+      }
+    } catch (err) {
+      console.log('[Evolution Go] Direct bypass attempt failed, falling back to proxy...', err);
+    }
+  }
+
+  // FALLBACK PARA O PROXY (SUPABASE EDGE FUNCTION)
+  console.log('[Evolution Go] Calling proxy...');
   const { data, error } = await supabase.functions.invoke('evolution-go-proxy', {
     body: payload,
   });
   
   if (error) {
     console.error('[Evolution Go Call] Error:', error);
-    if (error.context && typeof error.context.json === 'function') {
+    let errorDetails = '';
+    if (error.context && typeof error.context.text === 'function') {
       try {
-        const errData = await error.context.clone().json();
-        throw new Error(errData.error || errData.message || error.message);
+        errorDetails = await error.context.clone().text();
+        console.error('[Evolution Go Call] Raw text:', errorDetails);
       } catch (e) {
-        // failed to parse json
+        // failed to read text
       }
     }
-    throw new Error(error.message || 'Erro na chamada Evolution Go');
+    throw new Error(errorDetails || error.message || 'Erro na chamada Evolution Go');
   }
   
   if (data?.error) throw new Error(data.error);
