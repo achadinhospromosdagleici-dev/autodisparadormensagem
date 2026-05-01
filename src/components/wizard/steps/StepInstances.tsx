@@ -75,11 +75,11 @@ export function StepInstances() {
   const [hasEvolutionGo, setHasEvolutionGo] = useState(false);
   const [hasChatwoot, setHasChatwoot] = useState(false);
   useEffect(() => {
-    async function checkApis() {
+    async function checkApis(checkDb = false) {
       // Evolution
       const evoLocal = loadEvolutionCredentials();
       if (evoLocal) setHasEvolution(true);
-      else {
+      else if (checkDb) {
         const evoDb = await loadEvolutionCredentialsWithFallback();
         setHasEvolution(!!evoDb);
       }
@@ -87,7 +87,7 @@ export function StepInstances() {
       // Evolution Go
       const evoGoLocal = loadEvolutionGoCredentials();
       if (evoGoLocal) setHasEvolutionGo(true);
-      else {
+      else if (checkDb) {
         const evoGoDb = await loadEvolutionGoCredentialsWithFallback();
         setHasEvolutionGo(!!evoGoDb);
       }
@@ -95,16 +95,16 @@ export function StepInstances() {
       // Chatwoot
       const cwLocal = loadChatwootCredentials();
       if (cwLocal) setHasChatwoot(true);
-      else {
+      else if (checkDb) {
         const cwDb = await loadChatwootCredentialsWithFallback();
         setHasChatwoot(!!cwDb);
       }
     }
-    checkApis();
+    checkApis(true);
 
-    // Auto-refresh periodically to pick up settings changes
+    // Auto-refresh periodically to pick up settings changes (only checks localStorage to prevent DB spam)
     const interval = setInterval(() => {
-      checkApis();
+      checkApis(false);
     }, 5000);
     return () => clearInterval(interval);
   }, []);
