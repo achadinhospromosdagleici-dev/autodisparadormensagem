@@ -3,17 +3,20 @@
 
 import {
   loadUnoApiCredentials,
+  loadUnoApiCredentialsWithFallback,
   sendUnoApiMessage,
   UnoApiMessage,
 } from './unoapi';
 import {
   loadEvolutionCredentials,
+  loadEvolutionCredentialsWithFallback,
   sendMessage as sendEvoMessage,
   getInstanceStatus,
   EvolutionMessage,
 } from './evolution';
 import {
   loadEvolutionGoCredentials,
+  loadEvolutionGoCredentialsWithFallback,
   sendEvolutionGoMessage,
   getEvolutionGoInstanceStatus,
   EvolutionGoMessage,
@@ -168,20 +171,21 @@ export async function sendCampaign(
 ): Promise<SendProgress> {
   if (selectedPhoneNumbers.length === 0) throw new Error('Nenhum número remetente selecionado');
 
-  const unoCredsEarly = loadUnoApiCredentials();
-  const evoCredsEarly = loadEvolutionCredentials();
+  const unoCredsEarly = await loadUnoApiCredentialsWithFallback();
+  const evoCredsEarly = await loadEvolutionCredentialsWithFallback();
+  const evoGoCredsEarly = await loadEvolutionGoCredentialsWithFallback();
 
   const cwCredsEarly = await loadChatwootCredentialsWithFallback();
 
   // Filter out instances that have no matching API credentials.
   const validInstances = selectedPhoneNumbers.filter(id => {
     const src = getInstanceSource(id);
-    if (src === 'evolution-go') return !!loadEvolutionGoCredentials();
+    if (src === 'evolution-go') return !!evoGoCredsEarly;
     if (src === 'evolution') return !!evoCredsEarly;
     if (src === 'unoapi') return !!unoCredsEarly;
     if (src === 'chatwoot') return !!cwCredsEarly;
     // default → use whichever API is configured
-    return !!evoCredsEarly || !!unoCredsEarly || !!loadEvolutionGoCredentials() || !!cwCredsEarly;
+    return !!evoCredsEarly || !!unoCredsEarly || !!evoGoCredsEarly || !!cwCredsEarly;
   });
 
   if (validInstances.length === 0) {
@@ -207,7 +211,7 @@ export async function sendCampaign(
 
   const unoCreds = unoCredsEarly;
   const evoCreds = evoCredsEarly;
-  const evoGoCreds = loadEvolutionGoCredentials();
+  const evoGoCreds = evoGoCredsEarly;
 
   const cwCreds = cwCredsEarly;
 
