@@ -209,9 +209,9 @@ export async function getEvolutionGoQRCode(creds: EvolutionGoCredentials, instan
 export async function getEvolutionGoInstanceStatus(
   creds: EvolutionGoCredentials,
   instanceName: string
-): Promise<{ status: string; qrcode?: string; phone?: string }> {
+): Promise<{ status: string; connected?: boolean; qrcode?: string; phone?: string }> {
   return evolutionGoCall({
-    action: 'status',
+    action: 'connectionState',
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
     instanceName,
