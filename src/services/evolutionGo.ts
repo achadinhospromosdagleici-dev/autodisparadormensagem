@@ -186,7 +186,7 @@ export async function sendEvolutionGoMessage(
     baseUrl: creds.baseUrl,
     apiKey: creds.apiKey,
     instanceName,
-    phoneNumber,
+    to: phoneNumber,
     message,
   });
 }
