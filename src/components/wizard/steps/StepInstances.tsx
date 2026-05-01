@@ -101,6 +101,12 @@ export function StepInstances() {
       }
     }
     checkApis();
+
+    // Auto-refresh periodically to pick up settings changes
+    const interval = setInterval(() => {
+      checkApis();
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot;
@@ -158,8 +164,16 @@ export function StepInstances() {
       loadAllInstances();
       hasLoadedRef.current = true;
     }
+
+    // Auto-refresh instances every 15 seconds
+    const interval = setInterval(() => {
+      if (!loading) {
+        loadAllInstances(false);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loading]);
 
   // Cleanup orphaned selections (instances no longer available)
   useEffect(() => {
@@ -173,30 +187,25 @@ export function StepInstances() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evoInstances, unoInstances, evoGoInstances, chatwootInboxes, loading]);
 
-  const loadAllInstances = async () => {
+  const loadAllInstances = async (showLoading = true) => {
     console.log('[StepInstances] loadAllInstances called');
-    setLoading(true);
+    if (showLoading) setLoading(true);
     const promises: Promise<void>[] = [];
 
     // UnoAPI
-    if (unoApiConnected) {
-      const creds = await loadUnoApiCredentialsWithFallback();
-      console.log('[StepInstances] UnoAPI connected, creds:', creds ? 'found' : 'not found');
-      if (creds) {
-        promises.push(
-          fetchUnoInstances(creds)
-            .then(({ instances: fetched }) => {
-              console.log('[StepInstances] UnoAPI instances fetched:', fetched);
-              setUnoInstances(fetched);
-            })
-            .catch((err) => {
-              console.error('[StepInstances] UnoAPI fetch error:', err);
-              setUnoInstances([]);
-            })
-        );
-      }
-    } else {
-      console.log('[StepInstances] UnoAPI not connected, skipping');
+    const unoCreds = await loadUnoApiCredentialsWithFallback();
+    if (unoCreds) {
+      promises.push(
+        fetchUnoInstances(unoCreds)
+          .then(({ instances: fetched }) => {
+            console.log('[StepInstances] UnoAPI instances fetched:', fetched);
+            setUnoInstances(fetched);
+          })
+          .catch((err) => {
+            console.error('[StepInstances] UnoAPI fetch error:', err);
+            setUnoInstances([]);
+          })
+      );
     }
 
     // Evolution - try user's own first, then shared (for trial users)
@@ -257,8 +266,7 @@ export function StepInstances() {
     }
 
     await Promise.all(promises);
-    console.log('[StepInstances] All instances loaded, unoApiConnected:', unoApiConnected);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
 // Merge all sources into unified Instance[]

@@ -5,8 +5,10 @@ import { ScheduledCampaign } from '@/components/wizard/CampaignScheduler';
 import { ABTest } from '@/components/wizard/ABTesting';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
 import { CampaignMetrics } from '@/components/wizard/Dashboard';
-import { ChatwootInbox } from '@/services/chatwoot';
-import { loadUnoApiCredentials, testConnection } from '@/services/unoapi';
+import { ChatwootInbox, loadChatwootCredentialsWithFallback, saveChatwootCredentials } from '@/services/chatwoot';
+import { loadUnoApiCredentials, testConnection, loadUnoApiCredentialsWithFallback, saveUnoApiCredentials } from '@/services/unoapi';
+import { loadEvolutionCredentialsWithFallback, saveEvolutionCredentials } from '@/services/evolution';
+import { loadEvolutionGoCredentialsWithFallback, saveEvolutionGoCredentials } from '@/services/evolutionGo';
 
 export interface DataRow {
   id: string;
@@ -253,6 +255,28 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('wizard_state', JSON.stringify(state));
   }, [state]);
+
+  // Load APIs from DB on mount and populate localStorage
+  useEffect(() => {
+    const preloadApis = async () => {
+      try {
+        const uno = await loadUnoApiCredentialsWithFallback();
+        if (uno) localStorage.setItem('unoapi_credentials', JSON.stringify(uno));
+        
+        const evo = await loadEvolutionCredentialsWithFallback();
+        if (evo) localStorage.setItem('evolution_credentials', JSON.stringify(evo));
+        
+        const evogo = await loadEvolutionGoCredentialsWithFallback();
+        if (evogo) localStorage.setItem('evolution_go_credentials', JSON.stringify(evogo));
+        
+        const cw = await loadChatwootCredentialsWithFallback();
+        if (cw) localStorage.setItem('chatwoot_credentials', JSON.stringify(cw));
+      } catch (err) {
+        console.error('[WizardContext] Error preloading APIs:', err);
+      }
+    };
+    preloadApis();
+  }, []);
 
   const setCurrentStep = (step: number) => setState(prev => ({ ...prev, currentStep: Math.max(1, Math.min(6, step)) }));
   const nextStep = () => setCurrentStep(state.currentStep + 1);
