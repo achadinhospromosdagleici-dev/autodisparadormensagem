@@ -202,6 +202,27 @@ const sampleCampaignHistory: Campaign[] = [
   },
 ];
 
+const defaultState: WizardState = {
+  currentStep: 1,
+  data: [],
+  columns: ['numero'],
+  messages: [],
+  instances: defaultInstances,
+  selectedInstances: ['1'],
+  settings: defaultSettings,
+  campaignHistory: sampleCampaignHistory,
+  chatwootConnected: false,
+  unoApiConnected: false,
+  chatwootInboxes: [],
+  selectedInboxId: null,
+  followUpConfig: defaultFollowUpConfig,
+  scheduledCampaigns: [],
+  abTests: [],
+  metrics: defaultMetrics,
+  activeCampaigns: [],
+  selectedApi: null,
+};
+
 const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
 export function WizardProvider({ children }: { children: ReactNode }) {
@@ -224,23 +245,6 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     }
     return {
       ...defaultState,
-      data: [],
-      columns: ['numero'],
-      messages: [],
-      instances: defaultInstances,
-      selectedInstances: ['1'],
-      settings: defaultSettings,
-      campaignHistory: sampleCampaignHistory,
-      chatwootConnected: false,
-      unoApiConnected: false,
-      chatwootInboxes: [],
-      selectedInboxId: null,
-      followUpConfig: defaultFollowUpConfig,
-      scheduledCampaigns: [],
-      abTests: [],
-      metrics: defaultMetrics,
-      activeCampaigns: [],
-      selectedApi: null,
       unoApiConnected: !!localStorage.getItem('unoapi_credentials'),
     };
   });
