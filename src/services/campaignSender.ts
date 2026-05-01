@@ -271,8 +271,9 @@ export async function sendCampaign(
     }
 
     const contact = contacts[i];
-    const phoneNumber = contact.numero || contact.phone || '';
-    const contactName = contact.nome || contact.name || phoneNumber;
+    const rawPhoneNumber = contact.numero || contact.phone || '';
+    const phoneNumber = String(rawPhoneNumber).replace(/\D/g, '');
+    const contactName = contact.nome || contact.name || rawPhoneNumber;
 
     const senderInstId = validInstances[phoneIndex % validInstances.length];
     const senderName = getInstanceName(senderInstId);
