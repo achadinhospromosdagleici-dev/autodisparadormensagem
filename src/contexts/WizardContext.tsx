@@ -209,6 +209,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('wizard_state');
       if (saved) {
+        try {
           const parsed = JSON.parse(saved);
           return {
             ...defaultState,
