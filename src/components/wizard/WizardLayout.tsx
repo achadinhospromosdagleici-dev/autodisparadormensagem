@@ -35,8 +35,8 @@ const campaignSections = [
   { id: 'data-entry', title: '1. Importar Dados', description: 'Cole ou importe sua lista de contatos' },
   { id: 'data-review', title: '2. Revisar Dados', description: 'Valide e edite os dados importados' },
   { id: 'instances', title: '3. Nº de Disparo', description: 'Escolha API e instâncias para envio' },
-  { id: 'messages', title: '4. Mensagens', description: 'Crie o conteúdo das mensagens' },
   { id: 'settings', title: '5. Configurações', description: 'Nome, recurrence e opções de envio' },
+  { id: 'send', title: '6. Enviar', description: 'Revise e inicie o disparo' },
 ];
 
 export function WizardLayout() {
@@ -214,7 +214,7 @@ export function WizardLayout() {
             </section>
 
             <section ref={el => sectionRefs.current['send'] = el} className="scroll-mt-24">
-              <SectionHeader title="Enviar" description="Revise e inicie o disparo" isComplete={false} isLast />
+              <SectionHeader title="6. Enviar" description="Revise e inicie o disparo" isComplete={false} isLast />
               <div className="mt-4"><StepConfirmation /></div>
             </section>
           </div>
