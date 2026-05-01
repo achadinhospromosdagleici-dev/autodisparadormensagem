@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
-import { CampaignHistory, Campaign } from '../CampaignHistory';
+import { Campaign } from '../CampaignHistory';
 import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
 import { loadUnoApiCredentials } from '@/services/unoapi';
 import { loadEvolutionCredentials } from '@/services/evolution';
@@ -26,12 +26,11 @@ import { toast } from 'sonner';
 export function StepConfirmation() {
   const {
     data, messages, instances, selectedInstances, settings,
-    getValidCount, campaignHistory, addCampaign, reuseCampaign,
+    getValidCount, campaignHistory, addCampaign,
     unoApiConnected, followUpConfig, updateMetrics, scheduledCampaigns, addScheduledCampaign,
   } = useWizard();
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [scheduleName, setScheduleName] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
@@ -174,12 +173,6 @@ export function StepConfirmation() {
     toast.warning('Campanha pausada');
   };
 
-  const handleReuseCampaign = (campaign: Campaign) => {
-    reuseCampaign(campaign);
-    toast.success('Mensagens restauradas!');
-    setShowHistory(false);
-  };
-
   const summaryItems = [
     { icon: Users, label: 'Contatos Válidos', value: validContacts, color: 'text-success' },
     { icon: MessageSquare, label: 'Mensagens', value: messages.length, color: 'text-primary' },
@@ -199,23 +192,7 @@ export function StepConfirmation() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      {/* Toggle */}
-      <div className="flex gap-2">
-        <button onClick={() => setShowHistory(false)}
-          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${!showHistory ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>
-          <Send className="w-4 h-4" /> Nova Campanha
-        </button>
-        <button onClick={() => setShowHistory(true)}
-          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${showHistory ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`}>
-          <History className="w-4 h-4" /> Histórico ({campaignHistory.length})
-        </button>
-      </div>
-
-      {showHistory ? (
-        <CampaignHistory campaigns={campaignHistory} onReuse={handleReuseCampaign} />
-      ) : (
-        <>
-          {/* Summary */}
+      {/* Summary */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {summaryItems.map(item => (
               <div key={item.label} className="glass-card p-4 text-center">
@@ -475,8 +452,6 @@ export function StepConfirmation() {
           {hasRequiredCreds && selectedInstances.length === 0 && (
             <p className="text-center text-sm text-muted-foreground">Volte e selecione ao menos um número remetente</p>
           )}
-        </>
-      )}
     </div>
   );
 }
