@@ -94,7 +94,20 @@ async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
   const { data, error } = await supabase.functions.invoke('evolution-go-proxy', {
     body: payload,
   });
-  if (error) throw new Error(error.message || 'Erro na chamada Evolution Go');
+  
+  if (error) {
+    console.error('[Evolution Go Call] Error:', error);
+    if (error.context && typeof error.context.json === 'function') {
+      try {
+        const errData = await error.context.clone().json();
+        throw new Error(errData.error || errData.message || error.message);
+      } catch (e) {
+        // failed to parse json
+      }
+    }
+    throw new Error(error.message || 'Erro na chamada Evolution Go');
+  }
+  
   if (data?.error) throw new Error(data.error);
   return data;
 }
