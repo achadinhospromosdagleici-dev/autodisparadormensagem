@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Plus,
@@ -111,7 +111,10 @@ interface MessageTemplatesProps {
 }
 
 export function MessageTemplates({ onUseTemplate }: MessageTemplatesProps) {
-  const [templates, setTemplates] = useState<MessageTemplate[]>(loadTemplates());
+  const [templates, setTemplates] = useState<MessageTemplate[]>(defaultTemplates);
+  useEffect(() => {
+    loadTemplates().then(setTemplates).catch(() => {});
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newContent, setNewContent] = useState('');

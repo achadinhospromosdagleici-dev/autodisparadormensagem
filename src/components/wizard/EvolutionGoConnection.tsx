@@ -169,7 +169,7 @@ export function EvolutionGoConnection({ onInstancesLoaded }: EvolutionGoConnecti
     pollRef.current = setInterval(async () => {
       try {
         const status = await getEvolutionGoInstanceStatus(getCreds(), instName);
-        if (status.connected) {
+        if (status.status === 'open' || status.status === 'connected') {
           setQrCode('');
           clearInterval(pollRef.current!);
           clearInterval(timerRef.current!);

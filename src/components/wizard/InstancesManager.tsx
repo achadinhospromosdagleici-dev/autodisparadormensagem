@@ -71,11 +71,11 @@ export function InstancesManager() {
       if (creds) {
         try {
           const { instances: fetched } = await fetchUnoInstances(creds);
-          allInstances.push(...fetched.map((i: UnoApiInstance) => ({
+          allInstances.push(...fetched.map((i: UnoApiInstance): InstanceInfo => ({
             id: `uno_${i.phone}`,
             name: i.name || i.phone,
             phone: i.phone,
-            status: i.status === 'connected' ? 'connected' : 'disconnected',
+            status: (i.status === 'connected' ? 'connected' : 'disconnected') as InstanceInfo['status'],
             source: 'unoapi' as ApiSource,
           })));
         } catch (e) {}
@@ -88,11 +88,11 @@ export function InstancesManager() {
       if (creds) {
         try {
           const fetched = await fetchEvoInstances(creds);
-          allInstances.push(...fetched.map((i: EvolutionInstance) => ({
+          allInstances.push(...fetched.map((i: EvolutionInstance): InstanceInfo => ({
             id: `evo_${i.instanceName}`,
             name: i.profileName || i.instanceName,
             phone: i.phone || i.instanceName,
-            status: i.status === 'open' || i.status === 'connected' ? 'connected' : 'disconnected',
+            status: (i.status === 'open' || i.status === 'connected' ? 'connected' : 'disconnected') as InstanceInfo['status'],
             source: 'evolution' as ApiSource,
             profileName: i.profileName,
           })));
@@ -106,11 +106,11 @@ export function InstancesManager() {
       if (creds) {
         try {
           const fetched = await fetchEvolutionGoInstances(creds);
-          allInstances.push(...fetched.map((i: EvolutionGoInstance) => ({
+          allInstances.push(...fetched.map((i: EvolutionGoInstance): InstanceInfo => ({
             id: `evogo_${i.instanceName}`,
             name: i.profileName || i.instanceName,
             phone: i.phone || i.instanceName,
-            status: i.status === 'open' || i.status === 'connected' ? 'connected' : 'disconnected',
+            status: (i.status === 'open' || i.status === 'connected' ? 'connected' : 'disconnected') as InstanceInfo['status'],
             source: 'evolution-go' as ApiSource,
             profileName: i.profileName,
           })));
@@ -163,11 +163,11 @@ export function InstancesManager() {
         if (source === 'evolution') {
           const creds = loadEvolutionCredentials()!;
           const status = await getInstanceStatus(creds, instanceName);
-          connected = status.connected;
+          connected = !!status.connected;
         } else if (source === 'evolution-go') {
           const creds = loadEvolutionGoCredentials()!;
           const status = await getEvolutionGoInstanceStatus(creds, instanceName);
-          connected = status.connected;
+          connected = status.status === 'open' || status.status === 'connected';
         }
         
         if (connected) {
