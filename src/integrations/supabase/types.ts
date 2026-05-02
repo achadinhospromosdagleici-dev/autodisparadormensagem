@@ -14,6 +14,299 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_settings: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          model: string
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          id?: string
+          model: string
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          model?: string
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          phone: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chatwoot_settings: {
+        Row: {
+          account_id: number
+          api_token: string
+          base_url: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: number
+          api_token: string
+          base_url: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: number
+          api_token?: string
+          base_url?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          contact_name: string | null
+          created_at: string
+          id: string
+          instance_name: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          phone_number: string
+          profile_picture: string | null
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          instance_name: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          phone_number: string
+          profile_picture?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          instance_name?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          phone_number?: string
+          profile_picture?: string | null
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      evolution_go_settings: {
+        Row: {
+          api_key: string
+          base_url: string
+          created_at: string
+          id: string
+          instance_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          base_url: string
+          created_at?: string
+          id?: string
+          instance_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          base_url?: string
+          created_at?: string
+          id?: string
+          instance_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      evolution_settings: {
+        Row: {
+          api_key: string
+          base_url: string
+          created_at: string
+          id: string
+          instance_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          base_url: string
+          created_at?: string
+          id?: string
+          instance_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          base_url?: string
+          created_at?: string
+          id?: string
+          instance_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          media_type: string | null
+          media_url: string | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          media_type?: string | null
+          media_url?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string | null
+          conversation_id: string | null
+          created_at: string
+          from_me: boolean
+          id: string
+          instance_name: string
+          media_caption: string | null
+          media_url: string | null
+          message_id: string | null
+          message_type: string
+          phone_number: string
+          timestamp: string | null
+        }
+        Insert: {
+          content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          instance_name: string
+          media_caption?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          message_type?: string
+          phone_number: string
+          timestamp?: string | null
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          from_me?: boolean
+          id?: string
+          instance_name?: string
+          media_caption?: string | null
+          media_url?: string | null
+          message_id?: string | null
+          message_type?: string
+          phone_number?: string
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          mapped_phone: string
+          original_phone: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mapped_phone: string
+          original_phone: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mapped_phone?: string
+          original_phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -77,6 +370,84 @@ export type Database = {
         }
         Relationships: []
       }
+      unoapi_settings: {
+        Row: {
+          base_url: string
+          created_at: string
+          id: string
+          s3_access_key: string | null
+          s3_bucket: string | null
+          s3_enabled: boolean | null
+          s3_endpoint: string | null
+          s3_region: string | null
+          s3_secret_key: string | null
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_url: string
+          created_at?: string
+          id?: string
+          s3_access_key?: string | null
+          s3_bucket?: string | null
+          s3_enabled?: boolean | null
+          s3_endpoint?: string | null
+          s3_region?: string | null
+          s3_secret_key?: string | null
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_url?: string
+          created_at?: string
+          id?: string
+          s3_access_key?: string | null
+          s3_bucket?: string | null
+          s3_enabled?: boolean | null
+          s3_endpoint?: string | null
+          s3_region?: string | null
+          s3_secret_key?: string | null
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_instances: {
+        Row: {
+          created_at: string
+          id: string
+          instance_name: string
+          phone: string | null
+          profile_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_name: string
+          phone?: string | null
+          profile_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_name?: string
+          phone?: string | null
+          profile_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -98,6 +469,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          user_id: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          user_id?: string
+          value?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -112,6 +510,15 @@ export type Database = {
         Returns: boolean
       }
       is_trial_active: { Args: { _user_id: string }; Returns: boolean }
+      register_user_instance: {
+        Args: {
+          p_instance_name: string
+          p_phone: string
+          p_profile_name?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "superadmin" | "user"
