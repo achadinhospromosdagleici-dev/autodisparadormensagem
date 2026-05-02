@@ -12,6 +12,52 @@ function jsonResponse(data: any, status = 200) {
   });
 }
 
+function buildAuthHeaders(apiKey: string) {
+  return {
+    'Content-Type': 'application/json',
+    apikey: apiKey,
+    Authorization: `Bearer ${apiKey}`,
+  };
+}
+
+async function fetchFirstSuccessful(
+  requests: Array<{ endpoint: string; method?: string; headers?: HeadersInit; body?: string }>,
+) {
+  let lastStatus = 500;
+  let lastDetail = 'Nenhum endpoint compatível respondeu com sucesso';
+
+  for (const request of requests) {
+    try {
+      const response = await fetch(request.endpoint, {
+        method: request.method || 'GET',
+        headers: request.headers,
+        body: request.body,
+      });
+
+      if (response.ok) {
+        const text = await response.text();
+        return {
+          ok: true,
+          status: response.status,
+          endpoint: request.endpoint,
+          text,
+        };
+      }
+
+      lastStatus = response.status;
+      lastDetail = await response.text();
+    } catch (error) {
+      lastDetail = String(error);
+    }
+  }
+
+  return {
+    ok: false,
+    status: lastStatus,
+    detail: lastDetail,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,10 +70,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'baseUrl and apiKey are required' }, 400);
     }
 
-    const headers = {
-      'Content-Type': 'application/json',
-      apikey: apiKey,
-    };
+    const headers = buildAuthHeaders(apiKey);
     const base = baseUrl.replace(/\/$/, '');
 
     switch (action) {
@@ -353,18 +396,38 @@ Deno.serve(async (req) => {
             body = { number: to, text: message.content };
         }
 
-        const sendRes = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
+        const requestBody = JSON.stringify(body);
+        const sendAttempts = msgType === 'text'
+          ? [
+              {
+                endpoint: `${base}/send/text`,
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ number: to, text: message.content, delay: 1200 }),
+              },
+              {
+                endpoint,
+                method: 'POST',
+                headers,
+                body: requestBody,
+              },
+            ]
+          : [
+              {
+                endpoint,
+                method: 'POST',
+                headers,
+                body: requestBody,
+              },
+            ];
+
+        const sendRes = await fetchFirstSuccessful(sendAttempts);
 
         if (!sendRes.ok) {
-          const text = await sendRes.text();
-          return jsonResponse({ error: `Erro ao enviar: ${sendRes.status}`, detail: text }, sendRes.status);
+          return jsonResponse({ error: `Erro ao enviar: ${sendRes.status}`, detail: sendRes.detail }, sendRes.status);
         }
 
-        const sendData = await sendRes.json();
+        const sendData = sendRes.text ? JSON.parse(sendRes.text) : null;
         return jsonResponse({ success: true, data: sendData });
       }
 
