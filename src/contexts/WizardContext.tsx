@@ -33,6 +33,11 @@ export interface Message {
   // Optional button block title/footer
   btnTitle?: string;
   btnFooter?: string;
+  // Para tipo 'list' / 'carousel'
+  title?: string;
+  footer?: string;
+  sections?: unknown;
+  cards?: unknown;
 }
 
 export interface MessageButton {
