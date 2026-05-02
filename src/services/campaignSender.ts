@@ -296,7 +296,7 @@ export async function sendCampaign(
         if (source === 'evolution' && evoCreds) {
           // Evolution API sending
           const evoMsg: EvolutionMessage = {
-            type: msg.mediaType || 'text',
+            type: (msg.mediaType === 'list' || msg.mediaType === 'carousel' ? 'text' : (msg.mediaType || 'text')) as EvolutionMessage['type'],
             content: personalizedContent,
             mediaUrl: msg.mediaUrl,
             caption: personalizedCaption || personalizedContent,
@@ -313,7 +313,7 @@ export async function sendCampaign(
         } else if (source === 'evolution-go' && evoGoCreds) {
           // Evolution Go sending
           const evoGoMsg: EvolutionGoMessage = {
-            type: msg.mediaType || 'text',
+            type: (msg.mediaType === 'link' ? 'text' : (msg.mediaType || 'text')) as EvolutionGoMessage['type'],
             content: personalizedContent,
             mediaUrl: msg.mediaUrl,
             caption: personalizedCaption || personalizedContent,

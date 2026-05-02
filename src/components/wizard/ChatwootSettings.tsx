@@ -17,6 +17,7 @@ import {
   ChatwootInbox,
   saveChatwootCredentials,
   loadChatwootCredentials,
+  loadChatwootCredentialsWithFallback,
   clearChatwootCredentials,
   fetchInboxes,
 } from '@/services/chatwoot';

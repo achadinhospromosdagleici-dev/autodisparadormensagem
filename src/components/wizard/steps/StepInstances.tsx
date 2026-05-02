@@ -68,7 +68,7 @@ export function StepInstances() {
   const [chatwootInboxes, setChatwootInboxes] = useState<ChatwootInbox[]>([]);
   const [userInstances, setUserInstances] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const hasLoadedRef = useRef(false);
+  const hasLoadedRef = useRef<boolean | 'done'>(false);
 
   const [hasEvolution, setHasEvolution] = useState(false);
   const hasSharedEvolution = useSharedEvolution();
@@ -405,7 +405,7 @@ export function StepInstances() {
                 </p>
               </div>
             </div>
-            <button onClick={loadAllInstances} disabled={loading}
+            <button onClick={() => loadAllInstances()} disabled={loading}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm hover:bg-secondary/80 transition-colors">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Atualizar

@@ -151,13 +151,13 @@ export function StepMessages() {
           title: btnTitle.trim(),
           btnTitle: 'Selecionar',
           btnFooter: btnFooter.trim(),
-          buttons: listSections as Message['buttons'],
+          buttons: listSections as unknown as Message['buttons'],
         });
       } else if (mediaType === 'carousel' && isApiEvoGo) {
         addRichMessage({
           content: newMessage.trim(),
           mediaType: 'carousel',
-          buttons: carouselCards as Message['buttons'],
+          buttons: carouselCards as unknown as Message['buttons'],
         });
       } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
         addRichMessage({

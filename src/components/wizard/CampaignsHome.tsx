@@ -20,7 +20,8 @@ export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () =
     removeActiveCampaign, 
     updateActiveCampaign,
     currentStep,
-    data
+    data,
+    clearWizard,
   } = useWizard();
 
   // Consider current wizard state as a draft if it has data but not finished
