@@ -516,7 +516,7 @@ useEffect(() => {
               { label: '🎵 Áudio', desc: 'Mensagens de voz' },
               { label: '📹 Vídeo', desc: 'Vídeos com legenda' },
               { label: '📄 Documento', desc: 'PDFs e arquivos' },
-              { label: '🔗 Contato', desc: 'Cartão de Contato' },
+
             ].map(item => (
               <div key={item.label} className="p-2 rounded-lg bg-muted/30 border border-border/20">
                 <p className="font-medium text-xs">{item.label}</p>

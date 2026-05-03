@@ -26,6 +26,7 @@ import {
   GitBranch,
   List,
   LayoutGrid,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,10 +90,7 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (!linkUrl.trim()) { toast.error('Informe a URL do link'); return; }
     }
-    if (mediaType === 'contact') {
-      if (!btnTitle.trim()) { toast.error('Digite o nome do contato'); return; }
-      if (!btnFooter.trim()) { toast.error('Digite o número do contato'); return; }
-    }
+
     if (mediaType === 'list') {
       if (!newMessage.trim()) { toast.error('Digite a descrição da lista'); return; }
       if (!btnTitle.trim()) { toast.error('Digite o título da lista'); return; }
@@ -105,6 +103,7 @@ export function StepMessages() {
       const invalidCard = carouselCards.find(c => !c.title.trim());
       if (invalidCard) { toast.error('Cada card precisa de um título'); return; }
     }
+
     if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
       const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
@@ -137,13 +136,7 @@ export function StepMessages() {
           mediaType: 'link',
           linkUrl: linkUrl.trim(),
         });
-      } else if (mediaType === 'contact') {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'contact',
-          btnTitle: btnTitle.trim(),
-          btnFooter: btnFooter.trim(),
-        });
+
       } else if (mediaType === 'list' && isApiEvoGo) {
         addRichMessage({
           content: newMessage.trim(),
@@ -158,6 +151,14 @@ export function StepMessages() {
           content: newMessage.trim(),
           mediaType: 'carousel',
           buttons: carouselCards as unknown as Message['buttons'],
+        });
+      } else if (mediaType === 'contact') {
+        // Contato (vCard) - enviar como tipo especial
+        addRichMessage({
+          content: newMessage.trim(),
+          mediaType: 'contact',
+          contactName: btnTitle.trim(),
+          contactPhone: btnFooter.trim(),
         });
       } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
         addRichMessage({
@@ -222,8 +223,8 @@ return result;
     if (type === 'list') return isApiEvoGo;
     // Carousel - only Evolution Go
     if (type === 'carousel') return isApiEvoGo;
-    // Contact (vCard) - only UNOAPI
-    if (type === 'contact') return isApiUno;
+
+
     // Link - supported by all
     if (type === 'link') return true;
     // Media - supported by all
@@ -242,14 +243,15 @@ return result;
     ...((showAllOptions || isApiUno || isApiEvoGo) ? [
       { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
     ] : []),
-    // Contato (vCard) - só UNOAPI (ou todas se não hay API)
-    ...(showAllOptions || isApiUno ? [
-      { type: 'contact' as EditorMediaType, icon: Phone, label: 'Contato' },
     ] : []),
     // Lista e Carrossel - só Evolution Go (ou todas se não hay API)
     ...(showAllOptions || isApiEvoGo ? [
       { type: 'list' as EditorMediaType, icon: List, label: 'Lista' },
       { type: 'carousel' as EditorMediaType, icon: LayoutGrid, label: 'Carrossel' },
+    ] : []),
+    // Contato - só UNOAPI e Evolution Go
+    ...((showAllOptions || isApiUno || isApiEvoGo) ? [
+      { type: 'contact' as EditorMediaType, icon: UserPlus, label: 'Contato' },
     ] : []),
   ];
 
@@ -263,6 +265,7 @@ return result;
       case 'link': return '🔗';
       case 'list': return '📋';
       case 'carousel': return '🎠';
+
       default: return '📝';
     }
   };
@@ -455,7 +458,7 @@ return result;
                       {buttons.length < 3 && (
                         <button
                           type="button"
-                          onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                          onClick={() => setButtons([...buttons, { id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, type: 'url', label: '', value: '' }])}
                           className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
                         >
                           <Plus className="w-3 h-3" /> Adicionar botão
@@ -577,7 +580,7 @@ return result;
                     {buttons.length < 3 && (
                       <button
                         type="button"
-                        onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                        onClick={() => setButtons([...buttons, { id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, type: 'url', label: '', value: '' }])}
                         className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" /> Adicionar botão
@@ -868,7 +871,7 @@ return result;
                             type="button"
                             onClick={() => {
                               const next = [...carouselCards];
-                              next[cIdx].buttons = [...(card.buttons || []), { id: crypto.randomUUID(), type: 'reply', label: '', value: '' }];
+                              next[cIdx].buttons = [...(card.buttons || []), { id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, type: 'reply', label: '', value: '' }];
                               setCarouselCards(next);
                             }}
                             className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary"
@@ -927,10 +930,12 @@ return result;
               </div>
             )}
 
-            {/* Contact editor */}
+
+
+            {/* Contact Inputs */}
             {mediaType === 'contact' && (
-              <div className="space-y-3 animate-fade-in">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs text-muted-foreground font-medium">Nome do Contato</label>
                     <input
@@ -938,7 +943,7 @@ return result;
                       value={btnTitle}
                       onChange={(e) => setBtnTitle(e.target.value)}
                       placeholder="Ex: Suporte BemCash"
-                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border focus:ring-2 focus:ring-primary/50 outline-none transition-all text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -947,14 +952,17 @@ return result;
                       type="text"
                       value={btnFooter}
                       onChange={(e) => setBtnFooter(e.target.value)}
-                      placeholder="Ex: {{numero}} ou +5511999999999"
-                      className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      placeholder="Ex: {{numero}} ou +55119..."
+                      className="w-full px-3 py-2 rounded-lg bg-background border border-border focus:ring-2 focus:ring-primary/50 outline-none transition-all text-sm"
                     />
                   </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  💡 Envia um cartão de contato (vCard) que o usuário pode salvar facilmente.
-                </p>
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    O botão de contato enviará uma mensagem com um botão clicável que direciona o usuário diretamente para o WhatsApp do número informado.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -968,8 +976,7 @@ return result;
                     ? `Olá {{primeiro_nome}}, escolha uma opção abaixo:`
                     : mediaType === 'link'
                       ? `Olá {{primeiro_nome}}! Clique no link abaixo e finalize sua compra com 10% OFF 👇`
-                      : mediaType === 'contact'
-                        ? `Olá {{primeiro_nome}}, segue o contato que você solicitou:`
+
                         : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
               }
               className="w-full h-36 p-4 rounded-xl bg-muted/50 border border-border/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 scrollbar-thin"
@@ -1162,18 +1169,7 @@ return result;
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(newMessage, previewIndex)}
                     </p>
-                    {mediaType === 'contact' && (
-                      <div className="mb-3 p-3 rounded-lg bg-muted/50 border border-border/50 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Phone className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{replaceVariables(btnTitle || 'Nome do Contato', previewIndex)}</p>
-                          <p className="text-xs text-muted-foreground truncate">{replaceVariables(btnFooter || 'Número', previewIndex)}</p>
-                        </div>
-                        <div className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">vCard</div>
-                      </div>
-                    )}
+
 
                     {mediaType === 'link' && linkUrl && (
                       <a href={linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">
@@ -1252,18 +1248,7 @@ return result;
                     <p className="text-sm whitespace-pre-wrap">
                       {replaceVariables(msg.content, previewIndex)}
                     </p>
-                    {msg.mediaType === 'contact' && (
-                      <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border/50 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Phone className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{replaceVariables(msg.btnTitle || 'Contato', previewIndex)}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{replaceVariables(msg.btnFooter || '', previewIndex)}</p>
-                        </div>
-                        <div className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-medium uppercase">vCard</div>
-                      </div>
-                    )}
+
 
                     {msg.mediaType === 'link' && msg.linkUrl && (
                       <a href={msg.linkUrl} target="_blank" rel="noreferrer" className="block mt-2 text-xs text-primary underline break-all">

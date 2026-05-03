@@ -16,6 +16,7 @@ function buildAuthHeaders(apiKey: string) {
   return {
     'Content-Type': 'application/json',
     apikey: apiKey,
+    apiKey: apiKey,
     Authorization: `Bearer ${apiKey}`,
   };
 }
@@ -255,27 +256,17 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: 'instanceName, to, and message are required' }, 400);
         }
 
-        const statusRes = await fetch(`${base}/manager/api/instance/connectionState/${instanceName}`, { headers });
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          const state = statusData?.instance?.state || statusData?.state || 'close';
-          if (state !== 'open' && state !== 'connected') {
-            return jsonResponse({
-              error: 'Instância não está conectada',
-              status: state,
-              suggestion: 'reconnect',
-              message: 'Reconecte a instância antes de enviar mensagens.',
-            }, 422);
-          }
-        }
-
         const msgType = message.type || 'text';
         let endpoint = `${base}/message/sendText/${instanceName}`;
         let body: any;
 
         switch (msgType) {
           case 'text':
-            body = { number: to, text: message.content };
+            body = { 
+              number: to, 
+              textMessage: { text: message.content }, 
+              delay: 1200 
+            };
             break;
           case 'image':
             endpoint = `${base}/message/sendMedia/${instanceName}`;
@@ -336,18 +327,6 @@ Deno.serve(async (req) => {
             body = { number: to, text: linkText, linkPreview: true };
             break;
           }
-          case 'contact':
-            endpoint = `${base}/message/sendContact/${instanceName}`;
-            body = {
-              number: to,
-              contact: [
-                {
-                  fullName: message.contactName || message.content,
-                  phoneNumber: message.contactNumber || '',
-                }
-              ]
-            };
-            break;
           case 'list': {
             endpoint = `${base}/message/sendList/${instanceName}`;
             const sections = Array.isArray(message.sections) ? message.sections : [];
@@ -403,7 +382,7 @@ Deno.serve(async (req) => {
                 endpoint: `${base}/send/text`,
                 method: 'POST',
                 headers,
-                body: JSON.stringify({ number: to, text: message.content, delay: 1200 }),
+                body: JSON.stringify({ number: to, textMessage: { text: message.content }, delay: 1200 }),
               },
               {
                 endpoint,
@@ -457,7 +436,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: true, webhookUrl, data: webhookData });
       }
 
-      // ─�� WEBHOOK: Remover webhook ──
+      // ── WEBHOOK: Remover webhook ──
       case 'removeWebhook': {
         if (!instanceName) {
           return jsonResponse({ error: 'instanceName is required' }, 400);

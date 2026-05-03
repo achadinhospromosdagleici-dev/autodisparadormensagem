@@ -135,19 +135,7 @@ export function StepInstances() {
     setSelectedApi(api);
   };
 
-  // Auto-detect API on first load
-  useEffect(() => {
-    if (!selectedApi && hasLoadedRef.current !== 'done') {
-      if (unoApiConnected) {
-        setSelectedApi('unoapi');
-      } else if (hasEvolutionGo) {
-        setSelectedApi('evolution-go');
-      } else if (hasEvolution || hasSharedEvolution) {
-        setSelectedApi('evolution');
-      }
-      hasLoadedRef.current = 'done';
-    }
-  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo]);
+  // Auto-detect API on first load removed to give user full control
 
   useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -317,17 +305,18 @@ export function StepInstances() {
     : null;
 
   const handleSelectAll = () => {
+    if (activeInstances.length === 0) return;
+
     if (selectedSource) {
-      // If already selecting a specific source, only select others from that same source
-      const ids = displayInstances.filter(i => i.status === 'active' && (i as any).source === selectedSource).map(i => i.id);
+      // If already selecting a specific source, select all others from that same source
+      const ids = activeInstances.filter(i => (i as any).source === selectedSource).map(i => i.id);
       setSelectedInstances(ids);
     } else {
-      // If none selected, find the first available source and select its active instances
-      if (activeInstances.length > 0) {
-        const firstSource = (activeInstances[0] as any).source;
-        const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
-        setSelectedInstances(ids);
-      }
+      // If none selected, pick the source of the first active instance and select all from it
+      const firstSource = (activeInstances[0] as any).source;
+      const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
+      setSelectedInstances(ids);
+      setSelectedApi(firstSource);
     }
   };
 
@@ -492,10 +481,22 @@ export function StepInstances() {
                 onClick={() => {
                   if (!isActive) return;
                   if (isSourceDisabled) {
-                    import('sonner').then(({ toast }) => toast.error('Você não pode misturar instâncias de APIs diferentes.'));
+                    toast.error(`Você já selecionou instâncias de ${selectedSource}. Não é possível misturar com ${source}.`);
                     return;
                   }
+                  
+                  const isBeingSelected = !isSelected;
                   toggleInstanceSelection(instance.id);
+                  
+                  // Update global selected API
+                  if (isBeingSelected) {
+                    setSelectedApi(source);
+                  } else {
+                    // If deselecting the last one, clear selected API
+                    if (selectedInstances.length === 1) {
+                      setSelectedApi(null);
+                    }
+                  }
                 }}
                 className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${showDisabledVisuals ? 'opacity-50 cursor-not-allowed' : ''}`}
               >

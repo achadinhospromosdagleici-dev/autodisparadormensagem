@@ -272,7 +272,7 @@ export async function sendCampaign(
 
     const contact = contacts[i];
     const rawPhoneNumber = contact.numero || contact.phone || '';
-    const phoneNumber = String(rawPhoneNumber).replace(/\D/g, '');
+    const phoneNumber = contact.numero;
     const contactName = contact.nome || contact.name || rawPhoneNumber;
 
     const senderInstId = validInstances[phoneIndex % validInstances.length];
@@ -305,8 +305,6 @@ export async function sendCampaign(
             footer: msg.footer,
             buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
             linkUrl: msg.linkUrl,
-            contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
-            contactNumber: msg.mediaType === 'contact' ? replaceVariables(msg.btnFooter || '', contact) : undefined,
           };
           const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
           console.log('[campaignSender] Evolution send result:', result);
@@ -326,8 +324,6 @@ export async function sendCampaign(
             linkUrl: msg.linkUrl,
             sections: msg.sections as EvolutionGoMessage['sections'],
             cards: msg.cards as EvolutionGoMessage['cards'],
-            contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
-            contactNumber: msg.mediaType === 'contact' ? replaceVariables(msg.btnFooter || '', contact) : undefined,
           };
           const result = await sendEvolutionGoMessage(evoGoCreds, senderName, phoneNumber, evoGoMsg);
           console.log('[campaignSender] Evolution Go send result:', result);
@@ -360,7 +356,7 @@ export async function sendCampaign(
               if (b.type === 'url') {
                 return null; // Skip URL buttons, sent as text above
               } else if (b.type === 'phone') {
-                const phoneValue = replaceButtonValue(b.value, contact);
+                const phoneValue = replaceButtonValue(b.value, contact).replace(/\D/g, '');
                 // For contact button, use button label as contact name
                 const contactName = b.label || 'Contato';
                 console.log('[campaignSender] Contact button:', { label: b.label, contactName, phone: phoneValue });
@@ -385,27 +381,31 @@ export async function sendCampaign(
             }
             
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+
           } else if (msg.mediaType === 'link' && msg.linkUrl) {
             // Link message - send as text with URL
             const linkText = msg.linkUrl
               ? `${personalizedContent}\n\n🔗 Link: ${msg.linkUrl}`
               : personalizedContent;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, { content: linkText });
-          } else if (msg.mediaType === 'contact') {
-            // Contact (vCard) - send as interactive with contact data
-            const contactName = replaceVariables(msg.btnTitle || 'Contato', contact);
-            const contactNumber = replaceVariables(msg.btnFooter || '', contact);
+
+          } else if (msg.mediaType === 'contact' && msg.contactName && msg.contactPhone) {
+            // Contato (vCard) message
+            const contactName = replaceButtonValue(msg.contactName, contact);
+            const contactPhone = replaceButtonValue(msg.contactPhone, contact).replace(/\D/g, '');
             
-            unoMsg.buttons = [{
-              id: crypto.randomUUID(),
-              title: contactName,
-              phone: contactNumber,
-              contactName: contactName,
-            }];
+            console.log('[campaignSender] Sending contact:', { contactName, contactPhone });
             
-            // For UnoAPI, media.type = 'contact' triggers sendContactMessage
-            unoMsg.media = { type: 'contact' };
-            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            const unoMsgContact: UnoApiMessage = {
+              content: personalizedContent,
+              contact: {
+                name: contactName,
+                phone: contactPhone,
+              },
+            };
+            
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsgContact);
+
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
             const hasButtons = msg.buttons && msg.buttons.length > 0;
@@ -422,7 +422,7 @@ export async function sendCampaign(
                   id: b.id,
                   title: b.label,
                   url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
-                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact) : undefined,
+                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
                 })),
                 undefined,
                 msg.footer,
@@ -447,13 +447,9 @@ export async function sendCampaign(
           const inboxId = parseInt(senderName);
           const { conversationId } = await findOrCreateConversation(cwCreds, phoneNumber, inboxId, contactName);
           
-          const mt = msg.mediaType === 'contact' ? 'contact' : (msg.mediaType as any) || 'text';
-          const filename = msg.mediaType === 'contact' 
-            ? replaceVariables(msg.btnFooter || '', contact) // phone number as filename/meta
-            : msg.mediaFilename;
-          const caption = msg.mediaType === 'contact'
-            ? replaceVariables(msg.btnTitle || 'Contato', contact) // name as caption
-            : personalizedCaption || personalizedContent;
+          const mt = (msg.mediaType as any) || 'text';
+          const filename = msg.mediaFilename;
+          const caption = personalizedCaption || personalizedContent;
 
           await sendCwMediaMessage(
             cwCreds,

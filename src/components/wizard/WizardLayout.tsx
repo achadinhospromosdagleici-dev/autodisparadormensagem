@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import { StepDataEntry } from './steps/StepDataEntry';
 import { StepDataReview } from './steps/StepDataReview';

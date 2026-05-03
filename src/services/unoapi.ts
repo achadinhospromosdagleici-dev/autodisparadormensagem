@@ -30,7 +30,7 @@ export interface S3Config {
   region?: string;
 }
 
-export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'contact';
+export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document';
 
 export interface MediaAttachment {
   type: MediaType;
@@ -43,13 +43,17 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
-  buttons?: Array<{ id: string; title: string; url?: string; phone?: string; contactName?: string }>;
+  buttons?: Array<{ id: string; title: string; url?: string; phone?: string; value?: string }>;
   list?: {
     buttonText: string;
     sections: Array<{
       title: string;
       rows: Array<{ id: string; title: string; description?: string }>;
     }>;
+  };
+  contact?: {
+    name: string;
+    phone: string;
   };
   header?: string;
   footer?: string;
@@ -494,50 +498,7 @@ export async function sendDocumentMessage(
   }
 }
 
-// Send contact (vCard) message
-export async function sendContactMessage(
-  creds: UnoApiCredentials,
-  phoneNumberId: string,
-  to: string,
-  contactName: string,
-  contactNumber: string
-): Promise<any> {
-  const payload = {
-    messaging_product: 'whatsapp',
-    to,
-    type: 'contacts',
-    contacts: [
-      {
-        name: {
-          first_name: contactName,
-          formatted_name: contactName,
-        },
-        phones: [
-          {
-            phone: contactNumber,
-            type: 'MOBILE',
-          },
-        ],
-      },
-    ],
-  };
 
-  try {
-    return await proxySendMessage(creds, phoneNumberId, payload);
-  } catch (err) {
-    console.warn('[unoapi] Proxy failed for contact, trying direct fetch:', err);
-    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
-      method: 'POST',
-      headers: getHeaders(creds.token),
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const errorData = await res.text();
-      throw new Error(`Erro ao enviar contato: ${res.status} - ${errorData}`);
-    }
-    return await res.json();
-  }
-}
 
 // Send interactive buttons message
 export async function sendInteractiveButtons(
@@ -575,9 +536,15 @@ export async function sendInteractiveButtons(
               },
               title: btn.title,
             };
-          } else if (btn.phone) {
+          } else if (btn.type === 'phone' && btn.value) {
             // Phone button - use URL button pointing to wa.me for Baileys compatibility
-            const waMeUrl = `https://wa.me/${btn.phone.replace(/\D/g, '')}`;
+            // Use btn.value, not btn.phone, and add DDI 55 if not present
+            let phoneNum = btn.value.replace(/\D/g, ''); // Remove all non-digits
+            // Add DDI 55 if doesn't start with 55
+            if (!phoneNum.startsWith('55')) {
+              phoneNum = '55' + phoneNum;
+            }
+            const waMeUrl = `https://wa.me/${phoneNum}`;
             return {
               type: 'URL',
               url: {
@@ -585,12 +552,18 @@ export async function sendInteractiveButtons(
               },
               title: btn.title,
             };
-          } else {
-            return {
-              type: 'reply',
-              reply: { id: btn.id, title: btn.title },
-            };
-          }
+} else if (btn.value && btn.value.startsWith('http')) {
+              return {
+                type: 'reply',
+                reply: { id: btn.id, title: btn.title },
+              };
+            } else {
+              // Default reply button
+              return {
+                type: 'reply',
+                reply: { id: btn.id, title: btn.title },
+              };
+            }
         }),
       },
     },
@@ -692,6 +665,56 @@ export async function sendInteractiveList(
   }
 }
 
+// Send contact (vCard) message
+export async function sendContactMessage(
+  creds: UnoApiCredentials,
+  phoneNumberId: string,
+  to: string,
+  contactName: string,
+  contactPhone: string
+): Promise<any> {
+  // Format phone number - remove non-digits and add DDI 55 if needed
+  let phoneNum = contactPhone.replace(/\D/g, '');
+  if (!phoneNum.startsWith('55')) {
+    phoneNum = '55' + phoneNum;
+  }
+  
+  const payload: any = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'contacts',
+    contacts: [
+      {
+        name: {
+          formatted_name: contactName,
+        },
+        phones: [
+          {
+            wa_id: phoneNum,
+            phone: '+' + phoneNum,
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for contact, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar contato: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
+  }
+}
+
 // Generic send based on media type
 export async function sendUnoApiMessage(
   creds: UnoApiCredentials,
@@ -719,10 +742,21 @@ export async function sendUnoApiMessage(
       phoneNumberId,
       to,
       message.content,
-      message.list.buttonText,
-      message.list.sections,
-      message.header,
-      message.footer
+message.list.buttonText,
+        message.list.sections,
+        message.header,
+        message.footer
+      );
+  }
+
+  // Check for contact type
+  if (message.contact) {
+    return sendContactMessage(
+      creds,
+      phoneNumberId,
+      to,
+      message.contact.name,
+      message.contact.phone
     );
   }
 
@@ -746,8 +780,7 @@ export async function sendUnoApiMessage(
       return sendVideoMessage(creds, phoneNumberId, to, url, caption || message.content);
     case 'document':
       return sendDocumentMessage(creds, phoneNumberId, to, url, filename, caption || message.content);
-    case 'contact':
-      return sendContactMessage(creds, phoneNumberId, to, message.buttons?.[0]?.contactName || message.content, message.buttons?.[0]?.phone || '');
+
     default:
       return sendTextMessage(creds, phoneNumberId, to, message.content);
   }

@@ -152,6 +152,8 @@ export function StepDataReview() {
       return newMapping;
     });
     setMappingApplied(false);
+    // Automatic application for better UX
+    setTimeout(() => applyMapping(), 0);
   };
 
   const applyMapping = () => {
@@ -365,21 +367,6 @@ export function StepDataReview() {
               <span className="text-muted-foreground">1ª linha é cabeçalho</span>
             </label>
           </div>
-
-          {/* Prominent Apply Button */}
-          <button
-            onClick={applyMapping}
-            disabled={!hasNumeroMapped}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ${
-              hasNumeroMapped
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            Aplicar Mapeamento
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
 
         {!hasNumeroMapped && (

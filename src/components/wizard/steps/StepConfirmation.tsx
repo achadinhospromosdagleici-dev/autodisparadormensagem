@@ -137,7 +137,7 @@ export function StepConfirmation() {
 
       // Save to history
       const newCampaign: Campaign = {
-        id: crypto.randomUUID(),
+        id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         name: `Campanha ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
         date: new Date(),
         totalContacts: validContacts,
@@ -419,7 +419,7 @@ export function StepConfirmation() {
                       return;
                     }
                     addScheduledCampaign({
-                      id: crypto.randomUUID(),
+                      id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
                       status: 'scheduled',
                       name: scheduleName.trim(),
                       scheduledDate,
