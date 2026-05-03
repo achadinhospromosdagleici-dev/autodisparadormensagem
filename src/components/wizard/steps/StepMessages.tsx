@@ -243,15 +243,10 @@ return result;
     ...((showAllOptions || isApiUno || isApiEvoGo) ? [
       { type: 'buttons' as EditorMediaType, icon: MousePointerClick, label: 'Botões' },
     ] : []),
-    ] : []),
     // Lista e Carrossel - só Evolution Go (ou todas se não hay API)
     ...(showAllOptions || isApiEvoGo ? [
       { type: 'list' as EditorMediaType, icon: List, label: 'Lista' },
       { type: 'carousel' as EditorMediaType, icon: LayoutGrid, label: 'Carrossel' },
-    ] : []),
-    // Contato - só UNOAPI e Evolution Go
-    ...((showAllOptions || isApiUno || isApiEvoGo) ? [
-      { type: 'contact' as EditorMediaType, icon: UserPlus, label: 'Contato' },
     ] : []),
   ];
 
