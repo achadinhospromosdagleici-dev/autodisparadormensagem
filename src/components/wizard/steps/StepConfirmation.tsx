@@ -443,6 +443,8 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
                     setScheduleName('');
                     setScheduleDate('');
                     setScheduleTime('');
+                    clearWizard();
+                    onCampaignStarted?.();
                   }}
                   className="flex-1 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
                 >
