@@ -91,73 +91,6 @@ export async function isEvolutionGoConnectedAsync(): Promise<boolean> {
 
 // ── Generic proxy call ──
 async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
-  // ATTEMPT DIRECT CALL BYPASSING PROXY
-  if (payload.action === 'sendMessage' && payload.baseUrl && payload.apiKey && payload.to && payload.message) {
-    try {
-      const base = payload.baseUrl.replace(/\/$/, '');
-      
-      // Tentar endpoint /send/text primeiro (EvoGo customizado) se for texto
-      if (payload.message.type === 'text' || !payload.message.type) {
-        try {
-          const directRes = await fetch(`${base}/send/text`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': payload.apiKey,
-              'apiKey': payload.apiKey,
-              'Authorization': `Bearer ${payload.apiKey}`
-            },
-            body: JSON.stringify({
-              number: payload.to,
-              textMessage: {
-                text: payload.message.content
-              },
-              delay: 1200
-            })
-          });
-          
-          if (directRes.ok) {
-            console.log('[Evolution Go] Direct /send/text succeeded!');
-            return await directRes.json();
-          }
-        } catch (e) {
-          console.log('[Evolution Go] Direct /send/text failed (CORS or network):', e);
-        }
-      }
-
-      // Fallback para endpoint padrão Evolution
-      const endpoint = `${base}/message/sendText/${payload.instanceName}`;
-      try {
-        const directRes2 = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': payload.apiKey,
-            'apiKey': payload.apiKey,
-            'Authorization': `Bearer ${payload.apiKey}`
-          },
-          body: JSON.stringify({
-            number: payload.to,
-            textMessage: {
-              text: payload.message.content
-            },
-            delay: 1200
-          })
-        });
-        
-        if (directRes2.ok) {
-          console.log('[Evolution Go] Direct standard endpoint succeeded!');
-          return await directRes2.json();
-        }
-      } catch (e) {
-        console.log('[Evolution Go] Direct standard endpoint failed:', e);
-      }
-    } catch (err) {
-      console.log('[Evolution Go] Direct bypass attempt failed, falling back to proxy...', err);
-    }
-  }
-
-  // FALLBACK PARA O PROXY (SUPABASE EDGE FUNCTION)
   console.log('[Evolution Go] Calling proxy...');
   const { data, error } = await supabase.functions.invoke('evolution-go-proxy', {
     body: payload,
@@ -239,7 +172,7 @@ export async function logoutEvolutionGoInstance(creds: EvolutionGoCredentials, i
 
 // ── Enviar mensagem ──
 export interface EvolutionGoMessage {
-  type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'buttons' | 'list' | 'carousel';
+  type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'buttons' | 'list' | 'carousel' | 'contact';
   content: string;
   mediaUrl?: string;
   caption?: string;
@@ -252,6 +185,9 @@ export interface EvolutionGoMessage {
   linkUrl?: string;
   sections?: Array<{ title: string; rows: Array<{ id?: string; title: string; description: string }> }>;
   cards?: Array<{ image?: string; title?: string; description?: string; footer?: string; buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }> }>;
+  // Para contact:
+  contactName?: string;
+  contactNumber?: string;
 }
 
 export async function sendEvolutionGoMessage(

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import { StepDataEntry } from './steps/StepDataEntry';
 import { StepDataReview } from './steps/StepDataReview';
@@ -215,7 +215,7 @@ export function WizardLayout() {
 
             <section ref={el => sectionRefs.current['send'] = el} className="scroll-mt-24">
               <SectionHeader title="6. Enviar" description="Revise e inicie o disparo" isComplete={false} isLast />
-              <div className="mt-4"><StepConfirmation /></div>
+              <div className="mt-4"><StepConfirmation onCampaignStarted={() => setCurrentView('home')} /></div>
             </section>
           </div>
         );

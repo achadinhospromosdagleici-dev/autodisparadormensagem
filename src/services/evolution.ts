@@ -178,6 +178,9 @@ export interface EvolutionMessage {
   buttons?: { type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
   // Para link:
   linkUrl?: string;
+  // Para contact:
+  contactName?: string;
+  contactNumber?: string;
 }
 
 export async function sendMessage(

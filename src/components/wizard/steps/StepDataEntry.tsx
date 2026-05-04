@@ -52,8 +52,6 @@ export function StepDataEntry() {
       return;
     }
     
-    // Create rows and deduplicate based on formatted number
-    const seenNumbers = new Set<string>();
     const rows: DataRow[] = dataLines
       .filter(line => {
         const values = parseCSVLine(line, delimiter);
@@ -62,7 +60,7 @@ export function StepDataEntry() {
       .map((line) => {
         const values = parseCSVLine(line, delimiter);
         const row: DataRow = {
-          id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          id: crypto.randomUUID(),
           numero: '',
           isValid: false,
         };
@@ -78,27 +76,12 @@ export function StepDataEntry() {
         row.errorMessage = validation.errorMessage;
 
         return row;
-      })
-      .filter(row => {
-        if (!row.numero || !row.isValid) return true; // Keep invalid for review
-        if (seenNumbers.has(row.numero)) return false; // Deduplicate
-        seenNumbers.add(row.numero);
-        return true;
       });
 
-    setData(prev => {
-      if (!isAppending) return rows;
-      
-      // When appending, also check against existing data
-      const existingNumbers = new Set(prev.map(r => r.numero));
-      const uniqueNewRows = rows.filter(r => !r.isValid || !existingNumbers.has(r.numero));
-      return [...prev, ...uniqueNewRows];
-    });
-
+    setData(prev => isAppending ? [...prev, ...rows] : rows);
     const validCount = rows.filter(r => r.isValid).length;
-    toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} únicos e válidos)`);
-    nextStep();
-  }, [setData, setColumns, data.length, columns, nextStep]);
+    toast.success(`${rows.length} registros ${isAppending ? 'adicionados' : 'importados'} (${validCount} válidos)`);
+  }, [setData, setColumns, data.length, columns]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const text = e.clipboardData.getData('text');

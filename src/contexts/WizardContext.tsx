@@ -22,7 +22,7 @@ export interface Message {
   id: string;
   content: string;
   aiVariations?: string[];
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
@@ -215,7 +215,7 @@ const defaultState: WizardState = {
   columns: ['numero'],
   messages: [],
   instances: defaultInstances,
-  selectedInstances: [],
+  selectedInstances: ['1'],
   settings: defaultSettings,
   campaignHistory: sampleCampaignHistory,
   chatwootConnected: false,
@@ -336,10 +336,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
-    setState(prev => ({ ...prev, messages: [...prev.messages, { id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, content, ...media }] }));
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
   const addRichMessage = (msg: Omit<Message, 'id'>) => {
-    setState(prev => ({ ...prev, messages: [...prev.messages, { id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, ...msg }] }));
+    setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), ...msg }] }));
   };
   const updateMessage = (id: string, content: string) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, content } : msg) }));
   const updateRichMessage = (id: string, updates: Partial<Omit<Message, 'id'>>) => setState(prev => ({ ...prev, messages: prev.messages.map(msg => msg.id === id ? { ...msg, ...updates } : msg) }));
@@ -361,7 +361,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     return { ...prev, selectedInstances: typeof ids === 'function' ? ids(current) : ids };
   });
   const selectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: prev.instances.filter(i => i.status === 'active').map(i => i.id) }));
-  const deselectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: [], selectedApi: null }));
+  const deselectAllInstances = () => setState(prev => ({ ...prev, selectedInstances: [] }));
   const getValidCount = () => (Array.isArray(state.data) ? state.data.filter(row => row.isValid).length : 0);
   const getInvalidCount = () => (Array.isArray(state.data) ? state.data.filter(row => !row.isValid).length : 0);
   const addCampaign = (campaign: Campaign) => setState(prev => ({ ...prev, campaignHistory: [campaign, ...prev.campaignHistory] }));
@@ -377,7 +377,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   };
 
   const reuseCampaign = (campaign: Campaign) => {
-    const restoredMessages = campaign.messages.map(content => ({ id: `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, content }));
+    const restoredMessages = campaign.messages.map(content => ({ id: crypto.randomUUID(), content }));
     // Reset to step 1 so the user can input the spreadsheet data required for the new dispatch
     setState(prev => ({ ...prev, messages: restoredMessages, currentStep: 1 }));
   };
@@ -388,10 +388,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
-  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => {
-    if (prev.selectedApi === api) return prev;
-    return { ...prev, selectedApi: api, selectedInstances: [] };
-  });
+  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
   const addScheduledCampaign = (campaign: ScheduledCampaign) => setState(prev => ({ ...prev, scheduledCampaigns: [...prev.scheduledCampaigns, campaign] }));
   const cancelScheduledCampaign = (id: string) => setState(prev => ({ ...prev, scheduledCampaigns: prev.scheduledCampaigns.map(c => c.id === id ? { ...c, status: 'cancelled' as const } : c) }));
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));

@@ -135,7 +135,19 @@ export function StepInstances() {
     setSelectedApi(api);
   };
 
-  // Auto-detect API on first load removed to give user full control
+  // Auto-detect API on first load
+  useEffect(() => {
+    if (!selectedApi && hasLoadedRef.current !== 'done') {
+      if (unoApiConnected) {
+        setSelectedApi('unoapi');
+      } else if (hasEvolutionGo) {
+        setSelectedApi('evolution-go');
+      } else if (hasEvolution || hasSharedEvolution) {
+        setSelectedApi('evolution');
+      }
+      hasLoadedRef.current = 'done';
+    }
+  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo]);
 
   useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -298,31 +310,24 @@ export function StepInstances() {
   ];
 
   const displayInstances = mergedInstances.length > 0 ? mergedInstances : instances.map(i => ({ ...i, source: 'default' as const }));
-  
-  // Filter by selected API if one is chosen
-  const filteredInstances = selectedApi 
-    ? displayInstances.filter(i => (i as any).source === selectedApi)
-    : displayInstances;
-
-  const activeInstances = filteredInstances.filter((i) => i.status === 'active');
+  const activeInstances = displayInstances.filter((i) => i.status === 'active');
   
   const selectedSource = selectedInstances.length > 0 
     ? (displayInstances.find(i => i.id === selectedInstances[0]) as any)?.source 
     : null;
 
   const handleSelectAll = () => {
-    if (activeInstances.length === 0) return;
-
     if (selectedSource) {
-      // If already selecting a specific source, select all others from that same source
-      const ids = activeInstances.filter(i => (i as any).source === selectedSource).map(i => i.id);
+      // If already selecting a specific source, only select others from that same source
+      const ids = displayInstances.filter(i => i.status === 'active' && (i as any).source === selectedSource).map(i => i.id);
       setSelectedInstances(ids);
     } else {
-      // If none selected, pick the source of the first active instance and select all from it
-      const firstSource = (activeInstances[0] as any).source;
-      const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
-      setSelectedInstances(ids);
-      setSelectedApi(firstSource);
+      // If none selected, find the first available source and select its active instances
+      if (activeInstances.length > 0) {
+        const firstSource = (activeInstances[0] as any).source;
+        const ids = activeInstances.filter(i => (i as any).source === firstSource).map(i => i.id);
+        setSelectedInstances(ids);
+      }
     }
   };
 
@@ -356,60 +361,19 @@ export function StepInstances() {
       {/* API Selection */}
       {hasAnyApi && (
         <div className="glass-card p-4 border-primary/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-medium">API de Envio</p>
-                <p className="text-sm text-muted-foreground">
-                  Selecione a fonte para carregar os números
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Phone className="w-5 h-5 text-primary" />
             </div>
-            
-            <div className="flex bg-muted/50 rounded-lg p-1">
-              {unoApiConnected && (
-                <button
-                  onClick={() => handleSelectApi('unoapi')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    selectedApi === 'unoapi' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  UnoAPI
-                </button>
-              )}
-              {(hasEvolution || !!hasSharedEvolution) && (
-                <button
-                  onClick={() => handleSelectApi('evolution')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    selectedApi === 'evolution' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Evolution
-                </button>
-              )}
-              {hasEvolutionGo && (
-                <button
-                  onClick={() => handleSelectApi('evolution-go')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    selectedApi === 'evolution-go' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Evo Go
-                </button>
-              )}
-              {hasChatwoot && (
-                <button
-                  onClick={() => handleSelectApi('chatwoot' as any)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    selectedApi === 'chatwoot' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Chatwoot
-                </button>
-              )}
+            <div>
+              <p className="font-medium">API de Envio</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedApi === 'unoapi' && 'Usando UnoAPI'}
+                {selectedApi === 'evolution' && 'Usando Evolution'}
+                {selectedApi === 'evolution-go' && 'Usando Evolution Go'}
+                {selectedApi === 'chatwoot' && 'Usando Chatwoot'}
+                {!selectedApi && loading ? 'Detectando...' : (!selectedApi && 'Automático')}
+              </p>
             </div>
           </div>
         </div>
@@ -515,7 +479,7 @@ export function StepInstances() {
       {/* Grid */}
       {!loading && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredInstances.map((instance) => {
+          {displayInstances.map((instance) => {
             const isSelected = selectedInstances.includes(instance.id);
             const isActive = instance.status === 'active';
             const source = (instance as any).source || 'default';
@@ -528,22 +492,10 @@ export function StepInstances() {
                 onClick={() => {
                   if (!isActive) return;
                   if (isSourceDisabled) {
-                    toast.error(`Você já selecionou instâncias de ${selectedSource}. Não é possível misturar com ${source}.`);
+                    import('sonner').then(({ toast }) => toast.error('Você não pode misturar instâncias de APIs diferentes.'));
                     return;
                   }
-                  
-                  const isBeingSelected = !isSelected;
                   toggleInstanceSelection(instance.id);
-                  
-                  // Update global selected API
-                  if (isBeingSelected) {
-                    setSelectedApi(source);
-                  } else {
-                    // If deselecting the last one, clear selected API
-                    if (selectedInstances.length === 1) {
-                      setSelectedApi(null);
-                    }
-                  }
                 }}
                 className={`instance-card ${instance.status} ${isSelected ? 'selected' : ''} ${showDisabledVisuals ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
