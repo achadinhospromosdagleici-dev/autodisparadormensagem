@@ -56,13 +56,14 @@ export function StepMessages() {
   const [carouselCards, setCarouselCards] = useState<{ image?: string; title: string; description: string; footer?: string; buttons: MessageButton[] }[]>([]);
   const [showFollowUp, setShowFollowUp] = useState(false);
 
-  const variables = [...columns];
+  const variables = columns.map((c) => `{{${c}}}`);
   if (columns.find((c) => c.toLowerCase() === 'nome')) {
     variables.push('{{primeiro_nome}}');
   }
 
   const insertVariable = (variable: string) => {
-    setNewMessage((prev) => prev + variable);
+    const v = variable.startsWith('{{') ? variable : `{{${variable}}}`;
+    setNewMessage((prev) => prev + v);
   };
 
   const isApiUno = selectedApi === 'unoapi';
