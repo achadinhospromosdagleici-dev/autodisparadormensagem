@@ -23,11 +23,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function StepConfirmation() {
+interface StepConfirmationProps {
+  onCampaignStarted?: () => void;
+}
+
+export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = {}) {
   const {
     data, messages, instances, selectedInstances, settings,
     getValidCount, campaignHistory, addCampaign,
     unoApiConnected, followUpConfig, updateMetrics, scheduledCampaigns, addScheduledCampaign,
+    addActiveCampaign, updateActiveCampaign, clearWizard,
   } = useWizard();
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
@@ -63,109 +68,116 @@ export function StepConfirmation() {
   };
 
   const handleStartSending = async () => {
-    console.log('[StepConfirmation] handleStartSending clicked', {
-      selectedInstances,
-      validContacts,
-      messagesCount: messages.length,
-      usesEvolution,
-      usesUnoApi,
-      hasEvoCreds: !!evoCreds,
-      hasUnoCreds: !!unoCreds,
-      hasRequiredCreds,
+    if (selectedInstances.length === 0) { toast.error('Selecione ao menos um número remetente!'); return; }
+    if (usesEvolution && !evoCreds) { toast.error('Credenciais da Evolution API não configuradas'); return; }
+    if (usesUnoApi && !unoCreds) { toast.error('Credenciais da UnoAPI não configuradas'); return; }
+    if (validContacts === 0) { toast.error('Nenhum contato válido para envio'); return; }
+    if (messages.length === 0) { toast.error('Configure ao menos uma mensagem'); return; }
+
+    const campaignId = crypto.randomUUID();
+    const campaignName = `Campanha ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+    // Add to active campaigns immediately so the home page shows progress
+    addActiveCampaign({
+      id: campaignId,
+      name: campaignName,
+      status: 'running',
+      totalContacts: validContacts,
+      sentCount: 0,
+      failedCount: 0,
+      repliedCount: 0,
+      createdAt: new Date(),
     });
-    if (selectedInstances.length === 0) {
-      toast.error('Selecione ao menos um número remetente!');
-      return;
-    }
-    if (usesEvolution && !evoCreds) {
-      toast.error('Credenciais da Evolution API não configuradas');
-      return;
-    }
-    if (usesUnoApi && !unoCreds) {
-      toast.error('Credenciais da UnoAPI não configuradas');
-      return;
-    }
-    if (validContacts === 0) {
-      toast.error('Nenhum contato válido para envio');
-      return;
-    }
-    if (messages.length === 0) {
-      toast.error('Configure ao menos uma mensagem');
-      return;
-    }
 
-    setIsSending(true);
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-    try {
-      const contactsData = validData.map(row => {
-        const obj: Record<string, any> = {};
-        Object.keys(row).forEach(key => {
-          if (key !== 'id' && key !== 'isValid' && key !== 'errorMessage') {
-            obj[key] = row[key];
-          }
+    const contactsData = validData.map(row => {
+      const obj: Record<string, any> = {};
+      Object.keys(row).forEach(key => {
+        if (key !== 'id' && key !== 'isValid' && key !== 'errorMessage') obj[key] = row[key];
+      });
+      return obj;
+    });
+
+    const campaignMessages: CampaignMessage[] = messages.map(m => ({
+      content: m.content,
+      mediaType: (m as any).mediaType || 'text',
+      mediaUrl: (m as any).mediaUrl || undefined,
+      mediaCaption: (m as any).mediaCaption || undefined,
+      mediaFilename: (m as any).mediaFilename || undefined,
+      title: (m as any).mediaType === 'buttons' ? (m as any).mediaCaption : undefined,
+      footer: (m as any).mediaType === 'buttons' ? (m as any).mediaFilename : undefined,
+      buttons: (m as any).buttons || undefined,
+      linkUrl: (m as any).linkUrl || undefined,
+    }));
+
+    // Run send in background so we can close the wizard view
+    void (async () => {
+      try {
+        const result = await sendCampaign(
+          contactsData,
+          campaignMessages,
+          settings,
+          selectedInstances,
+          followUpConfig,
+          (p) => {
+            updateActiveCampaign(campaignId, {
+              sentCount: p.sent,
+              failedCount: p.failed,
+              repliedCount: p.replied,
+              currentContact: p.currentContact,
+              status: p.status === 'completed' ? 'completed'
+                : p.status === 'error' ? 'error'
+                : p.status === 'paused' ? 'paused'
+                : 'running',
+            });
+          },
+          controller.signal,
+        );
+
+        const newCampaign: Campaign = {
+          id: campaignId,
+          name: campaignName,
+          date: new Date(),
+          totalContacts: validContacts,
+          sentCount: result.sent,
+          successCount: result.sent - result.failed,
+          failedCount: result.failed,
+          messages: messages.map(m => m.content),
+          status: result.failed === 0 ? 'completed' : 'partial',
+        };
+        addCampaign(newCampaign);
+
+        updateActiveCampaign(campaignId, {
+          status: result.failed === 0 ? 'completed' : (result.sent > 0 ? 'completed' : 'error'),
+          sentCount: result.sent,
+          failedCount: result.failed,
+          repliedCount: result.replied,
         });
-        return obj;
-      });
 
-      console.log('[StepConfirmation] contactsData sample:', JSON.stringify(contactsData[0]).substring(0, 300));
-      console.log('[StepConfirmation] messages[0] content:', messages[0]?.content);
+        updateMetrics({
+          totalSent: result.sent,
+          totalFailed: result.failed,
+          totalReplied: result.replied,
+          deliveryRate: result.sent > 0 ? Math.round(((result.sent - result.failed) / result.sent) * 1000) / 10 : 0,
+          replyRate: result.sent > 0 ? Math.round((result.replied / result.sent) * 1000) / 10 : 0,
+          failRate: result.sent > 0 ? Math.round((result.failed / result.sent) * 1000) / 10 : 0,
+        });
 
-      const campaignMessages: CampaignMessage[] = messages.map(m => ({
-        content: m.content,
-        mediaType: (m as any).mediaType || 'text',
-        mediaUrl: (m as any).mediaUrl || undefined,
-        mediaCaption: (m as any).mediaCaption || undefined,
-        mediaFilename: (m as any).mediaFilename || undefined,
-        // Para tipo "buttons": title vem em mediaCaption, footer em mediaFilename
-        title: (m as any).mediaType === 'buttons' ? (m as any).mediaCaption : undefined,
-        footer: (m as any).mediaType === 'buttons' ? (m as any).mediaFilename : undefined,
-        buttons: (m as any).buttons || undefined,
-        // Para tipo "link"
-        linkUrl: (m as any).linkUrl || undefined,
-      }));
+        toast.success(`Campanha finalizada! ${result.sent} enviadas.`);
+      } catch (err: any) {
+        updateActiveCampaign(campaignId, { status: 'error' });
+        toast.error(`Erro: ${err.message}`);
+      } finally {
+        abortRef.current = null;
+      }
+    })();
 
-      const result = await sendCampaign(
-        contactsData,
-        campaignMessages,
-        settings,
-        selectedInstances,
-        followUpConfig,
-        (p) => setProgress({ ...p }),
-        abortRef.current.signal,
-      );
-
-      // Save to history
-      const newCampaign: Campaign = {
-        id: crypto.randomUUID(),
-        name: `Campanha ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-        date: new Date(),
-        totalContacts: validContacts,
-        sentCount: result.sent,
-        successCount: result.sent - result.failed,
-        failedCount: result.failed,
-        messages: messages.map(m => m.content),
-        status: result.failed === 0 ? 'completed' : 'partial',
-      };
-      addCampaign(newCampaign);
-
-      // Update metrics
-      updateMetrics({
-        totalSent: result.sent,
-        totalFailed: result.failed,
-        totalReplied: result.replied,
-        deliveryRate: result.sent > 0 ? Math.round(((result.sent - result.failed) / result.sent) * 1000) / 10 : 0,
-        replyRate: result.sent > 0 ? Math.round((result.replied / result.sent) * 1000) / 10 : 0,
-        failRate: result.sent > 0 ? Math.round((result.failed / result.sent) * 1000) / 10 : 0,
-      });
-
-      toast.success(`Campanha finalizada! ${result.sent} enviadas.`);
-    } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
-    } finally {
-      setIsSending(false);
-      abortRef.current = null;
-    }
+    toast.success('Campanha iniciada — acompanhe o progresso na página inicial');
+    // Reset wizard state and close the creation view
+    clearWizard();
+    onCampaignStarted?.();
   };
 
   const handleStop = () => {
