@@ -388,7 +388,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
-  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
+  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => {
+    if (prev.selectedApi === api) return prev;
+    return { ...prev, selectedApi: api, selectedInstances: [] };
+  });
   const addScheduledCampaign = (campaign: ScheduledCampaign) => setState(prev => ({ ...prev, scheduledCampaigns: [...prev.scheduledCampaigns, campaign] }));
   const cancelScheduledCampaign = (id: string) => setState(prev => ({ ...prev, scheduledCampaigns: prev.scheduledCampaigns.map(c => c.id === id ? { ...c, status: 'cancelled' as const } : c) }));
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));

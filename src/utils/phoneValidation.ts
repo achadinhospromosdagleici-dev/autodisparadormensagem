@@ -128,8 +128,8 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
     }
   }
 
-  // Format the number
-  const formatted = `+${countryCode} ${formatLocalNumber(localNumber, countryCode)}`;
+  // Format the number: Clean numeric string only (no +, spaces or symbols)
+  const formatted = countryCode + localNumber;
 
   return {
     isValid: true,
