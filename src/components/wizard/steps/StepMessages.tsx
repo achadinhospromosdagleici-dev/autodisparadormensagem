@@ -30,6 +30,7 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
+import { MessageComposerExtras } from '../MessageComposerExtras';
 
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
 
@@ -974,6 +975,15 @@ return result;
                         : `Legenda da ${mediaType === 'image' ? 'imagem' : mediaType === 'audio' ? 'áudio' : mediaType === 'video' ? 'vídeo' : 'documento'} (opcional)`
               }
               className="w-full h-36 p-4 rounded-xl bg-muted/50 border border-border/50 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 scrollbar-thin"
+            />
+
+            <MessageComposerExtras
+              onInsertText={(t) => setNewMessage((prev) => prev + t)}
+              onMediaReady={({ url, type, filename }) => {
+                setMediaType(type);
+                setMediaUrl(url);
+                if (filename) setMediaFilename(filename);
+              }}
             />
 
             <button
