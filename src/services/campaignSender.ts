@@ -303,7 +303,14 @@ export async function sendCampaign(
             filename: msg.mediaFilename,
             title: msg.title,
             footer: msg.footer,
-            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            buttons: msg.buttons?.map(b => {
+              if (b.type === 'phone') {
+                let phoneNum = replaceButtonValue(b.value, contact).replace(/\D/g, '');
+                if (phoneNum.length > 0 && !phoneNum.startsWith('55')) phoneNum = '55' + phoneNum;
+                return { type: 'url', label: b.label, value: `https://wa.me/${phoneNum}` };
+              }
+              return { type: b.type as any, label: b.label, value: replaceButtonValue(b.value, contact) };
+            }),
             linkUrl: msg.linkUrl,
           };
           const result = await sendEvoMessage(evoCreds, senderName, phoneNumber, evoMsg);
@@ -320,7 +327,14 @@ export async function sendCampaign(
             footer: msg.footer,
             btnTitle: msg.btnTitle,
             btnFooter: msg.btnFooter,
-            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            buttons: msg.buttons?.map(b => {
+              if (b.type === 'phone') {
+                let phoneNum = replaceButtonValue(b.value, contact).replace(/\D/g, '');
+                if (phoneNum.length > 0 && !phoneNum.startsWith('55')) phoneNum = '55' + phoneNum;
+                return { type: 'url', label: b.label, value: `https://wa.me/${phoneNum}` };
+              }
+              return { type: b.type as any, label: b.label, value: replaceButtonValue(b.value, contact) };
+            }),
             linkUrl: msg.linkUrl,
             sections: msg.sections as EvolutionGoMessage['sections'],
             cards: msg.cards as EvolutionGoMessage['cards'],
@@ -356,15 +370,13 @@ export async function sendCampaign(
               if (b.type === 'url') {
                 return null; // Skip URL buttons, sent as text above
               } else if (b.type === 'phone') {
-                const phoneValue = replaceButtonValue(b.value, contact).replace(/\D/g, '');
-                // For contact button, use button label as contact name
-                const contactName = b.label || 'Contato';
-                console.log('[campaignSender] Contact button:', { label: b.label, contactName, phone: phoneValue });
+                let phoneValue = replaceButtonValue(b.value, contact).replace(/\D/g, '');
+                if (phoneValue.length > 0 && !phoneValue.startsWith('55')) phoneValue = '55' + phoneValue;
+                const waMeUrl = `https://wa.me/${phoneValue}`;
                 return {
                   id: b.id,
                   title: b.label,
-                  phone: phoneValue,
-                  contactName: contactName,
+                  url: waMeUrl,
                 };
               } else {
                 return {
@@ -418,12 +430,17 @@ export async function sendCampaign(
                 senderName,
                 phoneNumber,
                 personalizedCaption || personalizedContent,
-                msg.buttons!.map(b => ({
-                  id: b.id,
-                  title: b.label,
-                  url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
-                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
-                })),
+                msg.buttons!.map(b => {
+                  if (b.type === 'url') {
+                    return { id: b.id, title: b.label, url: replaceButtonValue(b.value, contact) };
+                  } else if (b.type === 'phone') {
+                    let phoneNum = replaceButtonValue(b.value, contact).replace(/\D/g, '');
+                    if (phoneNum.length > 0 && !phoneNum.startsWith('55')) phoneNum = '55' + phoneNum;
+                    const waMeUrl = `https://wa.me/${phoneNum}`;
+                    return { id: b.id, title: b.label, url: waMeUrl };
+                  }
+                  return { id: b.id, title: b.label };
+                }),
                 undefined,
                 msg.footer,
                 { type: mt, url: msg.mediaUrl, filename: msg.mediaFilename },
