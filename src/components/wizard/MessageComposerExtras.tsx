@@ -118,9 +118,12 @@ export function MessageComposerExtras({ onInsertText, onMediaReady }: Props) {
     }
     setUploadingSticker(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
-      const url = await uploadFile(file, 'stickers', safe, file.type || 'image/webp');
-      await saveToLibrary({ media_type: 'sticker', url, filename: safe, size_bytes: file.size });
+      // Converter para .webp 512x512 (formato padrão WhatsApp)
+      const webpBlob = await convertToWebpSticker(file);
+      const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50);
+      const safe = `${baseName || 'sticker'}.webp`;
+      const url = await uploadFile(webpBlob, 'stickers', safe, 'image/webp');
+      await saveToLibrary({ media_type: 'sticker', url, filename: safe, size_bytes: webpBlob.size });
       toast.success('Figurinha salva na galeria!');
       await loadLibrary('sticker');
     } catch (err: any) {
