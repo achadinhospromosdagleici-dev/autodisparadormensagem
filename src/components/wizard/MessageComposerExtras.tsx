@@ -118,9 +118,12 @@ export function MessageComposerExtras({ onInsertText, onMediaReady }: Props) {
     }
     setUploadingSticker(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
-      const url = await uploadFile(file, 'stickers', safe, file.type || 'image/webp');
-      await saveToLibrary({ media_type: 'sticker', url, filename: safe, size_bytes: file.size });
+      // Converter para .webp 512x512 (formato padrão WhatsApp)
+      const webpBlob = await convertToWebpSticker(file);
+      const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50);
+      const safe = `${baseName || 'sticker'}.webp`;
+      const url = await uploadFile(webpBlob, 'stickers', safe, 'image/webp');
+      await saveToLibrary({ media_type: 'sticker', url, filename: safe, size_bytes: webpBlob.size });
       toast.success('Figurinha salva na galeria!');
       await loadLibrary('sticker');
     } catch (err: any) {
@@ -210,6 +213,38 @@ export function MessageComposerExtras({ onInsertText, onMediaReady }: Props) {
   };
 
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  const convertToWebpSticker = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => { img.src = reader.result as string; };
+      reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+      img.onload = () => {
+        const SIZE = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas indisponível'));
+        // Fit contendo a imagem em 512x512 com fundo transparente
+        const ratio = Math.min(SIZE / img.width, SIZE / img.height);
+        const w = img.width * ratio;
+        const h = img.height * ratio;
+        const x = (SIZE - w) / 2;
+        const y = (SIZE - h) / 2;
+        ctx.clearRect(0, 0, SIZE, SIZE);
+        ctx.drawImage(img, x, y, w, h);
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('Falha ao converter para WebP')),
+          'image/webp',
+          0.92
+        );
+      };
+      img.onerror = () => reject(new Error('Imagem inválida'));
+      reader.readAsDataURL(file);
+    });
+  };
 
   return (
     <div className="relative flex items-center gap-2 px-1">
