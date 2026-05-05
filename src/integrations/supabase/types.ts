@@ -197,6 +197,39 @@ export type Database = {
         }
         Relationships: []
       }
+      media_library: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          filename: string | null
+          id: string
+          media_type: string
+          size_bytes: number | null
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          filename?: string | null
+          id?: string
+          media_type: string
+          size_bytes?: number | null
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          filename?: string | null
+          id?: string
+          media_type?: string
+          size_bytes?: number | null
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_templates: {
         Row: {
           content: string
