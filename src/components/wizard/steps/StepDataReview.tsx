@@ -591,9 +591,7 @@ export function StepDataReview() {
                     {columns.map((col, colIndex) => {
                       const rawValue = (row[col] as string) || '';
                       const isNumeroCol = columnMapping[colIndex] === 'numero';
-                      const displayValue = !mappingApplied && isNumeroCol
-                        ? previewPhoneClean(rawValue, colIndex)
-                        : rawValue;
+                      const displayValue = rawValue;
 
                       return (
                         <td key={col} className="py-3 px-4">
@@ -609,9 +607,6 @@ export function StepDataReview() {
                           ) : isNumeroCol ? (
                             <span className="font-mono text-primary">
                               {displayValue}
-                              {!mappingApplied && rawValue !== displayValue && (
-                                <span className="ml-1.5 text-xs text-muted-foreground line-through">{rawValue}</span>
-                              )}
                             </span>
                           ) : columnMapping[colIndex] === '_skip' ? (
                             <span className="text-muted-foreground/50">{rawValue || '-'}</span>
