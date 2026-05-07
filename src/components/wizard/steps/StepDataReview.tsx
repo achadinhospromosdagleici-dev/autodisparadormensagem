@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
 import { validatePhoneNumber, cleanPhoneValue, columnLooksLikePhone } from '@/utils/phoneValidation';
 import { autoMatchColumn, saveMappingHistory } from '@/utils/mappingStorage';
@@ -84,8 +84,12 @@ export function StepDataReview() {
   const [skippedRows, setSkippedRows] = useState<Set<string>>(new Set());
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [mappingApplied, setMappingApplied] = useState(false);
   const [addDDI, setAddDDI] = useState(false);
+
+  // Snapshot of original spreadsheet columns/data, captured once so we can
+  // re-apply mapping whenever the user changes a dropdown.
+  const originalColumnsRef = useRef<string[]>(columns);
+  const originalDataRef = useRef(data);
 
   // Auto-match columns on mount
   const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {
@@ -136,37 +140,42 @@ export function StepDataReview() {
     return matched;
   });
 
-  const originalColumns = columns;
+  const originalColumns = originalColumnsRef.current;
 
   const hasNumeroMapped = Object.values(columnMapping).includes('numero');
 
   const handleMappingChange = (colIndex: number, value: string) => {
-    setColumnMapping(prev => {
-      const newMapping = { ...prev };
-      if (value === 'numero') {
-        Object.keys(newMapping).forEach(key => {
-          if (newMapping[Number(key)] === 'numero') newMapping[Number(key)] = '_skip';
-        });
-      }
-      newMapping[colIndex] = value;
-      return newMapping;
-    });
-    setMappingApplied(false);
+    const newMapping = { ...columnMapping };
+    if (value === 'numero') {
+      Object.keys(newMapping).forEach(key => {
+        if (newMapping[Number(key)] === 'numero') newMapping[Number(key)] = '_skip';
+      });
+    }
+    newMapping[colIndex] = value;
+    setColumnMapping(newMapping);
+    // Auto-apply immediately
+    applyMapping(newMapping);
   };
 
-  const applyMapping = () => {
+  const applyMapping = (mappingArg?: Record<number, string>) => {
+    const mapping = mappingArg || columnMapping;
+    if (!Object.values(mapping).includes('numero')) return;
+
+    const sourceColumns = originalColumnsRef.current;
+    const sourceData = originalDataRef.current;
+
     // Save mapping history to localStorage
     const historyEntries: Record<string, string> = {};
-    originalColumns.forEach((col, i) => {
-      historyEntries[col] = columnMapping[i] || '_skip';
+    sourceColumns.forEach((col, i) => {
+      historyEntries[col] = mapping[i] || '_skip';
     });
     saveMappingHistory(historyEntries);
 
     // Build rename map
     const colRenameMap: Record<string, string> = {};
     const newColumns: string[] = [];
-    originalColumns.forEach((col, i) => {
-      const mapped = columnMapping[i] || '_skip';
+    sourceColumns.forEach((col, i) => {
+      const mapped = mapping[i] || '_skip';
       const newName = mapped === '_skip' ? col : mapped;
       colRenameMap[col] = newName;
       newColumns.push(newName);
@@ -174,25 +183,25 @@ export function StepDataReview() {
 
     // Identify phone columns
     const phoneOriginalCols: string[] = [];
-    originalColumns.forEach((col, i) => {
-      const mapped = columnMapping[i];
+    sourceColumns.forEach((col, i) => {
+      const mapped = mapping[i];
       if (mapped === 'numero' || mapped === 'custom') {
         phoneOriginalCols.push(col);
       }
     });
-    originalColumns.forEach((col, i) => {
-      if (!phoneOriginalCols.includes(col) && columnMapping[i] !== '_skip') {
-        const colValues = data.map(row => String(row[col] || ''));
+    sourceColumns.forEach((col, i) => {
+      if (!phoneOriginalCols.includes(col) && mapping[i] !== '_skip') {
+        const colValues = sourceData.map(row => String(row[col] || ''));
         if (columnLooksLikePhone(colValues)) phoneOriginalCols.push(col);
       }
     });
 
     // Remove skipped rows and empty rows
-    const activeData = (Array.isArray(data) ? data : []).filter(row => {
+    const activeData = (Array.isArray(sourceData) ? sourceData : []).filter(row => {
       if (skippedRows.has(row.id)) return false;
       // Check if row has any non-empty value in mapped columns
-      return (originalColumns || []).some((col, i) => {
-        if (columnMapping[i] === '_skip') return false;
+      return (sourceColumns || []).some((col, i) => {
+        if (mapping[i] === '_skip') return false;
         const val = String(row[col] || '').trim();
         return val !== '';
       });
@@ -204,7 +213,7 @@ export function StepDataReview() {
         id: row.id, numero: '', isValid: false,
       };
 
-      originalColumns.forEach(col => {
+      sourceColumns.forEach(col => {
         const newKey = colRenameMap[col];
         let value = String(row[col] || '');
         if (phoneOriginalCols.includes(col) && value) value = cleanPhoneValue(value);
@@ -224,10 +233,23 @@ export function StepDataReview() {
 
     setColumns(newColumns);
     setData(updatedData);
-    setMappingApplied(true);
-    setSkippedRows(new Set());
-    toast.success(`Mapeamento aplicado! ${updatedData.length} contatos processados.`);
   };
+
+  // Auto-apply on mount once we have a numero column detected
+  useEffect(() => {
+    if (Object.values(columnMapping).includes('numero')) {
+      applyMapping(columnMapping);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-apply when DDI toggle changes
+  useEffect(() => {
+    if (Object.values(columnMapping).includes('numero')) {
+      applyMapping(columnMapping);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addDDI]);
 
   const getMappingOption = (colIndex: number) => {
     const value = columnMapping[colIndex] || '_skip';
@@ -351,35 +373,18 @@ export function StepDataReview() {
 
       {/* Mapping Controls Bar */}
       <div className="glass-card p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox checked={addDDI} onCheckedChange={checked => { setAddDDI(checked === true); setMappingApplied(false); }} />
-              <span className="text-muted-foreground">Inserir DDI 55</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={settings.hasHeader}
-                onCheckedChange={checked => setSettings({ hasHeader: checked === true })}
-              />
-              <span className="text-muted-foreground">1ª linha é cabeçalho</span>
-            </label>
-          </div>
-
-          {/* Prominent Apply Button */}
-          <button
-            onClick={applyMapping}
-            disabled={!hasNumeroMapped}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ${
-              hasNumeroMapped
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            Aplicar Mapeamento
-            <ArrowRight className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox checked={addDDI} onCheckedChange={checked => setAddDDI(checked === true)} />
+            <span className="text-muted-foreground">Inserir DDI 55</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox
+              checked={settings.hasHeader}
+              onCheckedChange={checked => setSettings({ hasHeader: checked === true })}
+            />
+            <span className="text-muted-foreground">1ª linha é cabeçalho</span>
+          </label>
         </div>
 
         {!hasNumeroMapped && (
@@ -533,7 +538,7 @@ export function StepDataReview() {
                 <th className="py-2 px-2 text-xs text-muted-foreground">
                   <EyeOff className="w-3.5 h-3.5 mx-auto opacity-50" />
                 </th>
-                <th className="py-2 px-2 w-14 text-xs text-muted-foreground text-center">ID</th>
+                <th className="py-2 px-2 w-14 text-xs text-muted-foreground text-center">#</th>
                 {columns.map((col, colIndex) => (
                   <th key={col} className="text-left py-2 px-4 font-mono text-xs text-muted-foreground uppercase">
                     <span className="flex items-center gap-1.5">
