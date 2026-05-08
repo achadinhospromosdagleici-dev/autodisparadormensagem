@@ -1,3 +1,4 @@
+// Test commit to verify GitHub sync
 import { useEffect, useState } from 'react';
 import { WizardProvider } from '@/contexts/WizardContext';
 import { WizardLayout } from '@/components/wizard/WizardLayout';
