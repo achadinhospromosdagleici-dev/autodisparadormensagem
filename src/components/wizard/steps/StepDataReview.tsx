@@ -86,10 +86,14 @@ export function StepDataReview() {
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [addDDI, setAddDDI] = useState(false);
 
-  // Snapshot of original spreadsheet columns/data, captured once so we can
+  // Snapshot of original spreadsheet columns/data, used to
   // re-apply mapping whenever the user changes a dropdown.
   const originalColumnsRef = useRef<string[]>(columns);
   const originalDataRef = useRef(data);
+  // Mantém refs sincronizadas com os dados atuais (ambos componentes
+  // ficam montados juntos, então o snapshot inicial pode estar vazio)
+  originalColumnsRef.current = columns;
+  originalDataRef.current = data;
 
   // Auto-match columns on mount
   const [columnMapping, setColumnMapping] = useState<Record<number, string>>(() => {

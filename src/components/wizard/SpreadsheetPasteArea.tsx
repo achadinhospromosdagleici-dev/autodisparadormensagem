@@ -1,13 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Grid3X3 } from 'lucide-react';
 
 interface SpreadsheetPasteAreaProps {
   onDataPaste?: (text: string) => void;
   onDataChange?: (hasData: boolean, rawText: string) => void;
-  onProcess?: () => void;
 }
 
-export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPasteAreaProps) {
+export function SpreadsheetPasteArea({ onDataPaste }: SpreadsheetPasteAreaProps) {
   const [cells, setCells] = useState<string[][]>([['']]);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
   const [columnWidths, setColumnWidths] = useState<number[]>([]);
@@ -15,6 +14,7 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
   const containerRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const prevCellsRef = useRef<string[][] | null>(null);
 
   const minRows = 5;
   const minCols = 4;
@@ -264,6 +264,18 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
 
   const hasData = Array.isArray(cells) && cells.some((row: string[]) => Array.isArray(row) && row.some(cell => cell.trim() !== ''));
 
+  // Auto-process data when cells change
+  useEffect(() => {
+    if (prevCellsRef.current !== null) {
+      const hasChanges = JSON.stringify(prevCellsRef.current) !== JSON.stringify(cells);
+      if (hasChanges && hasData && onDataPaste) {
+        const text = cells.map(row => row.join('\t')).join('\n');
+        onDataPaste(text);
+      }
+    }
+    prevCellsRef.current = cells;
+  }, [cells, hasData, onDataPaste]);
+
   return (
     <div 
       ref={containerRef}
@@ -371,16 +383,6 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
               className="text-xs text-destructive hover:text-destructive/80 font-medium transition-colors"
             >
               Limpar
-            </button>
-            <button
-              onClick={() => {
-                const text = cells.map(row => row.join('\t')).join('\n');
-                if (onDataPaste) onDataPaste(text);
-                if (onProcess) onProcess();
-              }}
-              className="text-xs text-primary hover:text-primary/80 font-medium transition-colors px-2 py-1 bg-primary/10 rounded-md"
-            >
-              Processar Dados
             </button>
           </div>
         </div>

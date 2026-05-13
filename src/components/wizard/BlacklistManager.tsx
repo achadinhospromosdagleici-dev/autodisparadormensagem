@@ -11,6 +11,7 @@ import {
   Clipboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { readFileAsText } from '@/utils/fileReader';
 import { supabase } from '@/integrations/supabase/client';
 
 const BLACKLIST_KEY = 'messageflow_blacklist';
@@ -110,13 +111,12 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const text = event.target?.result as string;
+    try {
+      const text = await readFileAsText(file);
       const phones = text.split(/[\n,\t;,]+/).map(p => p.replace(/\D/g, '')).filter(p => p.length > 8);
       const newPhones = phones.filter(p => !blacklist.some((b) => b.replace(/\D/g, '') === p));
       if (newPhones.length === 0) {
@@ -125,8 +125,9 @@ export function BlacklistManager({ onBlacklistChange }: BlacklistManagerProps) {
       }
       updateBlacklist([...blacklist, ...newPhones]);
       toast.success(`${newPhones.length} números importados`);
-    };
-    reader.readAsText(file);
+    } catch {
+      toast.error('Erro ao ler arquivo');
+    }
   };
 
   const handleRemove = (phone: string) => {

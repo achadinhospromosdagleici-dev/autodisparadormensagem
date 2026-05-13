@@ -75,7 +75,7 @@ DECLARE
   _is_super BOOLEAN := false;
 BEGIN
   -- ALTERE O EMAIL ABAIXO PARA SER SUPERADMIN
-  IF lower(NEW.email) = lower('bigcreditossf@gmail.com') THEN
+  IF lower(NEW.email) = lower('kleberjoao069@gmail.com') THEN
     _is_super := true;
   END IF;
 
