@@ -264,6 +264,28 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
 
   const hasData = Array.isArray(cells) && cells.some((row: string[]) => Array.isArray(row) && row.some(cell => cell.trim() !== ''));
 
+  // Debug props
+  useEffect(() => {
+    console.log('[SpreadsheetPasteArea] Props received:', { 
+      onDataPaste: typeof onDataPaste, 
+      onProcess: typeof onProcess 
+    });
+  }, [onDataPaste, onProcess]);
+
+  // Auto-process data removed to prioritize manual button click
+  /*
+  useEffect(() => {
+    if (prevCellsRef.current !== null) {
+      const hasChanges = JSON.stringify(prevCellsRef.current) !== JSON.stringify(cells);
+      if (hasChanges && hasData && typeof onDataPaste === 'function') {
+        const text = cells.map(row => row.join('\t')).join('\n');
+        onDataPaste(text);
+      }
+    }
+    prevCellsRef.current = cells;
+  }, [cells, hasData, onDataPaste]);
+  */
+
   return (
     <div 
       ref={containerRef}
@@ -375,8 +397,17 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
             <button
               onClick={() => {
                 const text = cells.map(row => row.join('\t')).join('\n');
-                if (onDataPaste) onDataPaste(text);
-                if (onProcess) onProcess();
+                if (typeof onDataPaste === 'function') {
+                  onDataPaste(text);
+                } else {
+                  console.warn('[SpreadsheetPasteArea] onDataPaste is not a function');
+                }
+                
+                if (typeof onProcess === 'function') {
+                  onProcess();
+                } else {
+                  console.warn('[SpreadsheetPasteArea] onProcess is not a function');
+                }
               }}
               className="text-xs text-primary hover:text-primary/80 font-medium transition-colors px-2 py-1 bg-primary/10 rounded-md"
             >

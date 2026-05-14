@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { SpreadsheetPasteArea } from '../SpreadsheetPasteArea';
 
 export function StepDataEntry() {
-  const { setImportedData, data, columns, settings, setSettings, nextStep } = useWizard();
+  const { setData, setColumns, data, columns, settings, setSettings, nextStep } = useWizard();
   const [pasteData, setPasteData] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showPasteArea, setShowPasteArea] = useState(false);
@@ -28,18 +28,32 @@ export function StepDataEntry() {
     // Se tem cabeçalho, os dados reais começam na linha 2 (índice 1)
     const dataLines = hasHeader ? lines.slice(1) : lines;
     
-    const dataRows = dataLines.map(line => {
+    const rows: any[] = dataLines.map(line => {
       const values = parseCSVLine(line, delimiter);
-      const row: Record<string, string> = {};
+      const row: any = {
+        id: crypto.randomUUID(),
+        numero: '',
+        isValid: false
+      };
       headerLine.forEach((col, i) => {
         row[col] = values[i] || '';
       });
+
+      // Se a coluna 'numero' existir, validar
+      if (row.numero) {
+        const validation = validatePhoneNumber(row.numero, true);
+        row.isValid = validation.isValid;
+        row.numero = validation.formatted;
+        row.errorMessage = validation.errorMessage;
+      }
+
       return row;
     });
 
-    setImportedData(dataRows, headerLine);
-    toast.success(`${dataRows.length} registros processados.`);
-  }, [setImportedData]);
+    setData(rows);
+    setColumns(headerLine);
+    toast.success(`${rows.length} registros processados.`);
+  }, [setData, setColumns]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,7 +180,14 @@ export function StepDataEntry() {
               setPasteData(text);
               processData(text, settings.hasHeader);
             }}
-            onProcess={() => nextStep()}
+            onProcess={() => {
+              if (typeof nextStep === 'function') {
+                nextStep();
+              } else {
+                console.error('[StepDataEntry] nextStep is not a function from useWizard');
+                toast.error('Erro ao avançar de etapa. Tente novamente.');
+              }
+            }}
           />
 
           {data.length > 0 && (
