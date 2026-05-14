@@ -111,6 +111,21 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
   return value;
 }
 
+export function sanitizeWaMeUrl(url: string): string {
+  if (!url || !url.includes('wa.me/')) return url;
+  try {
+    const parts = url.split('wa.me/');
+    const baseUrl = parts[0] + 'wa.me/';
+    const phoneAndQuery = parts[1];
+    const [phonePart, ...queryParts] = phoneAndQuery.split('?');
+    const cleanPhone = phonePart.replace(/\D/g, '');
+    const queryPart = queryParts.length > 0 ? '?' + queryParts.join('?') : '';
+    return baseUrl + cleanPhone + queryPart;
+  } catch (err) {
+    return url;
+  }
+}
+
 export interface CampaignMessage {
   content: string;
   mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
@@ -303,7 +318,11 @@ export async function sendCampaign(
             filename: msg.mediaFilename,
             title: msg.title,
             footer: msg.footer,
-            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            buttons: msg.buttons?.map(b => ({ 
+              type: b.type, 
+              label: b.label, 
+              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : b.value 
+            })),
             linkUrl: msg.linkUrl,
             contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
             contactNumber: msg.mediaType === 'contact' ? replaceVariables(msg.btnFooter || '', contact) : undefined,
@@ -322,7 +341,11 @@ export async function sendCampaign(
             footer: msg.footer,
             btnTitle: msg.btnTitle,
             btnFooter: msg.btnFooter,
-            buttons: msg.buttons?.map(b => ({ type: b.type, label: b.label, value: b.value })),
+            buttons: msg.buttons?.map(b => ({ 
+              type: b.type, 
+              label: b.label, 
+              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : b.value 
+            })),
             linkUrl: msg.linkUrl,
             sections: msg.sections as EvolutionGoMessage['sections'],
             cards: msg.cards as EvolutionGoMessage['cards'],
@@ -349,7 +372,7 @@ export async function sendCampaign(
             // If has URL buttons, include link in message text (works better with Baileys)
             if (urlButtons.length > 0) {
               const linksText = urlButtons.map(b => {
-                const linkUrl = replaceButtonValue(b.value, contact);
+                const linkUrl = sanitizeWaMeUrl(replaceButtonValue(b.value, contact));
                 return `🔗 ${b.label}: ${linkUrl}`;
               }).join('\n');
               unoMsg.content = `${personalizedContent}\n\n${linksText}`;

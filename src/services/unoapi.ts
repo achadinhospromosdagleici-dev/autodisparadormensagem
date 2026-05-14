@@ -580,13 +580,19 @@ export async function sendInteractiveButtons(
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
-            // URL button format for WhatsApp Cloud API
-            // signature is optional for tracking clicks per user
+            let finalUrl = btn.url;
+            if (finalUrl.includes('wa.me/')) {
+              const parts = finalUrl.split('wa.me/');
+              const baseUrl = parts[0] + 'wa.me/';
+              const phonePart = parts[1].split('?')[0];
+              const queryPart = parts[1].includes('?') ? '?' + parts[1].split('?')[1] : '';
+              finalUrl = baseUrl + phonePart.replace(/\D/g, '') + queryPart;
+            }
             return {
               type: 'URL',
               url: {
-                url: btn.url,
-                signature: to, // Add recipient as signature for tracking
+                url: finalUrl,
+                signature: to,
               },
               title: btn.title,
             };
