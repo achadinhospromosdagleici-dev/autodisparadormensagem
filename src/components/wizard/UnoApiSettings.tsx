@@ -57,7 +57,7 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
   const [s3Region, setS3Region] = useState(DEFAULT_S3_CONFIG.region);
   const [showS3Secret, setShowS3Secret] = useState(false);
 
-useEffect(() => {
+  React.useEffect(() => {
     async function load() {
       const creds = await loadUnoApiCredentialsWithFallback();
       if (creds) {

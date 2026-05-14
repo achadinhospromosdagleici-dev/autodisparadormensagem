@@ -581,12 +581,14 @@ export async function sendInteractiveButtons(
         buttons: buttons.map(btn => {
           if (btn.url) {
             let finalUrl = btn.url;
-            if (finalUrl.includes('wa.me/')) {
-              const parts = finalUrl.split('wa.me/');
-              const baseUrl = parts[0] + 'wa.me/';
-              const phonePart = parts[1].split('?')[0];
-              const queryPart = parts[1].includes('?') ? '?' + parts[1].split('?')[1] : '';
-              finalUrl = baseUrl + phonePart.replace(/\D/g, '') + queryPart;
+            if (finalUrl.includes('wa.me/') || finalUrl.includes('api.whatsapp.com')) {
+              // Extract phone number and remove non-digits
+              const phoneMatch = finalUrl.match(/(?:wa\.me\/|phone=)(\+?\d+)/);
+              if (phoneMatch) {
+                const fullMatch = phoneMatch[0];
+                const phone = phoneMatch[1].replace(/\D/g, '');
+                finalUrl = finalUrl.replace(phoneMatch[0], fullMatch.includes('wa.me/') ? `wa.me/${phone}` : `phone=${phone}`);
+              }
             }
             return {
               type: 'URL',

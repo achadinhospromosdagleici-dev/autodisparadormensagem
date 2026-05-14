@@ -74,7 +74,7 @@ export function StepInstances() {
   const hasSharedEvolution = useSharedEvolution();
   const [hasEvolutionGo, setHasEvolutionGo] = useState(false);
   const [hasChatwoot, setHasChatwoot] = useState(false);
-  useEffect(() => {
+  React.useEffect(() => {
     async function checkApis(checkDb = false) {
       // Evolution
       const evoLocal = loadEvolutionCredentials();
@@ -112,7 +112,7 @@ export function StepInstances() {
   const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot;
 
   // Fetch user's registered instances (for filtering when using shared Evolution)
-  useEffect(() => {
+  React.useEffect(() => {
     async function fetchUserInstances() {
       if (!user?.id) return;
       try {
@@ -136,7 +136,7 @@ export function StepInstances() {
   };
 
   // Auto-detect API on first load
-  useEffect(() => {
+  React.useEffect(() => {
     if (!selectedApi && hasLoadedRef.current !== 'done') {
       if (unoApiConnected) {
         setSelectedApi('unoapi');
@@ -149,7 +149,7 @@ export function StepInstances() {
     }
   }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
     if (!hasLoadedRef.current || unoApiConnected) {
       loadAllInstances();
@@ -157,7 +157,7 @@ export function StepInstances() {
     }
   }, [unoApiConnected]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Also call on initial mount
     if (!hasLoadedRef.current) {
       console.log('[StepInstances] Mount - loading instances');
@@ -176,7 +176,7 @@ export function StepInstances() {
   }, [loading]);
 
   // Cleanup orphaned selections (instances no longer available)
-  useEffect(() => {
+  React.useEffect(() => {
     if (loading) return;
     const validIds = new Set(mergedInstances.map(i => i.id));
     if (mergedInstances.length === 0) return; // no real instances loaded yet, keep defaults

@@ -321,7 +321,7 @@ export async function sendCampaign(
             buttons: msg.buttons?.map(b => ({ 
               type: b.type, 
               label: b.label, 
-              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : b.value 
+              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : (b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : b.value)
             })),
             linkUrl: msg.linkUrl,
             contactName: msg.mediaType === 'contact' ? replaceVariables(msg.btnTitle || 'Contato', contact) : undefined,
@@ -344,7 +344,7 @@ export async function sendCampaign(
             buttons: msg.buttons?.map(b => ({ 
               type: b.type, 
               label: b.label, 
-              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : b.value 
+              value: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : (b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : b.value)
             })),
             linkUrl: msg.linkUrl,
             sections: msg.sections as EvolutionGoMessage['sections'],
@@ -390,7 +390,7 @@ export async function sendCampaign(
                 return {
                   id: b.id,
                   title: b.label,
-                  phone: phoneValue,
+                  phone: phoneValue.replace(/\D/g, ''),
                   contactName: contactName,
                 };
               } else {
@@ -444,8 +444,8 @@ export async function sendCampaign(
                 msg.buttons!.map(b => ({
                   id: b.id,
                   title: b.label,
-                  url: b.type === 'url' ? replaceButtonValue(b.value, contact) : undefined,
-                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact) : undefined,
+                  url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : undefined,
+                  phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
                 })),
                 undefined,
                 msg.footer,
