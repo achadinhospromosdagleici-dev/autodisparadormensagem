@@ -560,15 +560,11 @@ export async function sendInteractiveButtons(
   phoneNumberId: string,
   to: string,
   body: string,
-  buttons: Array<{ id: string; title: string; url?: string; phone?: string }>,
+  buttons: Array<{ id: string; title: string; url?: string; phone?: string; reply?: string }>,
   header?: string,
   footer?: string,
   mediaHeader?: { type: 'image' | 'video' | 'document'; url: string; filename?: string }
 ): Promise<any> {
-  // Check button types
-  const hasUrlButton = buttons.some(b => b.url);
-  const hasPhoneButton = buttons.some(b => b.phone);
-
   const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
@@ -580,33 +576,31 @@ export async function sendInteractiveButtons(
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
+            // URL button - link customizado (não é wa.me, é qualquer URL)
             let finalUrl = btn.url;
             if (finalUrl.includes('wa.me/') || finalUrl.includes('api.whatsapp.com')) {
-              // Extract phone number and remove non-digits
+              // Se for wa.me, limpa o número do telefone
               const phoneMatch = finalUrl.match(/(?:wa\.me\/|phone=)(\+?\d+)/);
               if (phoneMatch) {
-                const fullMatch = phoneMatch[0];
                 const phone = phoneMatch[1].replace(/\D/g, '');
-                finalUrl = finalUrl.replace(phoneMatch[0], fullMatch.includes('wa.me/') ? `wa.me/${phone}` : `phone=${phone}`);
+                finalUrl = finalUrl.replace(phoneMatch[0], `wa.me/${phone}`);
               }
             }
             return {
               type: 'URL',
               url: {
                 url: finalUrl,
-                signature: to,
               },
               title: btn.title,
             };
-          } else if (btn.phone || (btn as any).value) {
-            // Phone button - use URL button pointing to wa.me for Baileys compatibility
-            const rawPhone = btn.phone || (btn as any).value;
-            let phoneNum = rawPhone.replace(/\D/g, ''); 
-            // Ensure DDI 55 if missing
+          } else if (btn.phone) {
+            // Phone button - gera link wa.me
+            let phoneNum = btn.phone.replace(/\D/g, '');
             if (phoneNum.length > 0 && !phoneNum.startsWith('55') && phoneNum.length <= 11) {
               phoneNum = '55' + phoneNum;
             }
             const waMeUrl = `https://wa.me/${phoneNum}`;
+            console.log('[unoapi] Phone button wa.me URL:', waMeUrl);
             return {
               type: 'URL',
               url: {
@@ -614,10 +608,23 @@ export async function sendInteractiveButtons(
               },
               title: btn.title,
             };
-          } else {
+          } else if (btn.reply) {
+            // Reply button - envia o texto quando clicado
             return {
               type: 'reply',
-              reply: { id: btn.id, title: btn.title },
+              reply: {
+                id: btn.id || crypto.randomUUID().toString(),
+                title: btn.reply,
+              },
+            };
+          } else {
+            // Default reply button (fallback)
+            return {
+              type: 'reply',
+              reply: {
+                id: btn.id || crypto.randomUUID().toString(),
+                title: btn.title,
+              },
             };
           }
         }),

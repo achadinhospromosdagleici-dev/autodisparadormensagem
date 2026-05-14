@@ -357,34 +357,39 @@ export async function sendCampaign(
           const unoMsg: UnoApiMessage = { content: personalizedContent };
           
           if (msg.mediaType === 'buttons') {
-            // Check if any button is URL - for Baileys, send as text with link instead of buttons
-            const urlButtons = msg.buttons?.filter(b => b.type === 'url') || [];
-            const phoneButtons = msg.buttons?.filter(b => b.type === 'phone') || [];
-            const replyButtons = msg.buttons?.filter(b => b.type === 'reply') || [];
-            
-            // If has URL buttons, include link in message text (works better with Baileys)
-            if (urlButtons.length > 0) {
-              const linksText = urlButtons.map(b => {
-                const linkUrl = sanitizeWaMeUrl(replaceButtonValue(b.value, contact));
-                return `🔗 ${b.label}: ${linkUrl}`;
-              }).join('\n');
-              unoMsg.content = `${personalizedContent}\n\n${linksText}`;
-            }
-            
-            // Only send interactive buttons for phone and reply (URL buttons as text above)
+            // Only send interactive buttons for all types (URL, phone, reply)
             const interactiveButtons = msg.buttons?.map(b => {
               if (b.type === 'url') {
-                return null; // Skip URL buttons, sent as text above
-              } else if (b.type === 'phone') {
-                const phoneValue = replaceButtonValue(b.value, contact);
-                // For contact button, use button label as contact name
-                const contactName = b.label || 'Contato';
-                console.log('[campaignSender] Contact button:', { label: b.label, contactName, phone: phoneValue });
+                // URL button - enviar como botão clicável com link customizado
                 return {
                   id: b.id,
                   title: b.label,
-                  phone: phoneValue.replace(/\D/g, ''),
+                  url: sanitizeWaMeUrl(replaceButtonValue(b.value, contact)),
+                };
+              } else if (b.type === 'phone') {
+                const phoneValue = replaceButtonValue(b.value, contact);
+                const contactName = b.label || 'Contato';
+                const cleanPhone = phoneValue.replace(/\D/g, '');
+                console.log('[campaignSender] Phone button:', { 
+                  label: b.label, 
+                  originalValue: b.value,
+                  contactName, 
+                  phoneValue,
+                  cleanPhone,
+                  finalPhone: cleanPhone
+                });
+                return {
+                  id: b.id,
+                  title: b.label,
+                  phone: cleanPhone,
                   contactName: contactName,
+                };
+              } else if (b.type === 'reply') {
+                // Reply button - envia texto quando clicado
+                return {
+                  id: b.id,
+                  title: b.label,
+                  reply: b.label,
                 };
               } else {
                 return {
@@ -395,7 +400,7 @@ export async function sendCampaign(
             }).filter(b => b !== null) || [];
             
             if (interactiveButtons.length > 0) {
-              unoMsg.buttons = interactiveButtons as Array<{ id: string; title: string; url?: string; phone?: string }>;
+              unoMsg.buttons = interactiveButtons as Array<{ id: string; title: string; url?: string; phone?: string; reply?: string }>;
               if (msg.title) unoMsg.header = msg.title;
               if (msg.footer) unoMsg.footer = msg.footer;
             }
