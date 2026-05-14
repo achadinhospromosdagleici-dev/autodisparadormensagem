@@ -598,9 +598,15 @@ export async function sendInteractiveButtons(
               },
               title: btn.title,
             };
-          } else if (btn.phone) {
+          } else if (btn.phone || (btn as any).value) {
             // Phone button - use URL button pointing to wa.me for Baileys compatibility
-            const waMeUrl = `https://wa.me/${btn.phone.replace(/\D/g, '')}`;
+            const rawPhone = btn.phone || (btn as any).value;
+            let phoneNum = rawPhone.replace(/\D/g, ''); 
+            // Ensure DDI 55 if missing
+            if (phoneNum.length > 0 && !phoneNum.startsWith('55') && phoneNum.length <= 11) {
+              phoneNum = '55' + phoneNum;
+            }
+            const waMeUrl = `https://wa.me/${phoneNum}`;
             return {
               type: 'URL',
               url: {
