@@ -112,18 +112,11 @@ function replaceButtonValue(value: string, contact: Record<string, any>): string
 }
 
 export function sanitizeWaMeUrl(url: string): string {
-  if (!url || !url.includes('wa.me/')) return url;
-  try {
-    const parts = url.split('wa.me/');
-    const baseUrl = parts[0] + 'wa.me/';
-    const phoneAndQuery = parts[1];
-    const [phonePart, ...queryParts] = phoneAndQuery.split('?');
-    const cleanPhone = phonePart.replace(/\D/g, '');
-    const queryPart = queryParts.length > 0 ? '?' + queryParts.join('?') : '';
-    return baseUrl + cleanPhone + queryPart;
-  } catch (err) {
-    return url;
-  }
+  if (!url) return url;
+  if (!url.includes('wa.me/') && !url.includes('api.whatsapp.com')) return url;
+  
+  // Aggressively remove + and other non-digits from the phone number part
+  return url.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
 }
 
 export interface CampaignMessage {

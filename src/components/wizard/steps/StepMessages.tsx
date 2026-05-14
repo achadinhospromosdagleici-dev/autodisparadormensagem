@@ -122,62 +122,88 @@ export function StepMessages() {
     };
 
     if (isEditing) {
-      updateRichMessage(editingMessageId, baseData);
+      const cleanButtons = buttons.map(b => {
+        let val = b.value.trim();
+        if (b.type === 'phone') {
+          val = val.replace(/\D/g, '');
+        } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
+          val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+        }
+        return { ...b, label: b.label.trim(), value: val };
+      });
+
+      updateRichMessage(editingMessageId, {
+        ...baseData,
+        buttons: buttons.length > 0 ? cleanButtons : undefined,
+        btnTitle: mediaType === 'buttons' || mediaType === 'contact' ? btnTitle.trim() : undefined,
+        btnFooter: mediaType === 'buttons' || mediaType === 'contact' ? btnFooter.trim() : undefined,
+        linkUrl: mediaType === 'link' ? linkUrl.trim() : undefined,
+      });
       toast.success('Mensagem atualizada');
     } else {
-      if (mediaType === 'buttons') {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'buttons',
-          buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
-          mediaCaption: btnTitle.trim() || undefined,
-          mediaFilename: btnFooter.trim() || undefined,
+        const cleanButtons = buttons.map(b => {
+          let val = b.value.trim();
+          if (b.type === 'phone') {
+            val = val.replace(/\D/g, '');
+          } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
+            val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+          }
+          return { ...b, label: b.label.trim(), value: val };
         });
-      } else if (mediaType === 'link') {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'link',
-          linkUrl: linkUrl.trim(),
-        });
-      } else if (mediaType === 'contact') {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'contact',
-          btnTitle: btnTitle.trim(),
-          btnFooter: btnFooter.trim(),
-        });
-      } else if (mediaType === 'list' && isApiEvoGo) {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'list',
-          title: btnTitle.trim(),
-          btnTitle: 'Selecionar',
-          btnFooter: btnFooter.trim(),
-          buttons: listSections as unknown as Message['buttons'],
-        });
-      } else if (mediaType === 'carousel' && isApiEvoGo) {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType: 'carousel',
-          buttons: carouselCards as unknown as Message['buttons'],
-        });
-      } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
-        addRichMessage({
-          content: newMessage.trim(),
-          mediaType,
-          mediaUrl: mediaUrl.trim(),
-          mediaCaption: newMessage.trim(),
-          mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
-          buttons: buttons.map(b => ({ ...b, label: b.label.trim(), value: b.value.trim() })),
-        });
-      } else {
-        addMessage(newMessage.trim(), {
-          mediaType,
-          mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
-          mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
-          mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
-        });
-      }
+
+        if (mediaType === 'buttons') {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType: 'buttons',
+            buttons: cleanButtons,
+            mediaCaption: btnTitle.trim() || undefined,
+            mediaFilename: btnFooter.trim() || undefined,
+          });
+        } else if (mediaType === 'link') {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType: 'link',
+            linkUrl: linkUrl.trim(),
+          });
+        } else if (mediaType === 'contact') {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType: 'contact',
+            btnTitle: btnTitle.trim(),
+            btnFooter: btnFooter.trim(),
+          });
+        } else if (mediaType === 'list' && isApiEvoGo) {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType: 'list',
+            title: btnTitle.trim(),
+            btnTitle: 'Selecionar',
+            btnFooter: btnFooter.trim(),
+            buttons: listSections as unknown as Message['buttons'],
+          });
+        } else if (mediaType === 'carousel' && isApiEvoGo) {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType: 'carousel',
+            buttons: carouselCards as unknown as Message['buttons'],
+          });
+        } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+          addRichMessage({
+            content: newMessage.trim(),
+            mediaType,
+            mediaUrl: mediaUrl.trim(),
+            mediaCaption: newMessage.trim(),
+            mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+            buttons: cleanButtons,
+          });
+        } else {
+          addMessage(newMessage.trim(), {
+            mediaType,
+            mediaUrl: mediaType !== 'text' ? mediaUrl.trim() : undefined,
+            mediaCaption: mediaType !== 'text' ? newMessage.trim() : undefined,
+            mediaFilename: mediaType === 'document' ? mediaFilename.trim() || undefined : undefined,
+          });
+        }
       toast.success('Mensagem adicionada');
     }
 
