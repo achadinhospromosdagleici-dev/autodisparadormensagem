@@ -29,7 +29,7 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
   if (!cleaned) {
     return {
       isValid: false,
-      formatted: phone,
+      formatted: '',
       errorMessage: 'Número vazio',
     };
   }
@@ -37,7 +37,7 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
   if (cleaned.length < 8) {
     return {
       isValid: false,
-      formatted: phone,
+      formatted: cleaned,
       errorMessage: 'Número muito curto',
     };
   }
@@ -45,7 +45,7 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
   if (cleaned.length > 15) {
     return {
       isValid: false,
-      formatted: phone,
+      formatted: cleaned,
       errorMessage: 'Número muito longo',
     };
   }
@@ -102,7 +102,7 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
       } else {
         return {
           isValid: false,
-          formatted: phone,
+          formatted: cleaned,
           errorMessage: 'Código de país não identificado',
         };
       }
@@ -115,14 +115,14 @@ export function validatePhoneNumber(phone: string, assumeAlreadyHasCountryCode =
     if (localNumber.length < pattern.minLength) {
       return {
         isValid: false,
-        formatted: phone,
+        formatted: cleaned,
         errorMessage: `Número muito curto para ${pattern.code}`,
       };
     }
     if (localNumber.length > pattern.maxLength) {
       return {
         isValid: false,
-        formatted: phone,
+        formatted: cleaned,
         errorMessage: `Número muito longo para ${pattern.code}`,
       };
     }
