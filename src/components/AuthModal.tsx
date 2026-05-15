@@ -90,6 +90,8 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
                   placeholder="Seu nome"
                   className="w-full pl-10 pr-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   required
+                  name="name"
+                  autoComplete="name"
                 />
               </div>
             </div>
@@ -106,6 +108,8 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
                 placeholder="seu@email.com"
                 className="w-full pl-10 pr-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
                 required
+                name="email"
+                autoComplete="email"
               />
             </div>
           </div>
@@ -122,6 +126,8 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
                 className="w-full pl-10 pr-10 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
                 required
                 minLength={6}
+                name="password"
+                autoComplete={isSignUp ? "new-password" : "current-password"}
               />
               <button
                 type="button"
@@ -146,6 +152,8 @@ export function AuthModal({ isOpen = true, onClose }: { isOpen?: boolean; onClos
                   className="w-full pl-10 pr-10 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
                   required
                   minLength={6}
+                  name="confirmPassword"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
