@@ -575,37 +575,26 @@ export async function sendInteractiveButtons(
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
-            // URL button - link customizado (não é wa.me, é qualquer URL)
-            let finalUrl = btn.url;
-            if (finalUrl.includes('wa.me/') || finalUrl.includes('api.whatsapp.com')) {
-              // Se for wa.me, limpa o número do telefone
-              const phoneMatch = finalUrl.match(/(?:wa\.me\/|phone=)(\+?\d+)/);
-              if (phoneMatch) {
-                const phone = phoneMatch[1].replace(/\D/g, '');
-                finalUrl = finalUrl.replace(phoneMatch[0], `wa.me/${phone}`);
-              }
-            }
+            // URL button - native cta_url
             return {
-              type: 'URL',
+              type: 'cta_url',
               url: {
-                url: finalUrl,
+                title: btn.title,
+                link: btn.url,
               },
-              title: btn.title,
             };
           } else if (btn.phone) {
-            // Phone button - gera link wa.me
+            // Phone button - native cta_call
             let phoneNum = btn.phone.replace(/\D/g, '');
             if (phoneNum.length > 0 && !phoneNum.startsWith('55') && phoneNum.length <= 11) {
               phoneNum = '55' + phoneNum;
             }
-            const waMeUrl = `https://wa.me/${phoneNum}`;
-            console.log('[unoapi] Phone button wa.me URL:', waMeUrl);
             return {
-              type: 'URL',
-              url: {
-                url: waMeUrl,
+              type: 'cta_call',
+              call: {
+                title: btn.title,
+                phone_number: `+${phoneNum}`,
               },
-              title: btn.title,
             };
           } else if (btn.reply) {
             // Reply button - envia o texto quando clicado
