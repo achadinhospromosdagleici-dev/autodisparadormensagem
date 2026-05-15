@@ -140,12 +140,23 @@ export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () =
                     </td>
                     <td className="px-6 py-6">
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                        campaign.status === 'running' 
-                          ? 'bg-success/10 text-success border-success/20' 
-                          : 'bg-warning/10 text-warning border-warning/20'
+                        campaign.status === 'running' ? 'bg-success/10 text-success border-success/20' :
+                        campaign.status === 'completed' ? 'bg-primary/10 text-primary border-primary/20' :
+                        campaign.status === 'error' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                        'bg-warning/10 text-warning border-warning/20'
                       }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${campaign.status === 'running' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-                        {campaign.status === 'running' ? 'Andamento' : 'Pausado'}
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          campaign.status === 'running' ? 'bg-success animate-pulse' : 
+                          campaign.status === 'completed' ? 'bg-primary' : 
+                          campaign.status === 'error' ? 'bg-destructive' : 
+                          'bg-warning'
+                        }`} />
+                        {
+                          campaign.status === 'running' ? 'Andamento' : 
+                          campaign.status === 'completed' ? 'Concluído' : 
+                          campaign.status === 'error' ? 'Erro' : 
+                          'Pausado'
+                        }
                       </span>
                     </td>
                     <td className="px-6 py-6 text-[10px] text-muted-foreground font-medium uppercase tracking-widest">
@@ -154,14 +165,16 @@ export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () =
                     </td>
                     <td className="px-6 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => updateActiveCampaign(campaign.id, { status: campaign.status === 'running' ? 'paused' : 'running' })}
-                          className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
-                            campaign.status === 'running' ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground'
-                          }`}
-                        >
-                          {campaign.status === 'running' ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                        </button>
+                        {campaign.status === 'running' || campaign.status === 'paused' ? (
+                          <button 
+                            onClick={() => updateActiveCampaign(campaign.id, { status: campaign.status === 'running' ? 'paused' : 'running' })}
+                            className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
+                              campaign.status === 'running' ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground'
+                            }`}
+                          >
+                            {campaign.status === 'running' ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+                          </button>
+                        ) : null}
                         <button 
                           onClick={() => removeActiveCampaign(campaign.id)}
                           className="p-2.5 rounded-xl bg-muted/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"

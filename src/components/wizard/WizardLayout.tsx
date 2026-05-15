@@ -46,7 +46,7 @@ export function WizardLayout() {
     scheduledCampaigns, addScheduledCampaign, cancelScheduledCampaign,
     metrics, getValidCount, addMessage, campaignHistory,
     activeCampaigns, updateActiveCampaign, removeActiveCampaign,
-    currentStep, clearWizard
+    currentStep, clearWizard, reuseCampaign
   } = useWizard();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [currentView, setCurrentView] = useState<AppView>('home');
@@ -147,7 +147,9 @@ export function WizardLayout() {
               <h1 className="text-2xl font-bold">Histórico de Campanhas</h1>
               <p className="text-sm text-muted-foreground">Todas as campanhas enviadas</p>
             </div>
-            <CampaignHistory campaigns={campaignHistory} onReuse={() => {}} />
+            <div className="lg:col-span-12">
+              <CampaignHistory campaigns={campaignHistory} onReuse={reuseCampaign} />
+            </div>
           </div>
         );
 
