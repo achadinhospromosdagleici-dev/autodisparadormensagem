@@ -697,6 +697,7 @@ export async function sendCarouselMessage(
     buttons: Array<{ id: string; title: string; url?: string; phone?: string; reply?: string; copy?: string }>;
   }>
 ): Promise<any> {
+  console.log('[unoapi] sendCarouselMessage payload:', JSON.stringify(cards, null, 2));
   const payload: any = {
     messaging_product: 'whatsapp',
     to,
