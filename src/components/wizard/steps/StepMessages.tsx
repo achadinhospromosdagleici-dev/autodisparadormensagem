@@ -131,8 +131,11 @@ export function StepMessages() {
     }
     if (mediaType === 'carousel') {
       if (carouselCards.length === 0) { toast.error('Adicione pelo menos um card'); return; }
-      const invalidCard = carouselCards.find(c => !c.title.trim());
-      if (invalidCard) { toast.error('Cada card precisa de um título'); return; }
+      const invalidCard = carouselCards.find(c => !c.title?.trim() || !c.buttons || c.buttons.length === 0);
+      if (invalidCard) { toast.error('Cada card precisa de um título e pelo menos um botão'); return; }
+      
+      const invalidBtn = carouselCards.some(c => c.buttons.some(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim())));
+      if (invalidBtn) { toast.error('Preencha o texto e o valor de todos os botões do carrossel'); return; }
     }
     if (['image', 'video', 'sticker', 'document'].includes(mediaType) && buttons.length > 0) {
       const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
