@@ -42,9 +42,9 @@ export interface Message {
 
 export interface MessageButton {
   id: string;
-  type: 'url' | 'phone' | 'reply';
+  type: 'url' | 'phone' | 'reply' | 'copy';
   label: string;          // Texto do botão (max 20 chars recomendado)
-  value: string;          // URL, telefone (com DDI) ou ID de resposta
+  value: string;          // URL, telefone (com DDI), ID de resposta, ou texto para copiar
 }
 
 export interface Instance {

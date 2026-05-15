@@ -43,7 +43,7 @@ export interface MediaAttachment {
 export interface UnoApiMessage {
   content: string;
   media?: MediaAttachment;
-  buttons?: Array<{ id: string; title: string; url?: string; phone?: string; contactName?: string }>;
+  buttons?: Array<{ id: string; title: string; url?: string; phone?: string; reply?: string; copy?: string; contactName?: string }>;
   list?: {
     buttonText: string;
     sections: Array<{
@@ -51,6 +51,13 @@ export interface UnoApiMessage {
       rows: Array<{ id: string; title: string; description?: string }>;
     }>;
   };
+  carousel?: Array<{
+    image?: string;
+    title: string;
+    description: string;
+    footer?: string;
+    buttons: Array<{ id: string; title: string; url?: string; phone?: string; reply?: string; copy?: string }>;
+  }>;
   header?: string;
   footer?: string;
 }
@@ -596,6 +603,15 @@ export async function sendInteractiveButtons(
                 phone_number: `+${phoneNum}`,
               },
             };
+          } else if (btn.copy) {
+            // Copy button - native cta_copy
+            return {
+              type: 'cta_copy',
+              copy_code: {
+                title: btn.title,
+                code: btn.copy,
+              },
+            };
           } else if (btn.reply) {
             // Reply button - envia o texto quando clicado
             return {
@@ -716,6 +732,105 @@ export async function sendInteractiveList(
   }
 }
 
+// Send interactive carousel message
+export async function sendCarouselMessage(
+  creds: UnoApiCredentials,
+  phoneNumberId: string,
+  to: string,
+  body: string,
+  cards: Array<{
+    image?: string;
+    title: string;
+    description: string;
+    footer?: string;
+    buttons: Array<{ id: string; title: string; url?: string; phone?: string; reply?: string; copy?: string }>;
+  }>
+): Promise<any> {
+  const payload: any = {
+    messaging_product: 'whatsapp',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'carousel',
+      body: { text: body },
+      action: {
+        cards: cards.map((card, index) => {
+          const cardPayload: any = {
+            card_index: index,
+            body: { text: card.description || ' ' },
+            action: {
+              buttons: card.buttons.map(btn => {
+                if (btn.url) {
+                  return {
+                    type: 'cta_url',
+                    url: {
+                      title: btn.title,
+                      link: btn.url,
+                    },
+                  };
+                } else if (btn.phone) {
+                  let phoneNum = btn.phone.replace(/\D/g, '');
+                  if (phoneNum.length > 0 && !phoneNum.startsWith('55') && phoneNum.length <= 11) {
+                    phoneNum = '55' + phoneNum;
+                  }
+                  return {
+                    type: 'cta_call',
+                    call: {
+                      title: btn.title,
+                      phone_number: `+${phoneNum}`,
+                    },
+                  };
+                } else if (btn.copy) {
+                  return {
+                    type: 'cta_copy',
+                    copy_code: {
+                      title: btn.title,
+                      code: btn.copy,
+                    },
+                  };
+                } else {
+                  return {
+                    type: 'reply',
+                    reply: {
+                      id: btn.id || crypto.randomUUID().toString(),
+                      title: btn.reply || btn.title,
+                    },
+                  };
+                }
+              }),
+            },
+          };
+
+          if (card.image) {
+            cardPayload.header = {
+              type: 'image',
+              image: { link: card.image },
+            };
+          }
+
+          return cardPayload;
+        }),
+      },
+    },
+  };
+
+  try {
+    return await proxySendMessage(creds, phoneNumberId, payload);
+  } catch (err) {
+    console.warn('[unoapi] Proxy failed for carousel, trying direct fetch:', err);
+    const res = await fetch(buildApiUrl(creds.baseUrl, phoneNumberId), {
+      method: 'POST',
+      headers: getHeaders(creds.token),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.text();
+      throw new Error(`Erro ao enviar carrossel: ${res.status} - ${errorData}`);
+    }
+    return await res.json();
+  }
+}
+
 // Generic send based on media type
 export async function sendUnoApiMessage(
   creds: UnoApiCredentials,
@@ -747,6 +862,17 @@ export async function sendUnoApiMessage(
       message.list.sections,
       message.header,
       message.footer
+    );
+  }
+
+  // Check for interactive carousel
+  if (message.carousel) {
+    return sendCarouselMessage(
+      creds,
+      phoneNumberId,
+      to,
+      message.content,
+      message.carousel
     );
   }
 

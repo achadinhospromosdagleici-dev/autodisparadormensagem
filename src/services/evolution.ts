@@ -175,7 +175,7 @@ export interface EvolutionMessage {
   // Para buttons:
   title?: string;
   footer?: string;
-  buttons?: { type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  buttons?: { type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }[];
   // Para link:
   linkUrl?: string;
   // Para contact:

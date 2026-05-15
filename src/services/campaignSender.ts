@@ -130,7 +130,7 @@ export interface CampaignMessage {
   footer?: string;
   btnTitle?: string;
   btnFooter?: string;
-  buttons?: { id: string; type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+  buttons?: { id: string; type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }[];
   // Para tipo 'link'
   linkUrl?: string;
   // Para tipo 'list' (Evolution Go)
@@ -141,7 +141,7 @@ export interface CampaignMessage {
     title?: string;
     description?: string;
     footer?: string;
-    buttons?: { id: string; type: 'url' | 'phone' | 'reply'; label: string; value: string }[];
+    buttons?: { id: string; type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }[];
   }[];
 }
 
@@ -391,6 +391,13 @@ export async function sendCampaign(
                   title: b.label,
                   reply: b.label,
                 };
+              } else if (b.type === 'copy') {
+                // Copy button - native cta_copy
+                return {
+                  id: b.id,
+                  title: b.label,
+                  copy: replaceButtonValue(b.value, contact),
+                };
               } else {
                 return {
                   id: b.id,
@@ -400,7 +407,7 @@ export async function sendCampaign(
             }).filter(b => b !== null) || [];
             
             if (interactiveButtons.length > 0) {
-              unoMsg.buttons = interactiveButtons as Array<{ id: string; title: string; url?: string; phone?: string; reply?: string }>;
+              unoMsg.buttons = interactiveButtons as Array<{ id: string; title: string; url?: string; phone?: string; reply?: string; copy?: string }>;
               if (msg.title) unoMsg.header = msg.title;
               if (msg.footer) unoMsg.footer = msg.footer;
             }
@@ -427,6 +434,37 @@ export async function sendCampaign(
             // For UnoAPI, media.type = 'contact' triggers sendContactMessage
             unoMsg.media = { type: 'contact' };
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+          } else if (msg.mediaType === 'list' && msg.sections && msg.sections.length > 0) {
+            unoMsg.list = {
+              buttonText: msg.btnTitle || 'Opções',
+              sections: msg.sections.map(s => ({
+                title: s.title,
+                rows: s.rows.map(r => ({
+                  id: r.id || crypto.randomUUID(),
+                  title: r.title,
+                  description: r.description,
+                })),
+              })),
+            };
+            if (msg.title) unoMsg.header = msg.title;
+            if (msg.footer) unoMsg.footer = msg.footer;
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+          } else if (msg.mediaType === 'carousel' && msg.cards && msg.cards.length > 0) {
+            unoMsg.carousel = msg.cards.map(card => ({
+              image: card.image,
+              title: card.title || '',
+              description: card.description || '',
+              footer: card.footer,
+              buttons: card.buttons?.map(b => ({
+                id: b.id,
+                title: b.label,
+                url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : undefined,
+                phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
+                reply: b.type === 'reply' ? b.label : undefined,
+                copy: b.type === 'copy' ? replaceButtonValue(b.value, contact) : undefined,
+              })).filter(b => !!b.title) || [],
+            }));
+            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
             const hasButtons = msg.buttons && msg.buttons.length > 0;
@@ -444,6 +482,7 @@ export async function sendCampaign(
                   title: b.label,
                   url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : undefined,
                   phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
+                  copy: b.type === 'copy' ? replaceButtonValue(b.value, contact) : undefined,
                 })),
                 undefined,
                 msg.footer,

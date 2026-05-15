@@ -181,10 +181,10 @@ export interface EvolutionGoMessage {
   footer?: string;
   btnTitle?: string;
   btnFooter?: string;
-  buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }>;
+  buttons?: Array<{ type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }>;
   linkUrl?: string;
   sections?: Array<{ title: string; rows: Array<{ id?: string; title: string; description: string }> }>;
-  cards?: Array<{ image?: string; title?: string; description?: string; footer?: string; buttons?: Array<{ type: 'url' | 'phone' | 'reply'; label: string; value: string }> }>;
+  cards?: Array<{ image?: string; title?: string; description?: string; footer?: string; buttons?: Array<{ type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }> }>;
   // Para contact:
   contactName?: string;
   contactNumber?: string;

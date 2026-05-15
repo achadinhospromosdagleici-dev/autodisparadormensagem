@@ -246,10 +246,10 @@ return result;
     if (showAllOptions) return true;
     // Buttons - UNOAPI and Evolution Go only (NOT Evolution API Node)
     if (type === 'buttons') return isApiUno || isApiEvoGo;
-    // List - only Evolution Go
-    if (type === 'list') return isApiEvoGo;
-    // Carousel - only Evolution Go
-    if (type === 'carousel') return isApiEvoGo;
+    // List - Evolution Go and UNOAPI
+    if (type === 'list') return isApiEvoGo || isApiUno;
+    // Carousel - Evolution Go and UNOAPI
+    if (type === 'carousel') return isApiEvoGo || isApiUno;
     // Contact (vCard) - only UNOAPI
     if (type === 'contact') return isApiUno;
     // Link - supported by all
@@ -274,8 +274,8 @@ return result;
     ...(showAllOptions || isApiUno ? [
       { type: 'contact' as EditorMediaType, icon: Phone, label: 'Contato' },
     ] : []),
-    // Lista e Carrossel - só Evolution Go (ou todas se não hay API)
-    ...(showAllOptions || isApiEvoGo ? [
+    // Lista e Carrossel - Evolution Go e UNOAPI (ou todas se não hay API)
+    ...(showAllOptions || isApiEvoGo || isApiUno ? [
       { type: 'list' as EditorMediaType, icon: List, label: 'Lista' },
       { type: 'carousel' as EditorMediaType, icon: LayoutGrid, label: 'Carrossel' },
     ] : []),
@@ -510,6 +510,7 @@ return result;
                             <option value="url">🔗 URL</option>
                             <option value="phone">📞 Telefone</option>
                             <option value="reply">💬 Resposta</option>
+                            <option value="copy">📋 Copiar Texto</option>
                           </select>
                           <input
                             type="text"
@@ -533,14 +534,14 @@ return result;
                         </div>
                         {btn.type !== 'reply' && (
                           <input
-                            type={btn.type === 'phone' ? 'tel' : 'url'}
+                            type={btn.type === 'phone' ? 'tel' : btn.type === 'url' ? 'url' : 'text'}
                             value={btn.value}
                             onChange={(e) => {
                               const next = [...buttons];
                               next[idx] = { ...btn, value: e.target.value };
                               setButtons(next);
                             }}
-                            placeholder={btn.type === 'url' ? 'https://seusite.com/oferta' : '+5511999999999'}
+                            placeholder={btn.type === 'url' ? 'https://seusite.com/oferta' : btn.type === 'copy' ? 'Texto para copiar' : '+5511999999999'}
                             className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                           />
                         )}
@@ -818,7 +819,7 @@ return result;
             )}
 
             {/* Carousel editor - only for Evolution Go */}
-            {mediaType === 'carousel' && isApiEvoGo && (
+            {(mediaType === 'carousel') && (isApiEvoGo || isApiUno) && (
               <div className="space-y-3 animate-fade-in">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -920,6 +921,7 @@ return result;
                             <option value="reply">Resposta</option>
                             <option value="url">URL</option>
                             <option value="phone">Telefone</option>
+                            <option value="copy">Copiar Texto</option>
                           </select>
                           <input
                             type="text"
