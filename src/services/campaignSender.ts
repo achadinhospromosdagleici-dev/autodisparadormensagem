@@ -434,12 +434,13 @@ export async function sendCampaign(
             // For UnoAPI, media.type = 'contact' triggers sendContactMessage
             unoMsg.media = { type: 'contact' };
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
-          } else if (msg.mediaType === 'list' && msg.sections && msg.sections.length > 0) {
+          } else if (msg.mediaType === 'list' && (msg.buttons || msg.sections)) {
+            const sections = msg.sections || msg.buttons;
             unoMsg.list = {
               buttonText: msg.btnTitle || 'Opções',
-              sections: msg.sections.map(s => ({
+              sections: (sections as any[]).map(s => ({
                 title: s.title,
-                rows: s.rows.map(r => ({
+                rows: s.rows.map((r: any) => ({
                   id: r.id || crypto.randomUUID(),
                   title: r.title,
                   description: r.description,
@@ -449,25 +450,26 @@ export async function sendCampaign(
             if (msg.title) unoMsg.header = msg.title;
             if (msg.footer) unoMsg.footer = msg.footer;
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
-          } else if (msg.mediaType === 'carousel' && msg.cards && msg.cards.length > 0) {
-            unoMsg.carousel = msg.cards.map(card => ({
+          } else if (msg.mediaType === 'carousel' && (msg.buttons || msg.cards)) {
+            const cards = msg.cards || msg.buttons;
+            unoMsg.carousel = (cards as any[]).map(card => ({
               image: card.image,
               title: card.title || '',
               description: card.description || '',
               footer: card.footer,
-              buttons: card.buttons?.map(b => ({
+              buttons: card.buttons?.map((b: any) => ({
                 id: b.id,
                 title: b.label,
                 url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : undefined,
                 phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
                 reply: b.type === 'reply' ? b.label : undefined,
                 copy: b.type === 'copy' ? replaceButtonValue(b.value, contact) : undefined,
-              })).filter(b => !!b.title) || [],
+              })).filter((b: any) => !!b.title) || [],
             }));
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
-            const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'document';
-            const hasButtons = msg.buttons && msg.buttons.length > 0;
+            const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'sticker' | 'document';
+            const hasButtons = msg.buttons && msg.buttons.length > 0 && mt !== 'sticker';
 
             if (hasButtons && (mt === 'image' || mt === 'video' || mt === 'document')) {
               // Mídia + botões → interactive com header de mídia
@@ -486,10 +488,10 @@ export async function sendCampaign(
                 })),
                 undefined,
                 msg.footer,
-                { type: mt, url: msg.mediaUrl, filename: msg.mediaFilename },
+                { type: mt as any, url: msg.mediaUrl, filename: msg.mediaFilename },
               );
             } else {
-              // Mídia simples (sem botões) ou áudio
+              // Mídia simples (sem botões) ou áudio ou figurinha
               unoMsg.media = {
                 type: mt,
                 url: msg.mediaUrl,

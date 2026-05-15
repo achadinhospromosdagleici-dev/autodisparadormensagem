@@ -136,9 +136,14 @@ export function StepMessages() {
 
       updateRichMessage(editingMessageId, {
         ...baseData,
-        buttons: buttons.length > 0 ? cleanButtons : undefined,
+        buttons: mediaType === 'carousel' 
+          ? (carouselCards as unknown as Message['buttons'])
+          : mediaType === 'list'
+            ? (listSections as unknown as Message['buttons'])
+            : buttons.length > 0 ? cleanButtons : undefined,
         btnTitle: mediaType === 'buttons' || mediaType === 'contact' ? btnTitle.trim() : undefined,
-        btnFooter: mediaType === 'buttons' || mediaType === 'contact' ? btnFooter.trim() : undefined,
+        title: mediaType === 'list' ? btnTitle.trim() : undefined,
+        btnFooter: mediaType === 'buttons' || mediaType === 'contact' || mediaType === 'list' ? btnFooter.trim() : undefined,
         linkUrl: mediaType === 'link' ? linkUrl.trim() : undefined,
       });
       toast.success('Mensagem atualizada');
@@ -174,7 +179,7 @@ export function StepMessages() {
             btnTitle: btnTitle.trim(),
             btnFooter: btnFooter.trim(),
           });
-        } else if (mediaType === 'list' && isApiEvoGo) {
+        } else if (mediaType === 'list') {
           addRichMessage({
             content: newMessage.trim(),
             mediaType: 'list',
@@ -183,7 +188,7 @@ export function StepMessages() {
             btnFooter: btnFooter.trim(),
             buttons: listSections as unknown as Message['buttons'],
           });
-        } else if (mediaType === 'carousel' && isApiEvoGo) {
+        } else if (mediaType === 'carousel') {
           addRichMessage({
             content: newMessage.trim(),
             mediaType: 'carousel',
@@ -1187,10 +1192,17 @@ return result;
                           setMediaType(msg.mediaType || 'text');
                           setMediaUrl(msg.mediaUrl || '');
                           setMediaFilename(msg.mediaFilename || '');
-                          setBtnTitle(msg.btnTitle || '');
+                          setBtnTitle(msg.mediaType === 'list' ? msg.title || '' : msg.btnTitle || '');
                           setBtnFooter(msg.btnFooter || '');
-                          setButtons(msg.buttons || []);
+                          setButtons(msg.mediaType === 'buttons' || ['image', 'video', 'sticker', 'document'].includes(msg.mediaType!) ? msg.buttons || [] : []);
                           setLinkUrl(msg.linkUrl || '');
+                          
+                          if (msg.mediaType === 'carousel') {
+                            setCarouselCards(msg.buttons as any || []);
+                          } else if (msg.mediaType === 'list') {
+                            setListSections(msg.buttons as any || []);
+                          }
+                          
                           toast.info('Modo de edição ativado');
                         }}
                         className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
