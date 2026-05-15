@@ -26,6 +26,7 @@ import {
   GitBranch,
   List,
   LayoutGrid,
+  Smile,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
