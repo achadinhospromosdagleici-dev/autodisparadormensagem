@@ -15,11 +15,11 @@ export default defineConfig(({ mode }) => ({
     // Local proxy to replace Supabase Edge Functions during dev
     {
       name: "local-proxy",
-      configureServer(server) {
-        server.middlewares.use("/api/proxy", async (req, res, next) => {
+      configureServer(server: any) {
+        server.middlewares.use("/api/proxy", async (req: any, res: any, next: any) => {
           if (req.method !== "POST") return next();
           let raw = "";
-          req.on("data", (chunk) => (raw += chunk));
+          req.on("data", (chunk: any) => (raw += chunk));
           req.on("end", async () => {
             try {
               const { baseUrl, token, endpoint, method, body } = JSON.parse(raw);
