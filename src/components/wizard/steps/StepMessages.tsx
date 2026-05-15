@@ -449,6 +449,58 @@ return result;
                     Cole uma URL ou clique em <strong>Upload</strong> para enviar do seu computador (máx. 25MB).
                   </p>
                 </div>
+
+                {/* Media Preview */}
+                {mediaUrl && (
+                  <div className="relative rounded-xl overflow-hidden border border-border/50 bg-muted/30 group animate-in fade-in zoom-in duration-300">
+                    {mediaType === 'image' && (
+                      <div className="flex items-center justify-center bg-black/5 dark:bg-white/5">
+                        <img 
+                          src={mediaUrl} 
+                          alt="Preview" 
+                          className="w-full h-auto max-h-[250px] object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=Erro+ao+carregar+imagem';
+                          }}
+                        />
+                      </div>
+                    )}
+                    {mediaType === 'video' && (
+                      <video src={mediaUrl} controls className="w-full h-auto max-h-[250px]" />
+                    )}
+                    {mediaType === 'audio' && (
+                      <div className="p-4 flex flex-col gap-2 bg-muted/40">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Music className="w-3.5 h-3.5" />
+                          <span>Prévia do Áudio</span>
+                        </div>
+                        <audio src={mediaUrl} controls className="w-full h-10" />
+                      </div>
+                    )}
+                    {mediaType === 'document' && (
+                      <div className="p-4 flex items-center gap-3 bg-muted/40">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <p className="text-sm font-medium truncate">{mediaFilename || 'Documento selecionado'}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{mediaUrl}</p>
+                        </div>
+                      </div>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setMediaUrl('');
+                        setMediaFilename('');
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-destructive/80 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive shadow-lg backdrop-blur-sm"
+                      title="Remover mídia"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {mediaType === 'document' && (
                   <div className="space-y-1.5">
                     <label className="text-xs text-muted-foreground font-medium">Nome do arquivo (opcional)</label>
@@ -856,6 +908,29 @@ return result;
                         className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
                       />
 
+                      {card.image && (
+                        <div className="relative mt-1 mb-1 rounded-md overflow-hidden border border-border/30 bg-muted/20 h-24 flex items-center justify-center group">
+                          <img 
+                            src={card.image} 
+                            alt="Card preview" 
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150x100?text=Erro+Imagem'; }}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const next = [...carouselCards];
+                              next[cIdx].image = '';
+                              setCarouselCards(next);
+                            }}
+                            className="absolute top-1 right-1 p-1 rounded-full bg-destructive/80 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                            title="Remover imagem"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+
                       <input
                         type="text"
                         value={card.title}
@@ -1097,9 +1172,37 @@ return result;
                     </div>
                   </div>
                   {msg.mediaUrl && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                      <Link className="w-3 h-3 shrink-0" /> {msg.mediaUrl}
-                    </p>
+                    <div className="space-y-1.5 mt-2">
+                      {msg.mediaType === 'image' && (
+                        <div className="w-32 h-20 rounded-lg overflow-hidden border border-border/30 bg-muted/20">
+                          <img 
+                            src={msg.mediaUrl} 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150x100?text=Erro+Imagem'; }}
+                          />
+                        </div>
+                      )}
+                      {msg.mediaType === 'video' && (
+                        <div className="w-32 h-20 rounded-lg overflow-hidden border border-border/30 bg-muted/20 flex items-center justify-center">
+                          <Video className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      {msg.mediaType === 'audio' && (
+                        <div className="w-full max-w-[200px] h-8 rounded-full overflow-hidden border border-border/30 bg-muted/20 flex items-center px-3 gap-2">
+                          <Music className="w-3 h-3 text-muted-foreground" />
+                          <div className="flex-1 h-1 bg-muted-foreground/20 rounded-full" />
+                        </div>
+                      )}
+                      {msg.mediaType === 'document' && (
+                        <div className="flex items-center gap-2 p-1.5 rounded-lg border border-border/30 bg-muted/20 max-w-xs">
+                          <FileText className="w-4 h-4 text-primary" />
+                          <span className="text-[10px] font-medium truncate">{msg.mediaFilename || 'Documento'}</span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1 truncate opacity-70">
+                        <Link className="w-2.5 h-2.5 shrink-0" /> {msg.mediaUrl}
+                      </p>
+                    </div>
                   )}
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-3">
                     {msg.content}
