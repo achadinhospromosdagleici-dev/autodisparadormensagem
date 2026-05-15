@@ -452,21 +452,27 @@ export async function sendCampaign(
             await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
           } else if (msg.mediaType === 'carousel' && (msg.buttons || msg.cards)) {
             const cards = msg.cards || msg.buttons;
-            unoMsg.carousel = (cards as any[]).map(card => ({
-              image: card.image,
-              title: card.title || '',
-              description: card.description || '',
-              footer: card.footer,
-              buttons: card.buttons?.map((b: any) => ({
-                id: b.id,
-                title: b.label,
-                url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value, contact)) : undefined,
-                phone: b.type === 'phone' ? replaceButtonValue(b.value, contact).replace(/\D/g, '') : undefined,
-                reply: b.type === 'reply' ? b.label : undefined,
-                copy: b.type === 'copy' ? replaceButtonValue(b.value, contact) : undefined,
-              })).filter((b: any) => !!b.title) || [],
-            }));
-            await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            if (Array.isArray(cards)) {
+              unoMsg.carousel = cards.map(card => ({
+                image: card.image,
+                title: card.title || '',
+                description: card.description || '',
+                footer: card.footer,
+                buttons: card.buttons?.map((b: any) => ({
+                  id: b.id || crypto.randomUUID(),
+                  title: b.label || b.title || '',
+                  url: b.type === 'url' ? sanitizeWaMeUrl(replaceButtonValue(b.value || b.url || '', contact)) : undefined,
+                  phone: b.type === 'phone' ? replaceButtonValue(b.value || b.phone || '', contact).replace(/\D/g, '') : undefined,
+                  reply: b.type === 'reply' ? (b.label || b.reply || '') : undefined,
+                  copy: b.type === 'copy' ? replaceButtonValue(b.value || b.copy || '', contact) : undefined,
+                })).filter((b: any) => !!b.title) || [],
+              }));
+              console.log('[campaignSender] Sending Carousel via UnoAPI:', JSON.stringify(unoMsg.carousel, null, 2));
+              await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            } else {
+              console.warn('[campaignSender] Carousel cards is not an array:', cards);
+              await sendUnoApiMessage(unoCreds, senderName, phoneNumber, unoMsg);
+            }
           } else if (msg.mediaType && msg.mediaType !== 'text' && msg.mediaUrl) {
             const mt = msg.mediaType as 'image' | 'audio' | 'video' | 'sticker' | 'document';
             const hasButtons = msg.buttons && msg.buttons.length > 0 && mt !== 'sticker';
