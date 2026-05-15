@@ -578,7 +578,7 @@ export async function sendInteractiveButtons(
     type: 'interactive',
     interactive: {
       type: 'button',
-      body: { text: body },
+      body: { text: body || ' ' },
       action: {
         buttons: buttons.map(btn => {
           if (btn.url) {
@@ -693,7 +693,7 @@ export async function sendInteractiveList(
     type: 'interactive',
     interactive: {
       type: 'list',
-      body: { text: body },
+      body: { text: body || ' ' },
       action: {
         button: buttonText,
         sections: sections.map(section => ({
@@ -752,7 +752,7 @@ export async function sendCarouselMessage(
     type: 'interactive',
     interactive: {
       type: 'carousel',
-      body: { text: body },
+      body: { text: body || ' ' },
       action: {
         cards: cards.map((card, index) => {
           const cardPayload: any = {
