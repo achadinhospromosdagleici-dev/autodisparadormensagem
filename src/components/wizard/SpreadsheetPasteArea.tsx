@@ -272,8 +272,8 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
     });
   }, [onDataPaste, onProcess]);
 
-  // Auto-process data removed to prioritize manual button click
-  /*
+  // Auto-process data on changes to keep parent state in sync
+  const prevCellsRef = useRef<string[][] | null>(null);
   useEffect(() => {
     if (prevCellsRef.current !== null) {
       const hasChanges = JSON.stringify(prevCellsRef.current) !== JSON.stringify(cells);
@@ -284,7 +284,6 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
     }
     prevCellsRef.current = cells;
   }, [cells, hasData, onDataPaste]);
-  */
 
   return (
     <div 

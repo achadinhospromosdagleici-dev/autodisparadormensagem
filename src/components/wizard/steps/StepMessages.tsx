@@ -1248,7 +1248,7 @@ return result;
             ) : (
               <>
                 {/* Preview current input */}
-                {newMessage && (
+                {(newMessage || mediaUrl) && (
                   <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
                     <p className="text-xs text-primary mb-2 font-medium">
                       Nova mensagem (prévia) {mediaType !== 'text' && `• ${mediaIcon(mediaType)} ${mediaType}`}
@@ -1374,8 +1374,24 @@ return result;
                       Mensagem {index + 1} {msg.mediaType && msg.mediaType !== 'text' && `• ${mediaIcon(msg.mediaType)} ${msg.mediaType}`}
                     </p>
                     {msg.mediaUrl && (
-                      <div className="mb-2 p-2 rounded-lg bg-muted/30 text-xs text-muted-foreground flex items-center gap-1">
-                        <Link className="w-3 h-3 shrink-0" /> {msg.mediaUrl}
+                      <div className="mb-3 space-y-2">
+                        {msg.mediaType === 'image' && (
+                          <img
+                            src={msg.mediaUrl}
+                            alt="Mídia"
+                            className="w-full max-h-48 object-contain rounded-lg border border-border/50 bg-muted/30"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        {msg.mediaType === 'video' && (
+                          <video src={msg.mediaUrl} controls className="w-full max-h-40 rounded-lg border border-border/50 bg-muted/30" />
+                        )}
+                        {msg.mediaType === 'audio' && (
+                          <audio src={msg.mediaUrl} controls className="w-full h-8" />
+                        )}
+                        <div className="p-2 rounded-lg bg-muted/30 text-[10px] text-muted-foreground flex items-center gap-1 truncate opacity-70">
+                          <Link className="w-2.5 h-2.5 shrink-0" /> {msg.mediaUrl}
+                        </div>
                       </div>
                     )}
                     {msg.mediaType === 'buttons' && msg.mediaCaption && (
