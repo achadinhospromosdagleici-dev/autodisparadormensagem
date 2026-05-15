@@ -197,6 +197,71 @@ export type Database = {
         }
         Relationships: []
       }
+      link_clicks: {
+        Row: {
+          browser: string | null
+          city: string | null
+          clicked_at: string
+          country: string | null
+          country_code: string | null
+          device: string | null
+          id: string
+          ip: string | null
+          link_id: string
+          os: string | null
+          referrer: string | null
+          region: string | null
+          user_agent: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          clicked_at?: string
+          country?: string | null
+          country_code?: string | null
+          device?: string | null
+          id?: string
+          ip?: string | null
+          link_id: string
+          os?: string | null
+          referrer?: string | null
+          region?: string | null
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          clicked_at?: string
+          country?: string | null
+          country_code?: string | null
+          device?: string | null
+          id?: string
+          ip?: string | null
+          link_id?: string
+          os?: string | null
+          referrer?: string | null
+          region?: string | null
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_clicks_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "short_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_library: {
         Row: {
           created_at: string
@@ -379,6 +444,45 @@ export type Database = {
         }
         Relationships: []
       }
+      short_links: {
+        Row: {
+          click_count: number
+          created_at: string
+          id: string
+          is_active: boolean
+          message: string | null
+          phone: string
+          slug: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          click_count?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          message?: string | null
+          phone: string
+          slug: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          click_count?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          message?: string | null
+          phone?: string
+          slug?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           id: string
@@ -543,6 +647,28 @@ export type Database = {
         Returns: boolean
       }
       is_trial_active: { Args: { _user_id: string }; Returns: boolean }
+      register_link_click: {
+        Args: {
+          p_browser: string
+          p_city: string
+          p_country: string
+          p_country_code: string
+          p_device: string
+          p_ip: string
+          p_os: string
+          p_referrer: string
+          p_region: string
+          p_slug: string
+          p_user_agent: string
+          p_utm_campaign: string
+          p_utm_medium: string
+          p_utm_source: string
+        }
+        Returns: {
+          message: string
+          phone: string
+        }[]
+      }
       register_user_instance: {
         Args: {
           p_instance_name: string

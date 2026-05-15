@@ -15,6 +15,7 @@ import { CampaignHistory } from './CampaignHistory';
 import { ActiveCampaigns } from './ActiveCampaigns';
 import { CampaignsHome } from './CampaignsHome';
 import { SuperAdminPanel } from './SuperAdminPanel';
+import { LinkGenerator } from './LinkGenerator';
 import { useAuth } from '@/contexts/AuthContext';
 import { Crown, Clock } from 'lucide-react';
 import {
@@ -163,6 +164,9 @@ export function WizardLayout() {
             <BlacklistManager />
           </div>
         );
+
+      case 'links':
+        return <LinkGenerator />;
 
       case 'home':
         return (
