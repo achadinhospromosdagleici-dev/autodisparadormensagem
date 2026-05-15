@@ -410,45 +410,26 @@ return result;
                           }
                           setUploading(true);
                           try {
-                            // Check if UnoAPI is connected with S3 enabled
-                            const unoCreds = loadUnoApiCredentials();
-                            const useS3 = unoCreds?.s3Enabled;
+                            // Upload to Supabase Storage (default - works with UnoAPI too!)
+                            console.log('[upload] Using Supabase Storage');
+                            const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
+                            const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
+                            const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBase}`;
                             
-                            if (useS3) {
-                              // Upload to S3 (via Edge Function)
-                              const s3Config = {
-                                endpoint: unoCreds.s3Endpoint || DEFAULT_S3_CONFIG.endpoint,
-                                accessKey: unoCreds.s3AccessKey || DEFAULT_S3_CONFIG.accessKey,
-                                secretKey: unoCreds.s3SecretKey || DEFAULT_S3_CONFIG.secretKey,
-                                bucket: unoCreds.s3Bucket || DEFAULT_S3_CONFIG.bucket,
-                                region: unoCreds.s3Region || DEFAULT_S3_CONFIG.region,
-                              };
-                              console.log('[upload] Using S3 upload for UnoAPI');
-                              const s3Url = await uploadToS3(file, s3Config);
-                              setMediaUrl(s3Url);
-                              toast.success('Arquivo enviado para S3! URL preenchida.');
-                            } else {
-                              // Upload to Supabase Storage (default - works with UnoAPI too!)
-                              console.log('[upload] Using Supabase Storage (default)');
-                              const ext = file.name.includes('.') ? file.name.split('.').pop() : '';
-                              const safeBase = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60);
-                              const path = `${mediaType}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeBase}`;
+                            const { error: upErr } = await supabase.storage
+                              .from('campaign-media')
+                              .upload(path, file, { contentType: file.type, upsert: false });
                               
-                              const { error: upErr } = await supabase.storage
-                                .from('campaign-media')
-                                .upload(path, file, { contentType: file.type, upsert: false });
-                                
-                              if (upErr) {
-                                if (upErr.message.includes('bucket not found') || upErr.message.includes('Bucket not found')) {
-                                  throw new Error('O bucket "campaign-media" não foi encontrado no Supabase. Por favor, execute o SQL de criação ou desative o S3.');
-                                }
-                                throw upErr;
+                            if (upErr) {
+                              if (upErr.message.includes('bucket not found') || upErr.message.includes('Bucket not found')) {
+                                throw new Error('O bucket "campaign-media" não foi encontrado no Supabase. Por favor, execute o SQL de criação.');
                               }
-                              
-                              const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
-                              setMediaUrl(pub.publicUrl);
-                              toast.success('Arquivo enviado com sucesso!');
+                              throw upErr;
                             }
+                            
+                            const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
+                            setMediaUrl(pub.publicUrl);
+                            toast.success('Arquivo enviado com sucesso!');
                             
                             if (mediaType === 'document' && !mediaFilename) {
                               setMediaFilename(file.name);
