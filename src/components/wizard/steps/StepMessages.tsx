@@ -58,7 +58,7 @@ export function StepMessages() {
   // Carousel editor state
   const [carouselCards, setCarouselCards] = useState<{ image?: string; title: string; description: string; footer?: string; buttons: MessageButton[] }[]>([]);
   const [showFollowUp, setShowFollowUp] = useState(false);
-  const [stickers, setStickers] = useState<{ id: string; url: string; name?: string }[]>([]);
+  const [stickers, setStickers] = useState<{ id: string; url: string; filename?: string }[]>([]);
 
   useEffect(() => {
     if (mediaType === 'sticker') {
@@ -72,15 +72,16 @@ export function StepMessages() {
       if (!user) return;
       
       const { data, error } = await supabase
-        .from('stickers')
+        .from('media_library')
         .select('*')
         .eq('user_id', user.id)
+        .eq('media_type', 'sticker')
         .order('created_at', { ascending: false });
         
       if (error) throw error;
       setStickers(data || []);
     } catch (err) {
-      console.error('[stickers-fetch]', err);
+      console.error('[media-library-fetch]', err);
     }
   };
 
@@ -467,14 +468,15 @@ return result;
                             const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
                             setMediaUrl(pub.publicUrl);
                             
-                            // Save to stickers gallery if it's a sticker
+                            // Save to media library if it's a sticker
                             if (mediaType === 'sticker') {
                               const { data: { user } } = await supabase.auth.getUser();
                               if (user) {
-                                await supabase.from('stickers').insert({
+                                await supabase.from('media_library').insert({
                                   user_id: user.id,
+                                  media_type: 'sticker',
                                   url: pub.publicUrl,
-                                  name: file.name
+                                  filename: file.name
                                 });
                                 fetchStickers();
                               }
