@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWizard, Message, MessageButton } from '@/contexts/WizardContext';
 import { FollowUpSettings } from '../FollowUpSettings';
 import {
@@ -58,6 +58,31 @@ export function StepMessages() {
   // Carousel editor state
   const [carouselCards, setCarouselCards] = useState<{ image?: string; title: string; description: string; footer?: string; buttons: MessageButton[] }[]>([]);
   const [showFollowUp, setShowFollowUp] = useState(false);
+  const [stickers, setStickers] = useState<{ id: string; url: string; name?: string }[]>([]);
+
+  useEffect(() => {
+    if (mediaType === 'sticker') {
+      fetchStickers();
+    }
+  }, [mediaType]);
+
+  const fetchStickers = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('stickers')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      setStickers(data || []);
+    } catch (err) {
+      console.error('[stickers-fetch]', err);
+    }
+  };
 
   const variables = columns.map((c) => `{{${c}}}`);
   if (columns.find((c) => c.toLowerCase() === 'nome')) {
@@ -438,6 +463,20 @@ return result;
                             
                             const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
                             setMediaUrl(pub.publicUrl);
+                            
+                            // Save to stickers gallery if it's a sticker
+                            if (mediaType === 'sticker') {
+                              const { data: { user } } = await supabase.auth.getUser();
+                              if (user) {
+                                await supabase.from('stickers').insert({
+                                  user_id: user.id,
+                                  url: pub.publicUrl,
+                                  name: file.name
+                                });
+                                fetchStickers();
+                              }
+                            }
+                            
                             toast.success('Arquivo enviado com sucesso!');
                             
                             if (mediaType === 'document' && !mediaFilename) {
@@ -508,6 +547,33 @@ return result;
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
+                  </div>
+                )}
+
+                {/* Sticker Gallery */}
+                {mediaType === 'sticker' && stickers.length > 0 && (
+                  <div className="space-y-2 py-2 border-t border-border/40">
+                    <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      Sua Galeria de Figurinhas
+                    </label>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto p-1 scrollbar-thin">
+                      {stickers.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setMediaUrl(s.url)}
+                          className={`relative aspect-square rounded-lg border-2 transition-all overflow-hidden bg-muted/20 hover:scale-105 ${mediaUrl === s.url ? 'border-primary shadow-md shadow-primary/20' : 'border-transparent hover:border-border'}`}
+                        >
+                          <img src={s.url} alt="Sticker" className="w-full h-full object-contain p-1" />
+                          {mediaUrl === s.url && (
+                            <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground rounded-full p-0.5">
+                              <Plus className="w-2 h-2" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {mediaType === 'document' && (
