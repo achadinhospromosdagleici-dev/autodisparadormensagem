@@ -775,8 +775,10 @@ export async function sendCarouselMessage(
       headers: getHeaders(creds.token),
       body: JSON.stringify(payload),
     });
+    console.log('[unoapi] Direct fetch response status:', res.status);
     if (!res.ok) {
       const errorData = await res.text();
+      console.error('[unoapi] Direct fetch error data:', errorData);
       throw new Error(`Erro ao enviar carrossel: ${res.status} - ${errorData}`);
     }
     return await res.json();
