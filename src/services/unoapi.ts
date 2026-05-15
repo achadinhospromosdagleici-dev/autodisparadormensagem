@@ -768,6 +768,11 @@ export async function sendUnoApiMessage(
 
   // Media messages
   const { type, url, caption, filename } = message.media;
+  
+  if (type === 'contact') {
+    return sendContactMessage(creds, phoneNumberId, to, message.buttons?.[0]?.contactName || message.content, message.buttons?.[0]?.phone || '');
+  }
+
   if (!url) {
     return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
@@ -781,8 +786,6 @@ export async function sendUnoApiMessage(
       return sendVideoMessage(creds, phoneNumberId, to, url, caption || message.content);
     case 'document':
       return sendDocumentMessage(creds, phoneNumberId, to, url, filename, caption || message.content);
-    case 'contact':
-      return sendContactMessage(creds, phoneNumberId, to, message.buttons?.[0]?.contactName || message.content, message.buttons?.[0]?.phone || '');
     default:
       return sendTextMessage(creds, phoneNumberId, to, message.content);
   }
