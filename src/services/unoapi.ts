@@ -524,13 +524,12 @@ export async function sendContactMessage(
     contacts: [
       {
         name: {
-          first_name: contactName,
           formatted_name: contactName,
         },
         phones: [
           {
-            phone: contactNumber,
-            type: 'MOBILE',
+            wa_id: contactNumber.replace(/\D/g, ''),
+            phone: contactNumber.startsWith('+') ? contactNumber : `+${contactNumber.replace(/\D/g, '')}`,
           },
         ],
       },
@@ -735,8 +734,8 @@ export async function sendUnoApiMessage(
   to: string,
   message: UnoApiMessage
 ): Promise<any> {
-  // Check for interactive buttons
-  if (message.buttons && message.buttons.length > 0) {
+  // Check for interactive buttons (but not if it's a contact message using buttons array for data payload)
+  if (message.buttons && message.buttons.length > 0 && (!message.media || message.media.type !== 'contact')) {
     return sendInteractiveButtons(
       creds,
       phoneNumberId,
