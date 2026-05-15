@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
 import { MessageComposerExtras } from '../MessageComposerExtras';
 
-type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
+type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'sticker' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
 
 export function StepMessages() {
   const { messages, columns, addMessage, addRichMessage, updateMessage, updateRichMessage, deleteMessage, moveMessage, settings, data, followUpConfig, setFollowUpConfig, selectedApi } =
@@ -77,7 +77,7 @@ export function StepMessages() {
       toast.error('Digite uma mensagem');
       return;
     }
-    if (['image', 'audio', 'video', 'document'].includes(mediaType) && !mediaUrl.trim()) {
+    if (['image', 'audio', 'video', 'sticker', 'document'].includes(mediaType) && !mediaUrl.trim()) {
       toast.error('Informe a URL da mídia');
       return;
     }
@@ -107,7 +107,7 @@ export function StepMessages() {
       const invalidCard = carouselCards.find(c => !c.title.trim());
       if (invalidCard) { toast.error('Cada card precisa de um título'); return; }
     }
-    if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+    if (['image', 'video', 'sticker', 'document'].includes(mediaType) && buttons.length > 0) {
       const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
     }
@@ -187,7 +187,7 @@ export function StepMessages() {
             mediaType: 'carousel',
             buttons: carouselCards as unknown as Message['buttons'],
           });
-        } else if (['image', 'video', 'document'].includes(mediaType) && buttons.length > 0) {
+        } else if (['image', 'video', 'sticker', 'document'].includes(mediaType) && buttons.length > 0) {
           addRichMessage({
             content: newMessage.trim(),
             mediaType,
@@ -264,6 +264,7 @@ return result;
     { type: 'image' as EditorMediaType, icon: Image, label: 'Imagem' },
     { type: 'audio' as EditorMediaType, icon: FileAudio, label: 'Áudio' },
     { type: 'video' as EditorMediaType, icon: Video, label: 'Vídeo' },
+    { type: 'sticker' as EditorMediaType, icon: Smile, label: 'Figurinha' },
     { type: 'document' as EditorMediaType, icon: FileText, label: 'Documento' },
     { type: 'link' as EditorMediaType, icon: ExternalLink, label: 'Link' },
     // Botões - UNOAPI e Evolution Go (ou todas se não hay API)
@@ -290,6 +291,7 @@ return result;
       case 'buttons': return '🔘';
       case 'link': return '🔗';
       case 'list': return '📋';
+      case 'sticker': return '✨';
       case 'carousel': return '🎠';
       default: return '📝';
     }
@@ -360,8 +362,8 @@ return result;
               </div>
             </div>
 
-            {/* Media URL Input — only for image/audio/video/document */}
-            {['image', 'audio', 'video', 'document'].includes(mediaType) && (
+            {/* Media URL Input — only for image/audio/video/sticker/document */}
+            {['image', 'audio', 'video', 'sticker', 'document'].includes(mediaType) && (
               <div className="space-y-3 animate-fade-in">
                 <div className="space-y-1.5">
                   <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
@@ -395,7 +397,7 @@ return result;
                         type="file"
                         className="hidden"
                         accept={
-                          mediaType === 'image' ? 'image/*'
+                          mediaType === 'image' || mediaType === 'sticker' ? 'image/*'
                           : mediaType === 'audio' ? 'audio/*'
                           : mediaType === 'video' ? 'video/*'
                           : '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip'
@@ -896,17 +898,60 @@ return result;
                         </button>
                       </div>
 
-                      <input
-                        type="url"
-                        value={card.image || ''}
-                        onChange={(e) => {
-                          const next = [...carouselCards];
-                          next[cIdx].image = e.target.value;
-                          setCarouselCards(next);
-                        }}
-                        placeholder="URL da imagem (opcional)"
-                        className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
-                      />
+                      <div className="flex gap-1.5">
+                        <input
+                          type="url"
+                          value={card.image || ''}
+                          onChange={(e) => {
+                            const next = [...carouselCards];
+                            next[cIdx].image = e.target.value;
+                            setCarouselCards(next);
+                          }}
+                          placeholder="URL da imagem (opcional)"
+                          className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs"
+                        />
+                        <label className="p-1.5 rounded-md bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors flex items-center justify-center shrink-0" title="Upload Imagem">
+                          <Upload className="w-3.5 h-3.5" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              
+                              if (file.size > 25 * 1024 * 1024) {
+                                toast.error('Arquivo muito grande (máx 25MB)');
+                                return;
+                              }
+
+                              const toastId = toast.loading('Enviando imagem do card...');
+                              try {
+                                const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
+                                const path = `carousel/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+                                
+                                const { error: upErr } = await supabase.storage
+                                  .from('campaign-media')
+                                  .upload(path, file);
+                                  
+                                if (upErr) throw upErr;
+                                
+                                const { data: pub } = supabase.storage.from('campaign-media').getPublicUrl(path);
+                                
+                                const next = [...carouselCards];
+                                next[cIdx].image = pub.publicUrl;
+                                setCarouselCards(next);
+                                toast.success('Imagem enviada!', { id: toastId });
+                              } catch (err: any) {
+                                console.error('[carousel-upload]', err);
+                                toast.error(`Falha: ${err.message}`, { id: toastId });
+                              } finally {
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
 
                       {card.image && (
                         <div className="relative mt-1 mb-1 rounded-md overflow-hidden border border-border/30 bg-muted/20 h-24 flex items-center justify-center group">
@@ -1253,12 +1298,12 @@ return result;
                     <p className="text-xs text-primary mb-2 font-medium">
                       Nova mensagem (prévia) {mediaType !== 'text' && `• ${mediaIcon(mediaType)} ${mediaType}`}
                     </p>
-                    {mediaType === 'image' && mediaUrl && (
+                    {(mediaType === 'image' || mediaType === 'sticker') && mediaUrl && (
                       <div className="mb-3">
                         <img
                           src={mediaUrl}
-                          alt="Prévia da imagem"
-                          className="w-full max-h-64 object-contain rounded-lg border border-border/50 bg-muted/30"
+                          alt="Prévia"
+                          className={`max-h-64 object-contain rounded-lg border border-border/50 bg-muted/30 ${mediaType === 'sticker' ? 'w-32 h-32' : 'w-full'}`}
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
                           }}
@@ -1375,11 +1420,11 @@ return result;
                     </p>
                     {msg.mediaUrl && (
                       <div className="mb-3 space-y-2">
-                        {msg.mediaType === 'image' && (
+                        {(msg.mediaType === 'image' || msg.mediaType === 'sticker') && (
                           <img
                             src={msg.mediaUrl}
                             alt="Mídia"
-                            className="w-full max-h-48 object-contain rounded-lg border border-border/50 bg-muted/30"
+                            className={`max-h-48 object-contain rounded-lg border border-border/50 bg-muted/30 ${msg.mediaType === 'sticker' ? 'w-24 h-24 mx-auto' : 'w-full'}`}
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         )}
