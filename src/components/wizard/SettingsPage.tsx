@@ -32,7 +32,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
   return (
     <div className="space-y-6">
       {/* Tab selector */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="flex flex-wrap gap-3">
         {tabs.map(tab => (
           <button
             key={tab.id}
