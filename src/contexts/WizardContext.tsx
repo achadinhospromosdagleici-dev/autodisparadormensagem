@@ -9,6 +9,7 @@ import { ChatwootInbox, loadChatwootCredentialsWithFallback, saveChatwootCredent
 import { loadUnoApiCredentials, testConnection, loadUnoApiCredentialsWithFallback, saveUnoApiCredentials } from '@/services/unoapi';
 import { loadEvolutionCredentialsWithFallback, saveEvolutionCredentials } from '@/services/evolution';
 import { loadEvolutionGoCredentialsWithFallback, saveEvolutionGoCredentials } from '@/services/evolutionGo';
+import { loadWuzapiSettings, testConnection as testWuzapiConnection } from '@/services/wuzapi';
 
 export interface DataRow {
   id: string;
@@ -79,6 +80,7 @@ interface WizardState {
   // New features
   chatwootConnected: boolean;
   unoApiConnected: boolean;
+  wuzapiConnected: boolean;
   chatwootInboxes: ChatwootInbox[];
   selectedInboxId: number | null;
   followUpConfig: FollowUpConfig;
@@ -86,7 +88,7 @@ interface WizardState {
   abTests: ABTest[];
   metrics: CampaignMetrics;
   activeCampaigns: ActiveCampaign[];
-  selectedApi: 'unoapi' | 'evolution' | 'evolution-go' | 'chatwoot' | null;
+  selectedApi: 'unoapi' | 'evolution' | 'evolution-go' | 'chatwoot' | 'wuzapi' | null;
 }
 
 interface WizardContextType extends WizardState {
@@ -118,10 +120,11 @@ interface WizardContextType extends WizardState {
   // New
   setChatwootConnected: (connected: boolean) => void;
   setUnoApiConnected: (connected: boolean) => void;
+  setWuzapiConnected: (connected: boolean) => void;
   setChatwootInboxes: (inboxes: ChatwootInbox[]) => void;
   setSelectedInboxId: (id: number | null) => void;
   setFollowUpConfig: (config: FollowUpConfig) => void;
-  setSelectedApi: (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => void;
+  setSelectedApi: (api: 'unoapi' | 'evolution' | 'evolution-go' | 'wuzapi' | null) => void;
   addScheduledCampaign: (campaign: ScheduledCampaign) => void;
   cancelScheduledCampaign: (id: string) => void;
   addABTest: (test: ABTest) => void;
@@ -220,6 +223,7 @@ const defaultState: WizardState = {
   campaignHistory: sampleCampaignHistory,
   chatwootConnected: false,
   unoApiConnected: false,
+  wuzapiConnected: false,
   chatwootInboxes: [],
   selectedInboxId: null,
   followUpConfig: defaultFollowUpConfig,
@@ -244,6 +248,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
             ...parsed,
             selectedInstances: Array.isArray(parsed.selectedInstances) ? parsed.selectedInstances : [],
             unoApiConnected: !!localStorage.getItem('unoapi_credentials'),
+            wuzapiConnected: !!localStorage.getItem('wuzapi_credentials'),
           };
         } catch (e) {
           console.error('Error loading wizard state:', e);
@@ -253,6 +258,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     return {
       ...defaultState,
       unoApiConnected: !!localStorage.getItem('unoapi_credentials'),
+      wuzapiConnected: !!localStorage.getItem('wuzapi_credentials'),
     };
   });
 
@@ -276,6 +282,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         
         const cw = await loadChatwootCredentialsWithFallback();
         if (cw) localStorage.setItem('chatwoot_credentials', JSON.stringify(cw));
+
+        const wuz = await loadWuzapiSettings();
+        if (wuz) localStorage.setItem('wuzapi_credentials', JSON.stringify(wuz));
       } catch (err) {
         console.error('[WizardContext] Error preloading APIs:', err);
       }
@@ -335,6 +344,34 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-check WuzAPI connection on mount and periodically
+  const checkWuzapiConnection = useRef(false);
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      if (checkWuzapiConnection.current) return;
+      checkWuzapiConnection.current = true;
+      
+      try {
+        const creds = await loadWuzapiSettings();
+        if (creds) {
+          const isOnline = await testWuzapiConnection(creds.baseUrl, creds.adminToken);
+          setWuzapiConnected(isOnline);
+          console.log('[WizardContext] WuzAPI connection checked:', isOnline ? 'online' : 'offline');
+        }
+      } catch (err) {
+        console.error('[WizardContext] WuzAPI connection check failed:', err);
+        setWuzapiConnected(false);
+      } finally {
+        checkWuzapiConnection.current = false;
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const addMessage = (content: string, media?: { mediaType?: Message['mediaType']; mediaUrl?: string; mediaCaption?: string; mediaFilename?: string }) => {
     setState(prev => ({ ...prev, messages: [...prev.messages, { id: crypto.randomUUID(), content, ...media }] }));
   };
@@ -385,10 +422,11 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   // New functions
   const setChatwootConnected = (connected: boolean) => setState(prev => ({ ...prev, chatwootConnected: connected }));
   const setUnoApiConnected = (connected: boolean) => setState(prev => ({ ...prev, unoApiConnected: connected }));
+  const setWuzapiConnected = (connected: boolean) => setState(prev => ({ ...prev, wuzapiConnected: connected }));
   const setChatwootInboxes = (inboxes: ChatwootInbox[]) => setState(prev => ({ ...prev, chatwootInboxes: inboxes }));
   const setSelectedInboxId = (id: number | null) => setState(prev => ({ ...prev, selectedInboxId: id }));
   const setFollowUpConfig = (config: FollowUpConfig) => setState(prev => ({ ...prev, followUpConfig: config }));
-  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
+  const setSelectedApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | 'wuzapi' | null) => setState(prev => ({ ...prev, selectedApi: api, selectedInstances: [] }));
   const addScheduledCampaign = (campaign: ScheduledCampaign) => setState(prev => ({ ...prev, scheduledCampaigns: [...prev.scheduledCampaigns, campaign] }));
   const cancelScheduledCampaign = (id: string) => setState(prev => ({ ...prev, scheduledCampaigns: prev.scheduledCampaigns.map(c => c.id === id ? { ...c, status: 'cancelled' as const } : c) }));
   const addABTest = (test: ABTest) => setState(prev => ({ ...prev, abTests: [...prev.abTests, test] }));
@@ -406,7 +444,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setSelectedInstances,
       selectAllInstances, deselectAllInstances, getValidCount, getInvalidCount, addCampaign, reuseCampaign,
       clearWizard,
-      setChatwootConnected, setUnoApiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig, setSelectedApi,
+      setChatwootConnected, setUnoApiConnected, setWuzapiConnected, setChatwootInboxes, setSelectedInboxId, setFollowUpConfig, setSelectedApi,
       addScheduledCampaign, cancelScheduledCampaign, addABTest, removeABTest, updateMetrics,
       addActiveCampaign, updateActiveCampaign, removeActiveCampaign,
     }}>

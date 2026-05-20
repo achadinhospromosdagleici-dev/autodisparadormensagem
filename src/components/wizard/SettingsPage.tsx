@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu } from 'lucide-react';
+import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu, MessageSquare } from 'lucide-react';
 import { ChatwootSettings } from './ChatwootSettings';
 import { EvolutionConnection } from './EvolutionConnection';
 import { EvolutionGoConnection } from './EvolutionGoConnection';
 import { UnoApiSettings } from './UnoApiSettings';
+import { WuzapiSettings } from './WuzapiSettings';
+import { WuzapiConnection } from './WuzapiConnection';
 import { ChatwootInbox } from '@/services/chatwoot';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,13 +15,14 @@ interface SettingsPageProps {
   onUnoApiConnectionChange: (connected: boolean) => void;
 }
 
-type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'ai-gateway';
+type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway';
 
 const tabs = [
   { id: 'unoapi' as SettingsTab, label: 'UnoAPI', icon: Zap, desc: 'Envio via WhatsApp Cloud API (texto, mídia, docs)' },
   { id: 'chatwoot' as SettingsTab, label: 'Chatwoot', icon: MessageCircle, desc: 'Integração com Chatwoot para envio e monitoramento' },
   { id: 'evolution' as SettingsTab, label: 'Evolution API', icon: Smartphone, desc: 'Conectar número via Evolution API (Node.js)' },
   { id: 'evolution-go' as SettingsTab, label: 'Evolution Go', icon: Cpu, desc: 'Conectar número via Evolution Go (Go)' },
+  { id: 'wuzapi' as SettingsTab, label: 'WuzAPI', icon: MessageSquare, desc: 'Conectar número via WuzAPI (Go/WaProto)' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
 ];
 
@@ -29,7 +32,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
   return (
     <div className="space-y-6">
       {/* Tab selector */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -62,6 +65,12 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
         )}
         {activeTab === 'evolution' && <EvolutionConnection />}
         {activeTab === 'evolution-go' && <EvolutionGoConnection />}
+        {activeTab === 'wuzapi' && (
+          <div className="space-y-6">
+            <WuzapiSettings />
+            <WuzapiConnection />
+          </div>
+        )}
         {activeTab === 'ai-gateway' && <AIGatewaySettings />}
       </div>
     </div>

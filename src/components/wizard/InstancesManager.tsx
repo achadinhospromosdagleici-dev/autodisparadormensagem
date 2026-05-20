@@ -20,9 +20,17 @@ import {
   getEvolutionGoQRCode,
   getEvolutionGoInstanceStatus,
 } from '@/services/evolutionGo';
+import {
+  loadWuzapiSettings,
+  getStatus as getWuzapiStatus,
+  getQRCode as getWuzapiQRCode,
+  connect as connectWuzapi,
+} from '@/services/wuzapi';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ConversationsPanel } from './ConversationsPanel';
 
-type ApiSource = 'unoapi' | 'evolution' | 'evolution-go';
+type ApiSource = 'unoapi' | 'evolution' | 'evolution-go' | 'wuzapi';
 
 interface InstanceInfo {
   id: string;
@@ -35,6 +43,7 @@ interface InstanceInfo {
 }
 
 export function InstancesManager() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [instances, setInstances] = useState<InstanceInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,11 +64,12 @@ export function InstancesManager() {
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const hasUno = !!loadUnoApiCredentials();
   const hasEvo = !!loadEvolutionCredentials();
   const hasEvoGo = !!loadEvolutionGoCredentials();
+  const hasWuzapi = typeof window !== 'undefined' && !!localStorage.getItem('wuzapi_credentials');
 
   const loadAllInstances = async () => {
     setLoading(true);
@@ -118,6 +128,29 @@ export function InstancesManager() {
       }
     }
 
+    // WuzAPI
+    if (hasWuzapi && user?.id) {
+      try {
+        const { data, error } = await supabase
+          .from('wuzapi_instances')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          allInstances.push(...data.map((i: any): InstanceInfo => ({
+            id: `wuz_${i.name}`,
+            name: i.name,
+            phone: i.phone || i.name,
+            status: (i.status === 'connected' ? 'connected' : 'disconnected') as InstanceInfo['status'],
+            source: 'wuzapi' as ApiSource,
+          })));
+        }
+      } catch (e) {
+        console.error('[InstancesManager] Error fetching WuzAPI instances:', e);
+      }
+    }
+
     setInstances(allInstances);
     setLoading(false);
   };
@@ -125,7 +158,7 @@ export function InstancesManager() {
   const handleGenerateQR = async (source: ApiSource, instanceName: string) => {
     try {
       setQrInstance(instanceName);
-      let data: { qrcode: string };
+      let data: { qrcode: string } = { qrcode: '' };
       
       if (source === 'evolution') {
         const creds = loadEvolutionCredentials()!;
@@ -133,6 +166,25 @@ export function InstancesManager() {
       } else if (source === 'evolution-go') {
         const creds = loadEvolutionGoCredentials()!;
         data = await getEvolutionGoQRCode(creds, instanceName);
+      } else if (source === 'wuzapi') {
+        const creds = await loadWuzapiSettings();
+        if (creds && user?.id) {
+          const { data: dbInstances } = await supabase
+            .from('wuzapi_instances')
+            .select('user_token, name, phone')
+            .eq('user_id', user.id);
+          
+          const matched = dbInstances?.find(di => di.name === instanceName || di.phone === instanceName);
+          if (matched?.user_token) {
+            await connectWuzapi(creds.baseUrl, matched.user_token);
+            const qr = await getWuzapiQRCode(creds.baseUrl, matched.user_token);
+            data = { qrcode: qr };
+          } else {
+            throw new Error('Instância WuzAPI não encontrada no banco de dados');
+          }
+        } else {
+          throw new Error('Credenciais da WuzAPI não configuradas');
+        }
       }
       
       setQrCode(data.qrcode || '');
@@ -168,6 +220,25 @@ export function InstancesManager() {
           const creds = loadEvolutionGoCredentials()!;
           const status = await getEvolutionGoInstanceStatus(creds, instanceName);
           connected = status.status === 'open' || status.status === 'connected';
+        } else if (source === 'wuzapi') {
+          const creds = await loadWuzapiSettings();
+          if (creds && user?.id) {
+            const { data: dbInstances } = await supabase
+              .from('wuzapi_instances')
+              .select('user_token, name, phone')
+              .eq('user_id', user.id);
+            
+            const matched = dbInstances?.find(di => di.name === instanceName || di.phone === instanceName);
+            if (matched?.user_token) {
+              const status = await getWuzapiStatus(creds.baseUrl, matched.user_token);
+              connected = !!status.connected;
+              if (connected && status.jid) {
+                const phone = status.jid.split('@')[0];
+                const { saveWuzapiInstanceDb } = await import('@/services/wuzapi');
+                await saveWuzapiInstanceDb(matched.user_token, phone, matched.name, 'connected');
+              }
+            }
+          }
         }
         
         if (connected) {
@@ -186,6 +257,7 @@ export function InstancesManager() {
       case 'unoapi': return '🌐';
       case 'evolution': return '📱';
       case 'evolution-go': return '⚡';
+      case 'wuzapi': return '💬';
     }
   };
 
@@ -194,6 +266,7 @@ export function InstancesManager() {
       case 'unoapi': return 'UnoAPI';
       case 'evolution': return 'Evolution';
       case 'evolution-go': return 'EvoGo';
+      case 'wuzapi': return 'WuzAPI';
     }
   };
 
@@ -237,7 +310,7 @@ export function InstancesManager() {
 
         {/* API Tabs */}
         <div className="p-3 border-b border-border bg-muted/20">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {hasEvo && (
               <button
                 onClick={() => setActiveApi('evolution')}
@@ -260,6 +333,18 @@ export function InstancesManager() {
                 }`}
               >
                 ⚡ EvoGo
+              </button>
+            )}
+            {hasWuzapi && (
+              <button
+                onClick={() => setActiveApi('wuzapi')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 ${
+                  activeApi === 'wuzapi' 
+                    ? 'bg-amber-600 text-white' 
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                💬 WuzAPI
               </button>
             )}
             {hasUno && (
@@ -363,7 +448,7 @@ export function InstancesManager() {
         {/* Help Text */}
         <div className="p-3 border-t border-border bg-muted/20">
           <p className="text-[10px] text-muted-foreground text-center">
-            {hasEvo ? '📱 Evolution API' : ''} {hasEvoGo ? '⚡ EvoGo' : ''} {hasUno ? '🌐 UnoAPI' : ''}
+            {hasEvo ? '📱 Evolution API ' : ''} {hasEvoGo ? '⚡ EvoGo ' : ''} {hasWuzapi ? '💬 WuzAPI ' : ''} {hasUno ? '🌐 UnoAPI ' : ''}
             <br />
             Clique em "Conectar" para gerar novo QR Code
           </p>

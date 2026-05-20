@@ -42,6 +42,10 @@ import {
   fetchInboxes,
   ChatwootInbox,
 } from '@/services/chatwoot';
+import {
+  loadWuzapiSettings,
+  WuzapiInstanceDb,
+} from '@/services/wuzapi';
 import { useSharedEvolution } from '@/hooks/useSharedEvolution';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,6 +70,7 @@ export function StepInstances() {
   const [evoInstances, setEvoInstances] = useState<EvolutionInstance[]>([]);
   const [evoGoInstances, setEvoGoInstances] = useState<EvolutionGoInstance[]>([]);
   const [chatwootInboxes, setChatwootInboxes] = useState<ChatwootInbox[]>([]);
+  const [wuzInstances, setWuzInstances] = useState<WuzapiInstanceDb[]>([]);
   const [userInstances, setUserInstances] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const hasLoadedRef = useRef<boolean | 'done'>(false);
@@ -74,6 +79,7 @@ export function StepInstances() {
   const hasSharedEvolution = useSharedEvolution();
   const [hasEvolutionGo, setHasEvolutionGo] = useState(false);
   const [hasChatwoot, setHasChatwoot] = useState(false);
+  const [hasWuzapi, setHasWuzapi] = useState(false);
   React.useEffect(() => {
     async function checkApis(checkDb = false) {
       // Evolution
@@ -99,6 +105,10 @@ export function StepInstances() {
         const cwDb = await loadChatwootCredentialsWithFallback();
         setHasChatwoot(!!cwDb);
       }
+
+      // WuzAPI
+      const wuzLocal = await loadWuzapiSettings();
+      if (wuzLocal) setHasWuzapi(true);
     }
     checkApis(true);
 
@@ -109,7 +119,7 @@ export function StepInstances() {
     return () => clearInterval(interval);
   }, []);
 
-  const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot;
+  const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot || hasWuzapi;
 
   // Fetch user's registered instances (for filtering when using shared Evolution)
   React.useEffect(() => {
@@ -131,7 +141,7 @@ export function StepInstances() {
     fetchUserInstances();
   }, [user]);
 
-  const handleSelectApi = (api: 'unoapi' | 'evolution' | 'evolution-go') => {
+  const handleSelectApi = (api: 'unoapi' | 'evolution' | 'evolution-go' | 'wuzapi') => {
     setSelectedApi(api);
   };
 
@@ -144,10 +154,12 @@ export function StepInstances() {
         setSelectedApi('evolution-go');
       } else if (hasEvolution || hasSharedEvolution) {
         setSelectedApi('evolution');
+      } else if (hasWuzapi) {
+        setSelectedApi('wuzapi');
       }
       hasLoadedRef.current = 'done';
     }
-  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo]);
+  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo, hasWuzapi]);
 
   React.useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -265,6 +277,29 @@ export function StepInstances() {
       );
     }
 
+    // WuzAPI
+    const wuzCreds = await loadWuzapiSettings();
+    if (wuzCreds && user?.id) {
+      promises.push(
+        supabase
+          .from('wuzapi_instances')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .then(({ data }) => {
+            if (data) {
+              setWuzInstances(data as WuzapiInstanceDb[]);
+            } else {
+              setWuzInstances([]);
+            }
+          })
+          .catch((err) => {
+            console.error('[StepInstances] WuzAPI fetch error:', err);
+            setWuzInstances([]);
+          })
+      );
+    }
+
     await Promise.all(promises);
     if (showLoading) setLoading(false);
   };
@@ -305,6 +340,15 @@ export function StepInstances() {
           status: 'active' as Instance['status'],
           phoneNumber: ib.phone_number || undefined,
           source: 'chatwoot' as const,
+        }))
+      : []),
+    ...(Array.isArray(wuzInstances) && wuzInstances.length > 0
+      ? wuzInstances.map((wi) => ({
+          id: `wuz_${wi.id}`,
+          name: wi.name,
+          status: (wi.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
+          phoneNumber: wi.phone || undefined,
+          source: 'wuzapi' as const,
         }))
       : []),
   ];
@@ -352,6 +396,7 @@ export function StepInstances() {
     if (source === 'evolution') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">Evolution</span>;
     if (source === 'unoapi') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-medium">UnoAPI</span>;
     if (source === 'chatwoot') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">Chatwoot</span>;
+    if (source === 'wuzapi') return <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium">WuzAPI</span>;
     return null;
   };
 
@@ -372,6 +417,7 @@ export function StepInstances() {
                 {selectedApi === 'evolution' && 'Usando Evolution'}
                 {selectedApi === 'evolution-go' && 'Usando Evolution Go'}
                 {selectedApi === 'chatwoot' && 'Usando Chatwoot'}
+                {selectedApi === 'wuzapi' && 'Usando WuzAPI'}
                 {!selectedApi && loading ? 'Detectando...' : (!selectedApi && 'Automático')}
               </p>
             </div>
@@ -393,13 +439,15 @@ export function StepInstances() {
                   {loading ? 'Buscando...' : (
                     <>
                       {evoInstances.length > 0 && <span>{evoInstances.length} Evolution</span>}
-                      {evoInstances.length > 0 && (unoInstances.length > 0 || evoGoInstances.length > 0 || chatwootInboxes.length > 0) && ' · '}
+                      {evoInstances.length > 0 && (unoInstances.length > 0 || evoGoInstances.length > 0 || chatwootInboxes.length > 0 || wuzInstances.length > 0) && ' · '}
                       {unoInstances.length > 0 && <span>{unoInstances.length} UnoAPI</span>}
-                      {unoInstances.length > 0 && (evoGoInstances.length > 0 || chatwootInboxes.length > 0) && ' · '}
+                      {unoInstances.length > 0 && (evoGoInstances.length > 0 || chatwootInboxes.length > 0 || wuzInstances.length > 0) && ' · '}
                       {evoGoInstances.length > 0 && <span>{evoGoInstances.length} Evo Go</span>}
-                      {evoGoInstances.length > 0 && chatwootInboxes.length > 0 && ' · '}
+                      {evoGoInstances.length > 0 && (chatwootInboxes.length > 0 || wuzInstances.length > 0) && ' · '}
                       {chatwootInboxes.length > 0 && <span>{chatwootInboxes.length} Chatwoot</span>}
-                      {evoInstances.length === 0 && unoInstances.length === 0 && evoGoInstances.length === 0 && chatwootInboxes.length === 0 && 'Nenhum número encontrado'}
+                      {chatwootInboxes.length > 0 && wuzInstances.length > 0 && ' · '}
+                      {wuzInstances.length > 0 && <span>{wuzInstances.length} WuzAPI</span>}
+                      {evoInstances.length === 0 && unoInstances.length === 0 && evoGoInstances.length === 0 && chatwootInboxes.length === 0 && wuzInstances.length === 0 && 'Nenhum número encontrado'}
                     </>
                   )}
                 </p>
@@ -564,7 +612,7 @@ export function StepInstances() {
             <div>
               <p className="font-medium text-warning">Nenhum número ativo</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Conecte um número na Evolution API ou UnoAPI para enviar mensagens.
+                Conecte um número na Evolution API, UnoAPI ou WuzAPI para enviar mensagens.
               </p>
             </div>
           </div>

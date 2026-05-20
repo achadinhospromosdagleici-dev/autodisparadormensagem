@@ -559,6 +559,7 @@ export type Database = {
           instance_name: string
           phone: string | null
           profile_name: string | null
+          source: string | null
           status: string
           updated_at: string
           user_id: string
@@ -569,6 +570,7 @@ export type Database = {
           instance_name: string
           phone?: string | null
           profile_name?: string | null
+          source?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -579,11 +581,83 @@ export type Database = {
           instance_name?: string
           phone?: string | null
           profile_name?: string | null
+          source?: string | null
           status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      wuzapi_settings: {
+        Row: {
+          id: string
+          user_id: string
+          base_url: string
+          admin_token: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          base_url?: string
+          admin_token: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          base_url?: string
+          admin_token?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wuzapi_instances: {
+        Row: {
+          id: string
+          user_id: string
+          settings_id: string | null
+          user_token: string
+          phone: string | null
+          name: string
+          status: string | null
+          connected_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          settings_id?: string | null
+          user_token: string
+          phone?: string | null
+          name: string
+          status?: string | null
+          connected_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          settings_id?: string | null
+          user_token?: string
+          phone?: string | null
+          name?: string
+          status?: string | null
+          connected_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wuzapi_instances_settings_id_fkey"
+            columns: ["settings_id"]
+            isOneToOne: false
+            referencedRelation: "wuzapi_settings"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       user_roles: {
         Row: {

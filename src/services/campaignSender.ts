@@ -26,6 +26,12 @@ import {
   findOrCreateConversation,
   sendMediaMessage as sendCwMediaMessage,
 } from './chatwoot';
+import {
+  loadWuzapiSettings,
+  loadWuzapiInstances,
+  getWuzapiInstanceCredentials,
+} from './wuzapi';
+import { sendWuzapiMessage } from './wuzapi-sender';
 import { FollowUpConfig } from '@/components/wizard/FollowUpSettings';
 
 export interface SendProgress {
@@ -146,11 +152,12 @@ export interface CampaignMessage {
 }
 
 // Detect which API to use based on selected instance ID prefix
-function getInstanceSource(instanceId: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' | 'default' {
+function getInstanceSource(instanceId: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' | 'wuzapi' | 'default' {
   if (instanceId.startsWith('evogo_')) return 'evolution-go';
   if (instanceId.startsWith('evo_')) return 'evolution';
   if (instanceId.startsWith('uno_')) return 'unoapi';
   if (instanceId.startsWith('chatwoot_')) return 'chatwoot';
+  if (instanceId.startsWith('wuz_')) return 'wuzapi';
   return 'default';
 }
 
@@ -159,6 +166,7 @@ function getInstanceName(instanceId: string): string {
   if (instanceId.startsWith('evo_')) return instanceId.slice(4);
   if (instanceId.startsWith('uno_')) return instanceId.slice(4);
   if (instanceId.startsWith('chatwoot_')) return instanceId.slice(9);
+  if (instanceId.startsWith('wuz_')) return instanceId.slice(4);
   return instanceId;
 }
 
@@ -182,8 +190,8 @@ export async function sendCampaign(
   const unoCredsEarly = await loadUnoApiCredentialsWithFallback();
   const evoCredsEarly = await loadEvolutionCredentialsWithFallback();
   const evoGoCredsEarly = await loadEvolutionGoCredentialsWithFallback();
-
   const cwCredsEarly = await loadChatwootCredentialsWithFallback();
+  const wuzCredsEarly = await loadWuzapiSettings();
 
   // Filter out instances that have no matching API credentials.
   const validInstances = selectedPhoneNumbers.filter(id => {
@@ -192,8 +200,9 @@ export async function sendCampaign(
     if (src === 'evolution') return !!evoCredsEarly;
     if (src === 'unoapi') return !!unoCredsEarly;
     if (src === 'chatwoot') return !!cwCredsEarly;
+    if (src === 'wuzapi') return !!wuzCredsEarly;
     // default → use whichever API is configured
-    return !!evoCredsEarly || !!unoCredsEarly || !!evoGoCredsEarly || !!cwCredsEarly;
+    return !!evoCredsEarly || !!unoCredsEarly || !!evoGoCredsEarly || !!cwCredsEarly || !!wuzCredsEarly;
   });
 
   if (validInstances.length === 0) {
@@ -220,20 +229,21 @@ export async function sendCampaign(
   const unoCreds = unoCredsEarly;
   const evoCreds = evoCredsEarly;
   const evoGoCreds = evoGoCredsEarly;
-
   const cwCreds = cwCredsEarly;
 
-  // Resolve API source per-instance (default → evolution → evolution-go → unoapi → chatwoot)
-  const resolveSource = (id: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' => {
+  // Resolve API source per-instance (default → evolution → evolution-go → unoapi → chatwoot → wuzapi)
+  const resolveSource = (id: string): 'evolution-go' | 'evolution' | 'unoapi' | 'chatwoot' | 'wuzapi' => {
     const s = getInstanceSource(id);
     if (s === 'evolution-go') return 'evolution-go';
     if (s === 'evolution') return 'evolution';
     if (s === 'unoapi') return 'unoapi';
     if (s === 'chatwoot') return 'chatwoot';
+    if (s === 'wuzapi') return 'wuzapi';
     // default → any available
     if (evoCreds) return 'evolution';
     if (evoGoCreds) return 'evolution-go';
     if (cwCreds) return 'chatwoot';
+    if (wuzCredsEarly) return 'wuzapi';
     return 'unoapi';
   };
 
@@ -242,7 +252,7 @@ export async function sendCampaign(
   }
 
   const primarySource = resolveSource(validInstances[0]);
-  const sourceLabel = primarySource === 'evolution-go' ? 'Evolution Go' : primarySource === 'evolution' ? 'Evolution API' : primarySource === 'chatwoot' ? 'Chatwoot' : 'UnoAPI';
+  const sourceLabel = primarySource === 'evolution-go' ? 'Evolution Go' : primarySource === 'evolution' ? 'Evolution API' : primarySource === 'chatwoot' ? 'Chatwoot' : primarySource === 'wuzapi' ? 'WuzAPI' : 'UnoAPI';
   addLog(`🚀 Iniciando campanha via ${sourceLabel}...`, 'info');
 
   // For Evolution: validate all instances (non-blocking — warn but continue)
@@ -531,6 +541,13 @@ export async function sendCampaign(
             caption,
             filename
           );
+        } else if (source === 'wuzapi' && wuzCredsEarly) {
+          // WuzAPI sending - get instance credentials dynamically
+          const instanceCreds = await getWuzapiInstanceCredentials(senderName);
+          if (!instanceCreds) {
+            throw new Error(`Credenciais WuzAPI não encontradas para instância "${senderName}"`);
+          }
+          await sendWuzapiMessage(senderName, phoneNumber, msg, contact);
         } else {
           throw new Error(`Nenhuma API disponível para a instância "${senderName}"`);
         }
