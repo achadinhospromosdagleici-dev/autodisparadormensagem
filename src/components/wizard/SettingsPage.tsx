@@ -67,7 +67,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
         {activeTab === 'evolution-go' && <EvolutionGoConnection />}
         {activeTab === 'wuzapi' && (
           <div className="space-y-6">
-            <WuzapiSettings />
+            <WuzapiSettings onConnectionChange={onConnectionChange} />
             <WuzapiConnection />
           </div>
         )}

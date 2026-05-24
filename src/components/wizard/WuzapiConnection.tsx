@@ -46,7 +46,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'waiting' | 'connecting' | 'connected' | 'error'>('waiting');
-  const [qrPolling, setQrPolling] = useState<NodeJS.Timeout | null>(null);
+  const [qrPolling, setQrPolling] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const loadInstances = useCallback(async () => {
     const settings = await loadWuzapiSettings();
@@ -58,7 +58,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     for (const inst of insts) {
       if (inst.status === 'connected' || inst.status === 'connecting') {
         try {
-          const status = await getStatus(settings.base_url, inst.user_token);
+          const status = await getStatus(settings.baseUrl, inst.user_token);
           if (status.loggedIn) {
             await updateWuzapiInstance(inst.id, { status: 'connected' });
           } else {
@@ -89,7 +89,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
       toast.error('Configure a WuzAPI primeiro nas Configurações');
       return;
     }
-    if (!settings.base_url || !settings.admin_token) {
+    if (!settings.baseUrl || !settings.adminToken) {
       toast.error('URL base ou token admin da WuzAPI não configurados');
       return;
     }
@@ -97,7 +97,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     setCreatingInstance(true);
 
     try {
-      const wuzapiUser = await createUser(settings.base_url, settings.admin_token, newInstanceName.trim());
+      const wuzapiUser = await createUser(settings.baseUrl, settings.adminToken, newInstanceName.trim());
 
       const inst = await saveWuzapiInstance(
         settings.id!,
@@ -114,7 +114,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
         setQrModalInstance(inst);
         setQrError(null);
         setConnectionStatus('waiting');
-        startQrPolling(inst, settings.base_url);
+        startQrPolling(inst, settings.baseUrl);
       }
     } catch (error: any) {
       toast.error('Erro ao criar instância: ' + (error.message || 'Desconhecido'));
@@ -176,7 +176,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
       toast.error('Configure a WuzAPI primeiro');
       return;
     }
-    if (!settings.base_url) {
+    if (!settings.baseUrl) {
       toast.error('URL base da WuzAPI não configurada');
       return;
     }
@@ -184,15 +184,15 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     setQrModalInstance(inst);
     setQrError(null);
     setConnectionStatus('waiting');
-    startQrPolling(inst, settings.base_url);
+    startQrPolling(inst, settings.baseUrl);
   };
 
   const handleDisconnect = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
-    if (!settings?.base_url) return;
+    if (!settings?.baseUrl) return;
 
     try {
-      await disconnect(settings.base_url, inst.user_token);
+      await disconnect(settings.baseUrl, inst.user_token);
       await updateWuzapiInstance(inst.id, { status: 'disconnected' });
       await loadInstances();
       toast.success('Instância desconectada');
@@ -203,10 +203,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
 
   const handleLogout = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
-    if (!settings?.base_url) return;
+    if (!settings?.baseUrl) return;
 
     try {
-      await logout(settings.base_url, inst.user_token);
+      await logout(settings.baseUrl, inst.user_token);
       await updateWuzapiInstance(inst.id, { status: 'disconnected' });
       await loadInstances();
       toast.success('Sessão removida. Escaneie o QR novamente.');
@@ -219,9 +219,9 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     if (!confirm(`Excluir instância "${inst.name}"?`)) return;
 
     const settings = await loadWuzapiSettings();
-    if (settings?.base_url) {
+    if (settings?.baseUrl) {
       try {
-        await logout(settings.base_url, inst.user_token);
+        await logout(settings.baseUrl, inst.user_token);
       } catch {}
     }
 
