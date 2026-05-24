@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface WuzapiCredentials {
   baseUrl: string;
   adminToken: string;
+  id?: string;
 }
 
 export interface WuzapiInstance {
@@ -33,6 +34,9 @@ export interface WuzapiButton {
   Url?: string;
   PhoneNumber?: string;
 }
+
+export type WuzapiStatus = 'connected' | 'disconnected' | 'connecting';
+export type WuzapiInstanceDb = WuzapiInstance;
 
 const STORAGE_KEY = 'wuzapi_credentials';
 
@@ -76,7 +80,8 @@ export async function loadWuzapiSettings(): Promise<WuzapiCredentials | null> {
       
     if (error || !data) return null;
     
-    const creds = {
+    const creds: WuzapiCredentials = {
+      id: data.id,
       baseUrl: data.base_url,
       adminToken: data.admin_token,
     };
@@ -258,21 +263,27 @@ export async function deleteWuzapiInstanceDb(name: string, userToken: string): P
 
 /**
  * Helper to fetch from WuzAPI with appropriate headers.
+ * Admin endpoints use Authorization header, user endpoints use token header.
  */
 async function apiCall(
   baseUrl: string,
   endpoint: string,
   token: string,
   method = 'GET',
-  body?: any
+  body?: any,
+  isAdmin = false,
 ): Promise<any> {
   const cleanBase = baseUrl.replace(/\/+$/, '');
   const url = `${cleanBase}${endpoint}`;
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': token,
   };
+  if (isAdmin) {
+    headers['Authorization'] = token;
+  } else {
+    headers['token'] = token;
+  }
 
   const response = await fetch(url, {
     method,
@@ -309,7 +320,7 @@ export async function testConnection(baseUrl: string, adminToken: string): Promi
 }
 
 export async function listUsers(baseUrl: string, adminToken: string): Promise<WuzapiUser[]> {
-  const data = await apiCall(baseUrl, '/admin/users', adminToken, 'GET');
+  const data = await apiCall(baseUrl, '/admin/users', adminToken, 'GET', undefined, true);
   return Array.isArray(data) ? data : (data?.users || []);
 }
 
@@ -318,16 +329,19 @@ export async function createUser(
   adminToken: string,
   name: string
 ): Promise<{ id: number; token: string }> {
-  const body = {
-    Name: name,
-    Webhook: '',
-    Events: []
-  };
-  return apiCall(baseUrl, '/admin/users', adminToken, 'POST', body);
+  const token = crypto.randomUUID().replace(/-/g, '');
+  await apiCall(baseUrl, '/admin/users', adminToken, 'POST', {
+    name,
+    token,
+    webhook: '',
+    events: 'All',
+    expiration: 0,
+  }, true);
+  return { id: 0, token };
 }
 
 export async function deleteUser(baseUrl: string, adminToken: string, userId: number): Promise<void> {
-  await apiCall(baseUrl, `/admin/users/${userId}`, adminToken, 'DELETE');
+  await apiCall(baseUrl, `/admin/users/${userId}`, adminToken, 'DELETE', undefined, true);
 }
 
 // ============================================================================
@@ -335,7 +349,10 @@ export async function deleteUser(baseUrl: string, adminToken: string, userId: nu
 // ============================================================================
 
 export async function connect(baseUrl: string, userToken: string): Promise<{ success: boolean; jid?: string }> {
-  return apiCall(baseUrl, '/session/connect', userToken, 'POST');
+  return apiCall(baseUrl, '/session/connect', userToken, 'POST', {
+    Subscribe: ['Message'],
+    Immediate: true,
+  });
 }
 
 export async function getStatus(
@@ -357,8 +374,8 @@ export async function getStatus(
 
 export async function getQRCode(baseUrl: string, userToken: string): Promise<string> {
   const res = await apiCall(baseUrl, '/session/qr', userToken, 'GET');
-  // Returns base64 image data URL or string containing QR code
-  return res.qr || res.qrcode || res.QR || '';
+  // Tenta campos do WuzAPI e fallback para outros formatos
+  return res?.data?.QRCode || res?.QRCode || res?.qr || res?.qrcode || res?.QR || '';
 }
 
 export async function disconnect(baseUrl: string, userToken: string): Promise<void> {
@@ -411,7 +428,9 @@ export async function sendAudio(
 ): Promise<MessageResult> {
   const payload = {
     Phone: to,
-    Audio: audioData
+    Audio: audioData.replace(/^data:[^,]+,/i, 'data:audio/ogg;base64,'),
+    PTT: true,
+    MimeType: 'audio/ogg; codecs=opus',
   };
   const res = await apiCall(baseUrl, '/chat/send/audio', userToken, 'POST', payload);
   return { success: true, id: res.id || res.messageId };
@@ -496,6 +515,104 @@ export async function sendContact(
   };
   const res = await apiCall(baseUrl, '/chat/send/contact', userToken, 'POST', payload);
   return { success: true, id: res.id || res.messageId };
+}
+
+// ============================================================================
+// BUTTONS & LIST ENDPOINTS
+// ============================================================================
+
+export async function sendButtons(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  body: string,
+  buttons: { DisplayText: string; Type?: 'reply' | 'url' | 'call'; Url?: string; PhoneNumber?: string }[],
+  imageDataUrl?: string,
+): Promise<MessageResult> {
+  const typeMap = { reply: 'reply', url: 'cta_url', call: 'cta_call' } as const;
+  const payload: Record<string, unknown> = {
+    Phone: to,
+    Body: body,
+    ...(imageDataUrl ? { Image: imageDataUrl } : {}),
+    Buttons: buttons.map((b) => ({
+      title: b.DisplayText,
+      id: b.DisplayText,
+      type: typeMap[b.Type ?? 'reply'],
+      ...(b.Url ? { url: b.Url } : {}),
+      ...(b.PhoneNumber ? { phone_number: b.PhoneNumber } : {}),
+    })),
+  };
+  const res = await apiCall(baseUrl, '/chat/send/buttons', userToken, 'POST', payload);
+  return { success: true, id: res.id || res.messageId };
+}
+
+export async function sendList(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  payload: {
+    topText: string;
+    desc: string;
+    buttonText: string;
+    footerText?: string;
+    sections: { title: string; rows: { title: string; description?: string; rowId?: string }[] }[];
+  },
+): Promise<MessageResult> {
+  const res = await apiCall(baseUrl, '/chat/send/list', userToken, 'POST', {
+    Phone: to,
+    ButtonText: payload.buttonText,
+    Desc: payload.desc,
+    TopText: payload.topText,
+    FooterText: payload.footerText ?? '',
+    Sections: payload.sections.map((s) => ({
+      Title: s.title,
+      Rows: s.rows.map((r) => ({
+        Title: r.title,
+        Description: r.description ?? '',
+        RowId: r.rowId ?? r.title,
+      })),
+    })),
+  });
+  return { success: true, id: res.id || res.messageId };
+}
+
+// ============================================================================
+// AVATAR & NUMBER CHECK ENDPOINTS
+// ============================================================================
+
+export async function getAvatar(
+  baseUrl: string,
+  userToken: string,
+  jid: string,
+): Promise<string> {
+  try {
+    const res = await apiCall(baseUrl, '/user/avatar', userToken, 'POST', { Phone: jid });
+    return res?.data?.URL || res?.URL || '';
+  } catch {
+    return '';
+  }
+}
+
+export async function checkPhone(
+  baseUrl: string,
+  userToken: string,
+  phone: string,
+): Promise<{ isWhatsApp: boolean; jid?: string }> {
+  try {
+    const res = await apiCall(baseUrl, '/user/check', userToken, 'POST', { Phone: phone });
+    const users = res?.data?.Users ?? [];
+    const found = users.find((u: { IsInWhatsapp?: boolean }) => u.IsInWhatsapp);
+    return {
+      isWhatsApp: !!found,
+      jid: found?.JID || undefined,
+    };
+  } catch {
+    return { isWhatsApp: false };
+  }
+}
+
+export function extractPhoneFromJid(jid: string): string {
+  return jid.split('@')[0]?.split(':')[0] || jid;
 }
 
 // ============================================================================

@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { loadUnoApiCredentials, uploadToS3, DEFAULT_S3_CONFIG } from '@/services/unoapi';
 import { MessageComposerExtras } from '../MessageComposerExtras';
+import { AiGenerateButton, AiVaryButton } from '../AiMessageHelper';
 
 type EditorMediaType = 'text' | 'image' | 'audio' | 'video' | 'sticker' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
 
@@ -1202,18 +1203,21 @@ return result;
               }}
             />
 
-            <button
-              onClick={handleAddMessage}
-              disabled={!newMessage.trim() && mediaType === 'text'}
-              className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                (newMessage.trim() || mediaType !== 'text')
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              {editingMessageId ? 'Atualizar' : 'Adicionar'} {mediaType === 'text' ? 'Mensagem' : `Mensagem com ${mediaType === 'image' ? 'Imagem' : mediaType === 'audio' ? 'Áudio' : mediaType === 'video' ? 'Vídeo' : 'Documento'}`}
-            </button>
+            <div className="flex gap-2">
+              <AiGenerateButton onApply={(texto) => setNewMessage((prev) => prev + texto)} />
+              <button
+                onClick={handleAddMessage}
+                disabled={!newMessage.trim() && mediaType === 'text'}
+                className={`flex-1 py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  (newMessage.trim() || mediaType !== 'text')
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                {editingMessageId ? 'Atualizar' : 'Adicionar'} {mediaType === 'text' ? 'Mensagem' : `Mensagem com ${mediaType === 'image' ? 'Imagem' : mediaType === 'audio' ? 'Áudio' : mediaType === 'video' ? 'Vídeo' : 'Documento'}`}
+              </button>
+            </div>
           </div>
 
           {/* Message List */}
@@ -1281,6 +1285,11 @@ return result;
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
+                      <AiVaryButton texto={msg.content} onApply={(texto) => {
+                        const updated = { ...msg, content: texto };
+                        updateRichMessage(msg.id, updated);
+                        toast.success('Mensagem variada aplicada');
+                      }} />
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(msg.content);

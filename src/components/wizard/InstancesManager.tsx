@@ -25,6 +25,7 @@ import {
   getStatus as getWuzapiStatus,
   getQRCode as getWuzapiQRCode,
   connect as connectWuzapi,
+  extractPhoneFromJid,
 } from '@/services/wuzapi';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -229,15 +230,15 @@ export function InstancesManager() {
               .eq('user_id', user.id);
             
             const matched = dbInstances?.find(di => di.name === instanceName || di.phone === instanceName);
-            if (matched?.user_token) {
-              const status = await getWuzapiStatus(creds.baseUrl, matched.user_token);
-              connected = !!status.connected;
-              if (connected && status.jid) {
-                const phone = status.jid.split('@')[0];
-                const { saveWuzapiInstanceDb } = await import('@/services/wuzapi');
-                await saveWuzapiInstanceDb(matched.user_token, phone, matched.name, 'connected');
+              if (matched?.user_token) {
+                const status = await getWuzapiStatus(creds.baseUrl, matched.user_token);
+                connected = !!status.connected;
+                if (connected && status.jid) {
+                  const phone = extractPhoneFromJid(status.jid);
+                  const { saveWuzapiInstanceDb } = await import('@/services/wuzapi');
+                  await saveWuzapiInstanceDb(matched.user_token, phone, matched.name, 'connected');
+                }
               }
-            }
           }
         }
         
