@@ -269,7 +269,7 @@ export async function deleteWuzapiInstanceDb(name: string, userToken: string): P
 }
 
 /**
- * Helper to fetch from WuzAPI with appropriate headers.
+ * Helper to call WuzAPI via Supabase Edge Function (avoids CORS).
  * Admin endpoints use Authorization header, user endpoints use token header.
  */
 async function apiCall(
@@ -281,36 +281,15 @@ async function apiCall(
   isAdmin = false,
 ): Promise<any> {
   if (!baseUrl) throw new Error('WuzAPI base URL não configurada');
-  const cleanBase = baseUrl.replace(/\/+$/, '');
-  const url = `${cleanBase}${endpoint}`;
-  
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (isAdmin) {
-    headers['Authorization'] = token;
-  } else {
-    headers['token'] = token;
-  }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
+  const { data, error } = await supabase.functions.invoke('wuzapi-proxy', {
+    body: { baseUrl, token, endpoint, method, body, isAdmin },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorObj;
-    try {
-      errorObj = JSON.parse(errorText);
-    } catch {
-      // ignore
-    }
-    throw new Error(errorObj?.error || errorText || `API error (${response.status})`);
-  }
+  if (error) throw new Error(error.message || 'Erro no proxy WuzAPI');
+  if (data?.error) throw new Error(data.details?.error || data.error);
 
-  return response.json();
+  return data;
 }
 
 // ============================================================================
