@@ -43,16 +43,19 @@ const STORAGE_KEY = 'wuzapi_credentials';
 /**
  * Saves global WuzAPI settings to localStorage and Supabase.
  */
-export async function saveWuzapiSettings(creds: WuzapiCredentials): Promise<void> {
+export async function saveWuzapiSettings(creds: WuzapiCredentials): Promise<{ success: boolean; error?: string }> {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(creds));
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  
-  await supabase.from('wuzapi_settings').upsert({
+  if (!user) return { success: false, error: 'Usuário não autenticado' };
+
+  const { error } = await supabase.from('wuzapi_settings').upsert({
     user_id: user.id,
     base_url: creds.baseUrl,
     admin_token: creds.adminToken,
   }, { onConflict: 'user_id' });
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
 }
 
 /**
@@ -129,18 +132,20 @@ export async function saveWuzapiInstance(
   name: string,
   phone?: string,
   status: 'connected' | 'disconnected' | 'connecting' = 'disconnected'
-): Promise<void> {
+): Promise<WuzapiInstance | null> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return null;
   
-  await supabase.from('wuzapi_instances').upsert({
+  const { data: inst, error } = await supabase.from('wuzapi_instances').upsert({
     user_id: user.id,
     settings_id: settingsId,
     user_token: userToken,
     phone,
     name,
     status
-  }, { onConflict: 'settings_id,user_token' });
+  }, { onConflict: 'settings_id,user_token' }).select().single();
+  
+  if (error) return null;
   
   await supabase.from('user_instances').upsert({
     user_id: user.id,
@@ -150,6 +155,8 @@ export async function saveWuzapiInstance(
     status: status === 'connected' ? 'connected' : 'connecting',
     source: 'wuzapi'
   }, { onConflict: 'user_id,instance_name' });
+  
+  return inst as WuzapiInstance;
 }
 
 /**
@@ -273,6 +280,7 @@ async function apiCall(
   body?: any,
   isAdmin = false,
 ): Promise<any> {
+  if (!baseUrl) throw new Error('WuzAPI base URL não configurada');
   const cleanBase = baseUrl.replace(/\/+$/, '');
   const url = `${cleanBase}${endpoint}`;
   
@@ -309,13 +317,13 @@ async function apiCall(
 // ADMIN ENDPOINTS
 // ============================================================================
 
-export async function testConnection(baseUrl: string, adminToken: string): Promise<boolean> {
+export async function testConnection(baseUrl: string, adminToken: string): Promise<{ success: boolean; users?: WuzapiUser[] }> {
   try {
-    await listUsers(baseUrl, adminToken);
-    return true;
+    const users = await listUsers(baseUrl, adminToken);
+    return { success: true, users };
   } catch (err) {
     console.error('[WuzAPI] Admin connection test failed:', err);
-    return false;
+    return { success: false };
   }
 }
 

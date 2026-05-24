@@ -355,8 +355,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       try {
         const creds = await loadWuzapiSettings();
         if (creds) {
-          const isOnline = await testWuzapiConnection(creds.baseUrl, creds.adminToken);
-          setWuzapiConnected(isOnline);
+          const result = await testWuzapiConnection(creds.baseUrl, creds.adminToken);
+          setWuzapiConnected(result.success);
           console.log('[WizardContext] WuzAPI connection checked:', isOnline ? 'online' : 'offline');
         }
       } catch (err) {

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  WuzapiSettings as WuzapiSettingsType,
+  WuzapiCredentials,
   testConnection,
   saveWuzapiSettings,
   loadWuzapiSettings,
@@ -36,11 +36,11 @@ export function WuzapiSettings({ onConnectionChange }: WuzapiSettingsProps) {
     async function load() {
       const settings = await loadWuzapiSettings();
       if (settings) {
-        setBaseUrl(settings.base_url);
-        setAdminToken(settings.admin_token);
+        setBaseUrl(settings.baseUrl);
+        setAdminToken(settings.adminToken);
         setIsConnected(true);
         onConnectionChange(true);
-        checkOnline(settings.base_url, settings.admin_token);
+        checkOnline(settings.baseUrl, settings.adminToken);
       }
     }
     load();
@@ -97,11 +97,16 @@ export function WuzapiSettings({ onConnectionChange }: WuzapiSettingsProps) {
     setIsLoading(true);
 
     try {
-      const settings = await saveWuzapiSettings(baseUrl.trim(), adminToken.trim());
-      if (settings) {
+      const result = await saveWuzapiSettings({
+        baseUrl: baseUrl.trim(),
+        adminToken: adminToken.trim(),
+      });
+      if (result.success) {
         setIsConnected(true);
         onConnectionChange(true);
         toast.success('Configurações salvas com sucesso!');
+      } else {
+        toast.error('Erro ao salvar: ' + (result.error || 'Desconhecido'));
       }
     } catch (error: any) {
       toast.error('Erro ao salvar configurações: ' + (error.message || 'Desconhecido'));

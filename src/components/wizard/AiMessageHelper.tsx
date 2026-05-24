@@ -120,7 +120,7 @@ export function AiVaryButton({ texto, onApply }: { texto: string; onApply: (text
   };
 
   async function handleVariar() {
-    if (!texto.trim()) return toast.error('Escreva uma mensagem primeiro');
+    if (!texto?.trim()) return toast.error('Escreva uma mensagem primeiro');
     setBusy(true);
     try {
       const versoes = await variarMensagem(texto, qtd, model);
@@ -141,7 +141,7 @@ export function AiVaryButton({ texto, onApply }: { texto: string; onApply: (text
       }}
     >
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" disabled={!texto.trim()}>
+        <Button type="button" variant="outline" size="sm" disabled={!texto?.trim()}>
           <Wand2 className="mr-2 h-4 w-4" /> Variar
         </Button>
       </DialogTrigger>
