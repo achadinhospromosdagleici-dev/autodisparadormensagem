@@ -89,6 +89,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
       toast.error('Configure a WuzAPI primeiro nas Configurações');
       return;
     }
+    if (!settings.base_url || !settings.admin_token) {
+      toast.error('URL base ou token admin da WuzAPI não configurados');
+      return;
+    }
 
     setCreatingInstance(true);
 
@@ -172,6 +176,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
       toast.error('Configure a WuzAPI primeiro');
       return;
     }
+    if (!settings.base_url) {
+      toast.error('URL base da WuzAPI não configurada');
+      return;
+    }
 
     setQrModalInstance(inst);
     setQrError(null);
@@ -181,7 +189,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
 
   const handleDisconnect = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
-    if (!settings) return;
+    if (!settings?.base_url) return;
 
     try {
       await disconnect(settings.base_url, inst.user_token);
@@ -195,7 +203,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
 
   const handleLogout = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
-    if (!settings) return;
+    if (!settings?.base_url) return;
 
     try {
       await logout(settings.base_url, inst.user_token);
@@ -211,7 +219,7 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     if (!confirm(`Excluir instância "${inst.name}"?`)) return;
 
     const settings = await loadWuzapiSettings();
-    if (settings) {
+    if (settings?.base_url) {
       try {
         await logout(settings.base_url, inst.user_token);
       } catch {}
