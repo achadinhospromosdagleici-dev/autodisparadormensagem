@@ -262,7 +262,7 @@ export function SpreadsheetPasteArea({ onDataPaste, onProcess }: SpreadsheetPast
     }
   };
 
-  const hasData = Array.isArray(cells) && cells.some((row: string[]) => Array.isArray(row) && row.some(cell => cell.trim() !== ''));
+  const hasData = Array.isArray(cells) && cells.some((row: string[]) => Array.isArray(row) && row.some(cell => (cell ?? '').trim() !== ''));
 
   // Debug props
   useEffect(() => {

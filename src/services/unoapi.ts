@@ -127,21 +127,6 @@ function buildApiUrl(baseUrl: string, phoneNumberId: string): string {
 
 // Proxy call via edge function (avoids CORS)
 async function proxyCall(creds: UnoApiCredentials, endpoint: string, method = 'GET', requestBody?: any): Promise<{ ok: boolean; data: any }> {
-  // Local dev: use Vite middleware proxy (same origin, no CORS)
-  if (import.meta.env.DEV) {
-    try {
-      const res = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: creds.baseUrl, token: creds.token, endpoint, method, body: requestBody }),
-      });
-      const data = await res.json();
-      return { ok: res.ok, data };
-    } catch {
-      return { ok: false, data: null };
-    }
-  }
-  // Production: use Supabase Edge Function
   try {
     const { data, error } = await supabase.functions.invoke('unoapi-proxy', {
       body: { 

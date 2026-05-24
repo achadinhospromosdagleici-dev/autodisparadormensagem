@@ -113,7 +113,7 @@ export function StepMessages() {
     if (mediaType === 'buttons') {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (buttons.length === 0) { toast.error('Adicione pelo menos um botão'); return; }
-      const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
+      const invalid = buttons.find(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões'); return; }
     }
     if (mediaType === 'link') {
@@ -128,7 +128,7 @@ export function StepMessages() {
       if (!newMessage.trim()) { toast.error('Digite a descrição da lista'); return; }
       if (!btnTitle.trim()) { toast.error('Digite o título da lista'); return; }
       if (listSections.length === 0) { toast.error('Adicione pelo menos uma seção com itens'); return; }
-      const invalidSection = listSections.find(s => !s.title.trim() || s.rows.length === 0);
+      const invalidSection = listSections.find(s => !(s.title ?? '').trim() || s.rows.length === 0);
       if (invalidSection) { toast.error('Cada seção precisa de título e pelo menos um item'); return; }
     }
     if (mediaType === 'carousel') {
@@ -136,11 +136,11 @@ export function StepMessages() {
       const invalidCard = carouselCards.find(c => !c.title?.trim() || !c.buttons || c.buttons.length === 0);
       if (invalidCard) { toast.error('Cada card precisa de um título e pelo menos um botão'); return; }
       
-      const invalidBtn = carouselCards.some(c => c.buttons.some(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim())));
+      const invalidBtn = carouselCards.some(c => c.buttons.some(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim())));
       if (invalidBtn) { toast.error('Preencha o texto e o valor de todos os botões do carrossel'); return; }
     }
     if (['image', 'video', 'sticker', 'document'].includes(mediaType) && buttons.length > 0) {
-      const invalid = buttons.find(b => !b.label.trim() || (b.type !== 'reply' && !b.value.trim()));
+      const invalid = buttons.find(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim()));
       if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
     }
 
@@ -155,13 +155,13 @@ export function StepMessages() {
 
     if (isEditing) {
       const cleanButtons = buttons.map(b => {
-        let val = b.value.trim();
+        let val = (b.value ?? '').trim();
         if (b.type === 'phone') {
           val = val.replace(/\D/g, '');
         } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
           val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
         }
-        return { ...b, label: b.label.trim(), value: val };
+        return { ...b, label: (b.label ?? '').trim(), value: val };
       });
 
       updateRichMessage(editingMessageId, {
@@ -179,13 +179,13 @@ export function StepMessages() {
       toast.success('Mensagem atualizada');
     } else {
         const cleanButtons = buttons.map(b => {
-          let val = b.value.trim();
+          let val = (b.value ?? '').trim();
           if (b.type === 'phone') {
             val = val.replace(/\D/g, '');
           } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
             val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
           }
-          return { ...b, label: b.label.trim(), value: val };
+          return { ...b, label: (b.label ?? '').trim(), value: val };
         });
 
         if (mediaType === 'buttons') {
