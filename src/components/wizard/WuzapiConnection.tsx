@@ -55,17 +55,12 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
     setInstances(insts);
 
     for (const inst of insts) {
-      if (inst.status === 'connected' || inst.status === 'connecting') {
-        try {
-          const status = await getStatus(settings.baseUrl, inst.user_token);
-          if (status.loggedIn) {
-            await updateWuzapiInstance(inst.id, { status: 'connected' });
-          } else {
-            await updateWuzapiInstance(inst.id, { status: 'disconnected' });
-          }
-        } catch {
-          await updateWuzapiInstance(inst.id, { status: 'disconnected' });
-        }
+      if (!inst.user_token) continue;
+      try {
+        const status = await getStatus(settings.baseUrl, inst.user_token);
+        await updateWuzapiInstance(inst.id, { status: status.loggedIn ? 'connected' : 'disconnected' });
+      } catch {
+        // keep current status
       }
     }
 

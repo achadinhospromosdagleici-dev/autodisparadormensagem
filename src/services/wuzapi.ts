@@ -395,9 +395,9 @@ export async function getStatus(
     // WuzAPI sometimes wraps in { code, data, ... }, sometimes returns directly
     const status = raw?.data || raw;
     return {
-      connected: !!status.connected,
-      loggedIn: !!status.loggedIn,
-      jid: status.jid || undefined,
+      connected: !!(status.Connected || status.connected),
+      loggedIn: !!(status.LoggedIn || status.loggedIn),
+      jid: status.jid || status.Jid || undefined,
     };
   } catch (err) {
     console.error('[WuzAPI] getStatus error:', err);
