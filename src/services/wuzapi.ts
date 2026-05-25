@@ -391,7 +391,9 @@ export async function getStatus(
   userToken: string
 ): Promise<{ connected: boolean; loggedIn: boolean; jid?: string }> {
   try {
-    const status = await apiCall(baseUrl, '/session/status', userToken, 'GET');
+    const raw = await apiCall(baseUrl, '/session/status', userToken, 'GET');
+    // WuzAPI sometimes wraps in { code, data, ... }, sometimes returns directly
+    const status = raw?.data || raw;
     return {
       connected: !!status.connected,
       loggedIn: !!status.loggedIn,

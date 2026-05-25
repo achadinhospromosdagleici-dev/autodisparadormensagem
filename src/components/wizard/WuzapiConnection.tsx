@@ -154,9 +154,8 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
               setQrCode(newQr);
             }
           }
-        } catch {
-          clearInterval(pollInterval);
-          setQrPolling(null);
+        } catch (err) {
+          console.error('[WuzapiConnection] Polling error:', err);
         }
       }, 5000);
 
