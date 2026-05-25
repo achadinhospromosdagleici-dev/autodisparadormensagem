@@ -550,6 +550,60 @@ export async function sendContact(
   return { success: true, id: res.id || res.messageId };
 }
 
+export async function sendSticker(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  stickerData: string,
+  packName?: string,
+  packPublisher?: string,
+  emojis?: string[],
+): Promise<MessageResult> {
+  const payload: Record<string, unknown> = {
+    Phone: to,
+    Sticker: stickerData,
+  };
+  if (packName) payload.PackName = packName;
+  if (packPublisher) payload.PackPublisher = packPublisher;
+  if (emojis) payload.Emojis = emojis;
+  const res = await apiCall(baseUrl, '/chat/send/sticker', userToken, 'POST', payload);
+  return { success: true, id: res.id || res.messageId };
+}
+
+export async function sendLocation(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  latitude: number,
+  longitude: number,
+  name?: string,
+): Promise<MessageResult> {
+  const payload: Record<string, unknown> = {
+    Phone: to,
+    Latitude: latitude,
+    Longitude: longitude,
+  };
+  if (name) payload.Name = name;
+  const res = await apiCall(baseUrl, '/chat/send/location', userToken, 'POST', payload);
+  return { success: true, id: res.id || res.messageId };
+}
+
+export async function sendPoll(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  header: string,
+  options: string[],
+): Promise<MessageResult> {
+  const payload = {
+    Group: to,
+    Header: header,
+    Options: options,
+  };
+  const res = await apiCall(baseUrl, '/chat/send/poll', userToken, 'POST', payload);
+  return { success: true, id: res.id || res.messageId };
+}
+
 // ============================================================================
 // BUTTONS & LIST ENDPOINTS
 // ============================================================================

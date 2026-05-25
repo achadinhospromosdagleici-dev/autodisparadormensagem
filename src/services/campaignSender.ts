@@ -127,7 +127,7 @@ export function sanitizeWaMeUrl(url: string): string {
 
 export interface CampaignMessage {
   content: string;
-  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact';
+  mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'buttons' | 'link' | 'list' | 'carousel' | 'contact' | 'sticker' | 'location' | 'poll';
   mediaUrl?: string;
   mediaCaption?: string;
   mediaFilename?: string;
@@ -139,7 +139,7 @@ export interface CampaignMessage {
   buttons?: { id: string; type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }[];
   // Para tipo 'link'
   linkUrl?: string;
-  // Para tipo 'list' (Evolution Go)
+  // Para tipo 'list' (Evolution Go / WuzAPI)
   sections?: { title: string; rows: { id?: string; title: string; description: string }[] }[];
   // Para tipo 'carousel' (Evolution Go)
   cards?: {
@@ -149,6 +149,12 @@ export interface CampaignMessage {
     footer?: string;
     buttons?: { id: string; type: 'url' | 'phone' | 'reply' | 'copy'; label: string; value: string }[];
   }[];
+  // Para tipo 'location'
+  latitude?: number;
+  longitude?: number;
+  // Para tipo 'poll'
+  pollHeader?: string;
+  pollOptions?: string[];
 }
 
 // Detect which API to use based on selected instance ID prefix
