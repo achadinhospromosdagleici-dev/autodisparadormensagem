@@ -152,14 +152,22 @@ export async function sendWuzapiMessage(
 
     case 'buttons':
       if (msg.buttons && msg.buttons.length > 0) {
-        const buttons = msg.buttons.map(b => ({
-          DisplayText: replaceVariables(b.label, contact),
-          Type: (b.type === 'phone' ? 'call' : b.type === 'url' ? 'url' : 'reply') as 'reply' | 'url' | 'call',
-          ...(b.type === 'url' && b.value ? { Url: replaceVariables(b.value, contact) } : {}),
-          ...(b.type === 'phone' && b.value ? { PhoneNumber: b.value.replace(/\D/g, '') } : {}),
-        }));
-        const body = msg.title ? `${personalizedContent}` : personalizedContent;
-        await wuzapiSendButtons(baseUrl, userToken, to, body, buttons, undefined);
+        const buttons = msg.buttons.map(b => {
+          const label = replaceVariables(b.label, contact);
+          const value = b.value ? replaceVariables(b.value, contact) : '';
+          switch (b.type) {
+            case 'url':
+              return { DisplayText: label, Type: 'url' as const, Url: value };
+            case 'phone':
+              return { DisplayText: label, Type: 'call' as const, PhoneNumber: value.replace(/\D/g, '') };
+            case 'copy':
+              return { DisplayText: label, Type: 'copy' as const, CopyCode: value };
+            case 'reply':
+            default:
+              return { DisplayText: label, Type: 'reply' as const };
+          }
+        });
+        await wuzapiSendButtons(baseUrl, userToken, to, personalizedContent, buttons, undefined, msg.title, msg.footer);
       }
       break;
 

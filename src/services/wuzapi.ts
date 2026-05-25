@@ -613,13 +613,17 @@ export async function sendButtons(
   userToken: string,
   to: string,
   body: string,
-  buttons: { DisplayText: string; Type?: 'reply' | 'url' | 'call'; Url?: string; PhoneNumber?: string }[],
+  buttons: { DisplayText: string; Type?: 'reply' | 'url' | 'call' | 'copy'; Url?: string; PhoneNumber?: string; CopyCode?: string }[],
   imageDataUrl?: string,
+  title?: string,
+  footer?: string,
 ): Promise<MessageResult> {
-  const typeMap = { reply: 'reply', url: 'cta_url', call: 'cta_call' } as const;
+  const typeMap = { reply: 'reply', url: 'cta_url', call: 'cta_call', copy: 'cta_copy' } as const;
   const payload: Record<string, unknown> = {
     Phone: to,
     Body: body,
+    ...(title ? { Title: title } : {}),
+    ...(footer ? { Footer: footer } : {}),
     ...(imageDataUrl ? { Image: imageDataUrl } : {}),
     Buttons: buttons.map((b) => ({
       title: b.DisplayText,
@@ -627,6 +631,7 @@ export async function sendButtons(
       type: typeMap[b.Type ?? 'reply'],
       ...(b.Url ? { url: b.Url } : {}),
       ...(b.PhoneNumber ? { phone_number: b.PhoneNumber } : {}),
+      ...(b.CopyCode ? { copy_code: b.CopyCode } : {}),
     })),
   };
   const res = await apiCall(baseUrl, '/chat/send/buttons', userToken, 'POST', payload);
