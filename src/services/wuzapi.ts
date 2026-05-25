@@ -98,6 +98,7 @@ export async function loadWuzapiSettings(): Promise<WuzapiCredentials | null> {
 
 /**
  * Loads all WuzAPI instances for the current user.
+ * Also migrates legacy instances from user_instances table (source='wuzapi').
  */
 export async function loadWuzapiInstances(): Promise<WuzapiInstance[]> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -109,7 +110,50 @@ export async function loadWuzapiInstances(): Promise<WuzapiInstance[]> {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
   
-  return (data || []) as WuzapiInstance[];
+  const instances = (data || []) as WuzapiInstance[];
+
+  // Migrate legacy instances from user_instances (source='wuzapi') that don't exist yet
+  const { data: legacyInstances } = await supabase
+    .from('user_instances')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('source', 'wuzapi');
+
+  if (legacyInstances) {
+    const existingNames = new Set(instances.map(i => i.name));
+    const { data: settings } = await supabase
+      .from('wuzapi_settings')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    for (const legacy of legacyInstances) {
+      const name = legacy.profile_name || legacy.instance_name.replace(/^wuz_/, '');
+      if (!name || existingNames.has(name)) continue;
+
+      const status: 'connected' | 'disconnected' = legacy.status === 'connected' ? 'connected' : 'disconnected';
+
+      const { data: newInst } = await supabase
+        .from('wuzapi_instances')
+        .insert({
+          user_id: user.id,
+          settings_id: settings?.id || null,
+          user_token: '',
+          name,
+          phone: legacy.phone,
+          status,
+        })
+        .select()
+        .single();
+
+      if (newInst) {
+        instances.push(newInst as WuzapiInstance);
+        existingNames.add(name);
+      }
+    }
+  }
+
+  return instances;
 }
 
 /**

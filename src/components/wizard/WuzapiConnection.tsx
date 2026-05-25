@@ -3,7 +3,6 @@ import {
   MessageCircle,
   Plus,
   RefreshCw,
-  Wifi,
   WifiOff,
   Trash2,
   Loader2,
@@ -180,6 +179,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
       toast.error('URL base da WuzAPI não configurada');
       return;
     }
+    if (!inst.user_token) {
+      toast.error('Token da instância não disponível. Crie uma nova instância.');
+      return;
+    }
 
     setQrModalInstance(inst);
     setQrError(null);
@@ -190,6 +193,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
   const handleDisconnect = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
     if (!settings?.baseUrl) return;
+    if (!inst.user_token) {
+      toast.error('Token da instância não disponível');
+      return;
+    }
 
     try {
       await disconnect(settings.baseUrl, inst.user_token);
@@ -204,6 +211,10 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
   const handleLogout = async (inst: WuzapiInstanceDb) => {
     const settings = await loadWuzapiSettings();
     if (!settings?.baseUrl) return;
+    if (!inst.user_token) {
+      toast.error('Token da instância não disponível');
+      return;
+    }
 
     try {
       await logout(settings.baseUrl, inst.user_token);
@@ -278,14 +289,27 @@ export function WuzapiConnection({ onInstancesChange }: WuzapiConnectionProps) {
           {instances.map(inst => (
             <div
               key={inst.id}
-              className="p-3 rounded-lg bg-muted/30 border border-border/50"
+              className={`p-3 rounded-lg bg-muted/30 border ${
+                inst.status === 'connected' ? 'border-success/30 bg-success/[0.02]' : 'border-border/50'
+              }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {inst.status === 'connected' ? (
-                    <Wifi className="w-4 h-4 text-green-500" />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-success/15 text-success border border-success/25">
+                      <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                      Online
+                    </span>
+                  ) : inst.status === 'connecting' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-warning/15 text-warning border border-warning/25">
+                      <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
+                      Conectando
+                    </span>
                   ) : (
-                    <WifiOff className="w-4 h-4 text-muted-foreground" />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border/50">
+                      <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+                      Offline
+                    </span>
                   )}
                   <div>
                     <p className="text-sm font-medium">{inst.name}</p>
