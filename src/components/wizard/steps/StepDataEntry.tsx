@@ -1,9 +1,20 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useWizard, DataRow } from '@/contexts/WizardContext';
 import { validatePhoneNumber, parseCSVLine, detectDelimiter } from '@/utils/phoneValidation';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Table, FileText, ListOrdered, Plus } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Table, FileText, ListOrdered, Plus, Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SpreadsheetPasteArea } from '../SpreadsheetPasteArea';
+import {
+  loadWuzapiInstances,
+  loadWuzapiSettings,
+  listGroups as wuzapiListGroups,
+} from '@/services/wuzapi';
+import {
+  loadUnoApiCredentialsWithFallback,
+  fetchInstances as fetchUnoInstances,
+  listUnoGroups,
+  getUnoGroupParticipants,
+} from '@/services/unoapi';
 
 export function StepDataEntry() {
   const { setData, setColumns, data, columns, settings, setSettings, nextStep } = useWizard();
@@ -11,8 +22,13 @@ export function StepDataEntry() {
   const [isDragging, setIsDragging] = useState(false);
   const [showPasteArea, setShowPasteArea] = useState(false);
 
-  // NÃO auto-ocultar - área só fecha quando usuário clica em Processar ou Fechar
-
+  const [showGroupImport, setShowGroupImport] = useState(false);
+  const [phones, setPhones] = useState<{ id: string; label: string; hasUno: boolean; wuzId?: string; wuzUrl?: string; wuzToken?: string }[]>([]);
+  const [selectedPhone, setSelectedPhone] = useState('');
+  const [groups, setGroups] = useState<{ id: string; name: string; participants?: { name: string; phone: string }[] }[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [importingGroups, setImportingGroups] = useState(false);
 
   const processData = useCallback((text: string, hasHeader: boolean = true) => {
     const lines = text.trim().split('\n').filter(line => line.trim());
@@ -25,7 +41,6 @@ export function StepDataEntry() {
     const delimiter = detectDelimiter(text);
     const headerLine = parseCSVLine(lines[0], delimiter);
     
-    // Se tem cabeçalho, os dados reais começam na linha 2 (índice 1)
     const dataLines = hasHeader ? lines.slice(1) : lines;
     
     const rows: any[] = dataLines.map(line => {
@@ -39,7 +54,6 @@ export function StepDataEntry() {
         row[col] = values[i] || '';
       });
 
-      // Se a coluna 'numero' existir, validar
       if (row.numero) {
         const validation = validatePhoneNumber(row.numero, true);
         row.isValid = validation.isValid;
@@ -89,12 +103,148 @@ export function StepDataEntry() {
     }
   }, [processData, settings.hasHeader]);
 
+  const loadPhones = useCallback(async () => {
+    const list: typeof phones = [];
+    const seen = new Set<string>();
+
+    const unoCreds = await loadUnoApiCredentialsWithFallback();
+    if (unoCreds) {
+      const result = await fetchUnoInstances(unoCreds);
+      for (const inst of result.instances || []) {
+        if (inst.status !== 'connected') continue;
+        if (!seen.has(inst.phone)) {
+          seen.add(inst.phone);
+          list.push({ id: inst.phone, label: `${inst.name || inst.phone} (UnoAPI)`, hasUno: true });
+        }
+      }
+    }
+
+    const wuzSettings = await loadWuzapiSettings();
+    if (wuzSettings?.url) {
+      const wuzInsts = await loadWuzapiInstances();
+      for (const inst of wuzInsts) {
+        if (inst.status !== 'connected') continue;
+        const phone = inst.phone || inst.id;
+        if (!phone) continue;
+        const existing = list.find(e => e.id === phone);
+        if (existing) {
+          existing.hasUno = existing.hasUno || false;
+          existing.wuzId = inst.id;
+          existing.wuzUrl = wuzSettings.url;
+          existing.wuzToken = inst.user_token;
+          existing.label = `${phone} (UnoAPI/WuzAPI)`;
+        } else if (!seen.has(phone)) {
+          seen.add(phone);
+          list.push({
+            id: phone,
+            label: `${phone} (WuzAPI)`,
+            hasUno: false,
+            wuzId: inst.id,
+            wuzUrl: wuzSettings.url,
+            wuzToken: inst.user_token,
+          });
+        }
+      }
+    }
+
+    setPhones(list);
+  }, []);
+
+  useEffect(() => {
+    if (showGroupImport) loadPhones();
+  }, [showGroupImport, loadPhones]);
+
+  const handleLoadGroups = useCallback(async () => {
+    if (!selectedPhone) return;
+    setLoadingGroups(true);
+    const entry = phones.find(p => p.id === selectedPhone);
+    const allGroups: typeof groups = [];
+
+    if (entry?.hasUno) {
+      const creds = await loadUnoApiCredentialsWithFallback();
+      if (creds) {
+        const unoGroups = await listUnoGroups(creds, entry.id);
+        for (const g of unoGroups) {
+          const participants = await getUnoGroupParticipants(creds, entry.id, g.jid);
+          allGroups.push({
+            id: g.jid,
+            name: g.subject || g.jid,
+            participants: participants.map(p => ({
+              name: p.name || '',
+              phone: p.phone || '',
+            })),
+          });
+        }
+      }
+    }
+
+    if (allGroups.length === 0 && entry?.wuzUrl && entry?.wuzToken) {
+      const wuzGroups = await wuzapiListGroups(entry.wuzUrl, entry.wuzToken);
+      for (const g of wuzGroups) {
+        allGroups.push({
+          id: g.jid,
+          name: g.name || g.jid,
+          participants: g.participants.map(p => ({
+            name: '',
+            phone: p.phone || '',
+          })),
+        });
+      }
+    }
+
+    setGroups(allGroups);
+    setLoadingGroups(false);
+  }, [selectedPhone, phones]);
+
+  const handleImportSelectedGroups = useCallback(async () => {
+    if (selectedGroups.size === 0) return;
+    setImportingGroups(true);
+
+    const rows: any[] = [];
+    const seen = new Set<string>();
+
+    for (const g of groups) {
+      if (!selectedGroups.has(g.id)) continue;
+      for (const p of g.participants || []) {
+        const cleanPhone = p.phone.replace(/\D/g, '');
+        if (!cleanPhone || seen.has(cleanPhone)) continue;
+        seen.add(cleanPhone);
+        rows.push({
+          id: crypto.randomUUID(),
+          nome: p.name || `Grupo: ${g.name}`,
+          numero: cleanPhone,
+          isValid: cleanPhone.length >= 10,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      setData(rows);
+      setColumns(['nome', 'numero']);
+      toast.success(`${rows.length} contatos importados de ${selectedGroups.size} grupo(s)`);
+      setShowGroupImport(false);
+      setSelectedGroups(new Set());
+      setGroups([]);
+      setSelectedPhone('');
+    } else {
+      toast.error('Nenhum contato encontrado nos grupos selecionados');
+    }
+
+    setImportingGroups(false);
+  }, [selectedGroups, groups, setData, setColumns]);
+
+  const toggleGroup = (id: string) => {
+    setSelectedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4">
-      {/* Toggle between paste areas */}
-      {!showPasteArea && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Textarea paste area */}
+      {!showPasteArea && !showGroupImport && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div 
             className={`relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${
               isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
@@ -111,11 +261,8 @@ export function StepDataEntry() {
             </div>
           </div>
 
-          {/* Textarea paste area (simple) */}
           <div 
-            className={`relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${
-              isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-            }`}
+            className="relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer border-border hover:border-primary/50"
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={(e) => {
@@ -142,7 +289,6 @@ export function StepDataEntry() {
             </div>
           </div>
 
-          {/* File upload */}
           <label className="relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer hover:border-primary/50 block">
             <input 
               type="file" 
@@ -156,10 +302,20 @@ export function StepDataEntry() {
               <p className="text-xs text-muted-foreground">Envie um arquivo CSV ou TXT</p>
             </div>
           </label>
+
+          <div 
+            className="relative border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer border-border hover:border-primary/50"
+            onClick={() => setShowGroupImport(true)}
+          >
+            <div className="text-center space-y-2">
+              <Users className="w-8 h-8 mx-auto text-muted-foreground" />
+              <div className="font-medium">Grupos</div>
+              <p className="text-xs text-muted-foreground">Importar contatos de grupos do WhatsApp</p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Show paste area when toggled */}
       {showPasteArea && (
         <div className="relative">
           <div className="flex justify-between items-center mb-2">
@@ -199,15 +355,120 @@ export function StepDataEntry() {
         </div>
       )}
 
-      {/* Instructions - Collapsible */}
-      {data.length === 0 && !showPasteArea && (
+      {showGroupImport && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Importar de Grupos
+            </h3>
+            <button
+              onClick={() => { setShowGroupImport(false); setGroups([]); setSelectedGroups(new Set()); }}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              ✕ Fechar
+            </button>
+          </div>
+
+          {phones.length === 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Carregando números...
+            </div>
+          )}
+
+          {phones.length > 0 && (
+            <div className="flex gap-2">
+              <select
+                value={selectedPhone}
+                onChange={(e) => setSelectedPhone(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+              >
+                <option value="">Selecione um número</option>
+                {phones.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleLoadGroups}
+                disabled={!selectedPhone || loadingGroups}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 disabled:opacity-50"
+              >
+                {loadingGroups ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Carregar Grupos'
+                )}
+              </button>
+            </div>
+          )}
+
+          {groups.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {groups.length} grupos encontrados
+                </span>
+                <button
+                  onClick={handleImportSelectedGroups}
+                  disabled={selectedGroups.size === 0 || importingGroups}
+                  className="px-3 py-1.5 bg-success text-white rounded-lg text-sm hover:bg-success/90 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {importingGroups ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      Importar {selectedGroups.size} grupo(s)
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                {groups.map(g => {
+                  const total = g.participants?.length || 0;
+                  return (
+                    <label
+                      key={g.id}
+                      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                        selectedGroups.has(g.id) ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedGroups.has(g.id)}
+                        onChange={() => toggleGroup(g.id)}
+                        className="rounded border-border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{g.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {total} {total === 1 ? 'participante' : 'participantes'}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {!loadingGroups && groups.length === 0 && selectedPhone && (
+            <p className="text-sm text-muted-foreground">
+              Nenhum grupo encontrado para este número.
+            </p>
+          )}
+        </div>
+      )}
+
+      {data.length === 0 && !showPasteArea && !showGroupImport && (
         <div className="p-4 bg-muted/50 rounded-lg space-y-2">
           <div className="flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="w-4 h-4" />
             Como importar dados:
           </div>
           <ul className="text-xs text-muted-foreground space-y-1 ml-6 list-disc">
-            <li>Escolha uma das opções acima (Planilha, Texto Simples ou Upload)</li>
+            <li>Escolha uma das opções acima (Planilha, Texto Simples, Upload ou Grupos)</li>
             <li>Cole ou arraste dados no formato: <strong>telefone, nome, empresa...</strong></li>
             <li>A primeira linha será usada como cabeçalho</li>
             <li>O sistema detectará automaticamente números de telefone</li>
@@ -215,8 +476,7 @@ export function StepDataEntry() {
         </div>
       )}
 
-      {/* Show current data summary when we have data */}
-      {(data.length > 0 && !showPasteArea) && (
+      {(data.length > 0 && !showPasteArea && !showGroupImport) && (
         <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-success">
@@ -237,7 +497,6 @@ export function StepDataEntry() {
         </div>
       )}
 
-      {/* Format options */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
         <label className="flex items-center gap-2 cursor-pointer">
           <input

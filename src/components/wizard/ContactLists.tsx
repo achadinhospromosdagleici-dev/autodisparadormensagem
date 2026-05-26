@@ -13,6 +13,7 @@ import {
   Loader2,
   Search,
   UserPlus,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,7 @@ import {
   ContactList,
   Contact,
 } from '@/services/contactLists';
+import { consultarCnpj, cnpjToAttributes, CnpjData } from '@/services/cnpj';
 
 export function ContactLists() {
   const [lists, setLists] = useState<ContactList[]>([]);
@@ -45,6 +47,11 @@ export function ContactLists() {
   const [contactAttrs, setContactAttrs] = useState('');
   const [editingContact, setEditingContact] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [cnpjQuery, setCnpjQuery] = useState('');
+  const [cnpjResult, setCnpjResult] = useState<CnpjData | null>(null);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjExpanded, setCnpjExpanded] = useState(false);
+  const [cnpjBusyContacts, setCnpjBusyContacts] = useState<Set<string>>(new Set());
 
   function loadLists() {
     setLists(getContactLists());
@@ -116,6 +123,69 @@ export function ContactLists() {
     deleteContact(contactId);
     if (selectedListId) setContacts(getContacts(selectedListId));
     toast.success('Contato excluído!');
+  }
+
+  async function handleCnpjLookup(cnpj: string) {
+    setCnpjLoading(true);
+    setCnpjResult(null);
+    const data = await consultarCnpj(cnpj);
+    if (!data) {
+      toast.error('CNPJ não encontrado');
+    } else {
+      setCnpjResult(data);
+      toast.success('Dados encontrados!');
+    }
+    setCnpjLoading(false);
+  }
+
+  async function handleBatchCnpjEnrich() {
+    if (!selectedListId) return;
+    const withCnpj = contacts.filter(c => c.attributes['cnpj']?.replace(/\D/g, '').length === 14);
+    if (withCnpj.length === 0) { toast.error('Nenhum contato com CNPJ válido'); return; }
+    const busy = new Set<string>();
+    let success = 0;
+    for (const c of withCnpj) {
+      busy.add(c.id);
+      setCnpjBusyContacts(new Set(busy));
+      const data = await consultarCnpj(c.attributes['cnpj']);
+      if (data) {
+        const newAttrs = { ...c.attributes, ...cnpjToAttributes(data) };
+        updateContact(c.id, { attributes: newAttrs });
+        success++;
+      }
+    }
+    setCnpjBusyContacts(new Set());
+    if (selectedListId) setContacts(getContacts(selectedListId));
+    toast.success(`${success} de ${withCnpj.length} contatos enriquecidos`);
+  }
+
+  async function handleCnpjForContact(contact: Contact) {
+    const cnpj = contact.attributes['cnpj']?.replace(/\D/g, '');
+    if (!cnpj || cnpj.length !== 14) {
+      toast.error('CNPJ inválido no contato');
+      return;
+    }
+    setCnpjBusyContacts(prev => new Set(prev).add(contact.id));
+    const data = await consultarCnpj(cnpj);
+    if (data) {
+      const newAttrs = { ...contact.attributes, ...cnpjToAttributes(data) };
+      updateContact(contact.id, { attributes: newAttrs });
+      if (selectedListId) setContacts(getContacts(selectedListId));
+      toast.success('Dados do CNPJ adicionados aos atributos!');
+    } else {
+      toast.error('CNPJ não encontrado');
+    }
+    setCnpjBusyContacts(prev => { const s = new Set(prev); s.delete(contact.id); return s; });
+  }
+
+  function handleAddCnpjResultToList() {
+    if (!selectedListId || !cnpjResult) return;
+    createContact(selectedListId, cnpjResult.razao_social || cnpjResult.nome_fantasia, cnpjResult.telefone?.replace(/\D/g, '') || '', {
+      ...cnpjToAttributes(cnpjResult),
+      cnpj: cnpjResult.cnpj,
+    });
+    setContacts(getContacts(selectedListId));
+    toast.success('Contato adicionado à lista!');
   }
 
   function handleCsvImport() {
@@ -227,6 +297,47 @@ export function ContactLists() {
         </div>
       )}
 
+      {/* CNPJ Consultation */}
+      <div className="glass-card p-4 space-y-3">
+        <button onClick={() => setCnpjExpanded(!cnpjExpanded)} className="flex items-center justify-between w-full text-left">
+          <span className="text-sm font-medium flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Consultar CNPJ
+          </span>
+          <span className="text-xs text-muted-foreground">{cnpjExpanded ? '▲' : '▼'}</span>
+        </button>
+        {cnpjExpanded && (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input value={cnpjQuery} onChange={e => setCnpjQuery(e.target.value)} placeholder="Digite um CNPJ (apenas números)"
+                className="flex-1 px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm" />
+              <button onClick={() => handleCnpjLookup(cnpjQuery)} disabled={cnpjQuery.replace(/\D/g, '').length !== 14 || cnpjLoading}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1">
+                {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Buscar'}
+              </button>
+            </div>
+            {cnpjResult && (
+              <div className="text-xs space-y-1 p-3 bg-muted/30 rounded-lg">
+                <p><strong>Razão Social:</strong> {cnpjResult.razao_social}</p>
+                <p><strong>Fantasia:</strong> {cnpjResult.nome_fantasia}</p>
+                <p><strong>Endereço:</strong> {[cnpjResult.logradouro, cnpjResult.numero, cnpjResult.bairro].filter(Boolean).join(', ')}</p>
+                <p><strong>Cidade/UF:</strong> {cnpjResult.municipio}/{cnpjResult.uf}</p>
+                <p><strong>Telefone:</strong> {cnpjResult.telefone}</p>
+                <p><strong>Email:</strong> {cnpjResult.email}</p>
+                <p><strong>CNAE:</strong> {cnpjResult.cnae_fiscal_descricao}</p>
+                <p><strong>Situação:</strong> {cnpjResult.descricao_situacao_cadastral}</p>
+                {selectedListId && (
+                  <button onClick={handleAddCnpjResultToList}
+                    className="mt-2 w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
+                    Adicionar como contato na lista atual
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {!selectedListId ? (
         /* List Grid */
         lists.length === 0 ? (
@@ -293,6 +404,12 @@ export function ContactLists() {
               className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm hover:bg-accent">
               <Download className="h-4 w-4" /> Exportar CSV
             </button>
+            {contacts.some(c => c.attributes['cnpj']) && (
+              <button onClick={handleBatchCnpjEnrich}
+                className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-input text-sm hover:bg-accent ml-auto">
+                <Building2 className="h-4 w-4" /> Enriquecer CNPJs
+              </button>
+            )}
           </div>
 
           {/* Add/Edit Contact Form */}
@@ -358,6 +475,13 @@ export function ContactLists() {
                         ))}
                       </td>
                       <td className="px-4 py-3 text-right">
+                        {c.attributes['cnpj'] && (
+                          <button onClick={() => handleCnpjForContact(c)} disabled={cnpjBusyContacts.has(c.id)}
+                            className="p-1.5 rounded-md hover:bg-accent text-muted-foreground inline-block"
+                            title="Buscar dados do CNPJ">
+                            {cnpjBusyContacts.has(c.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
                         <button onClick={() => startEditContact(c)}
                           className="p-1.5 rounded-md hover:bg-accent text-muted-foreground inline-block"><Edit3 className="h-3.5 w-3.5" /></button>
                         <button onClick={() => handleDeleteContact(c.id)}

@@ -1,4 +1,4 @@
-project_id = "ghoedllzghqltpqxyylv"
+project_id = "wbwpzsuxwwjplyzbjqmo"
 
 [auth]
 site_url = "http://localhost:8080/"
@@ -20,4 +20,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.wuzapi-proxy]
+verify_jwt = false
+
+[functions.group-scraper]
 verify_jwt = false

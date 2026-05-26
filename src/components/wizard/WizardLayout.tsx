@@ -18,6 +18,8 @@ import { SuperAdminPanel } from './SuperAdminPanel';
 import { LinkGenerator } from './LinkGenerator';
 import { GroupSender } from './GroupSender';
 import { ContactLists } from './ContactLists';
+import { GroupScraper } from './GroupScraper';
+import { ChipMaturer } from './ChipMaturer';
 import { resendCampaign } from '@/services/campaignSender';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -212,6 +214,20 @@ export function WizardLayout() {
         return (
           <div className="space-y-6">
             <ContactLists />
+          </div>
+        );
+
+      case 'group-scraper':
+        return (
+          <div className="space-y-6">
+            <GroupScraper />
+          </div>
+        );
+
+      case 'chip-maturer':
+        return (
+          <div className="space-y-6">
+            <ChipMaturer />
           </div>
         );
 
