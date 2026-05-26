@@ -782,6 +782,66 @@ export async function sendCarouselMessage(
 }
 
 // Generic send based on media type
+// ============================================================================
+// GROUP ENDPOINTS
+// ============================================================================
+
+export interface UnoGroup {
+  jid: string;
+  subject: string;
+  participantsCount: number;
+}
+
+export interface UnoGroupParticipant {
+  jid: string;
+  phone: string;
+  name: string;
+}
+
+export async function listUnoGroups(
+  creds: UnoApiCredentials,
+  phone: string,
+): Promise<UnoGroup[]> {
+  try {
+    const result = await proxyCall(creds, `/v15.0/${phone}/groups`);
+    if (!result.ok) return [];
+    const groups: any[] = result.data?.groups || [];
+    return groups.map((g: any) => ({
+      jid: g.jid || '',
+      subject: g.subject || '(Sem nome)',
+      participantsCount: g.participantsCount || 0,
+    }));
+  } catch (err) {
+    console.error('[UnoAPI] listUnoGroups error:', err);
+    return [];
+  }
+}
+
+export async function getUnoGroupParticipants(
+  creds: UnoApiCredentials,
+  phone: string,
+  groupId: string,
+): Promise<UnoGroupParticipant[]> {
+  try {
+    const cleanId = groupId.replace(/@g\.us$/, '');
+    const result = await proxyCall(creds, `/v15.0/${phone}/groups/${cleanId}/participants`);
+    if (!result.ok) return [];
+    const participants: any[] = result.data?.participants || [];
+    return participants.map((p: any) => {
+      const jid = p.jid || '';
+      const phoneNum = jid.split('@')[0]?.split(':')[0] || jid;
+      return {
+        jid,
+        phone: phoneNum,
+        name: p.name || '',
+      };
+    });
+  } catch (err) {
+    console.error('[UnoAPI] getUnoGroupParticipants error:', err);
+    return [];
+  }
+}
+
 export async function sendUnoApiMessage(
   creds: UnoApiCredentials,
   phoneNumberId: string,

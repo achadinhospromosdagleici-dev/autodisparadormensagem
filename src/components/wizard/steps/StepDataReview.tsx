@@ -4,8 +4,8 @@ import { validatePhoneNumber, cleanPhoneValue, columnLooksLikePhone } from '@/ut
 import { autoMatchColumn, saveMappingHistory } from '@/utils/mappingStorage';
 import {
   Search, Filter, Trash2, CheckCircle2, AlertCircle, Edit3, Check, X,
-  ChevronDown, MoreHorizontal, Phone, Sparkles, EyeOff, Eye, ArrowRight,
-  Zap, RotateCcw, Save,
+  ChevronDown, MoreHorizontal, Phone, Sparkles, EyeOff, Eye,
+  RotateCcw, Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -370,28 +370,7 @@ export function StepDataReview() {
             </label>
           </div>
 
-          {/* Prominent Apply Button */}
-          <button
-            onClick={applyMapping}
-            disabled={!hasNumeroMapped}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ${
-              hasNumeroMapped
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-          >
-            <Zap className="w-4 h-4" />
-            Aplicar Mapeamento
-            <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
-
-        {!hasNumeroMapped && (
-          <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">
-            <AlertCircle className="w-3.5 h-3.5" />
-            Selecione qual coluna contém o número de telefone (campo obrigatório)
-          </div>
-        )}
 
         {skippedRows.size > 0 && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-lg">

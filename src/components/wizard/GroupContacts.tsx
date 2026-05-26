@@ -16,50 +16,196 @@ import {
   loadWuzapiSettings,
   loadWuzapiInstances,
   listGroups,
-  getGroupInfo,
   WuzapiGroup,
-  WuzapiInstance,
+  WuzapiGroupParticipant,
 } from '@/services/wuzapi';
+import {
+  loadUnoApiCredentialsWithFallback,
+  fetchInstances as fetchUnoInstances,
+  listUnoGroups,
+  getUnoGroupParticipants,
+} from '@/services/unoapi';
+
+interface PhoneEntry {
+  phone: string;
+  label: string;
+  hasWuzapi: boolean;
+  hasUnoapi: boolean;
+  wuzapiInstanceId?: string;
+}
+
+interface UnifiedParticipant {
+  jid: string;
+  phone: string;
+  name?: string;
+  isAdmin?: boolean;
+}
+
+interface UnifiedGroup {
+  jid: string;
+  name: string;
+  participants: UnifiedParticipant[];
+}
+
+type GroupApiSource = 'wuzapi' | 'unoapi';
+
+async function loadGroupsFromWuzapi(settings: any, instanceId: string): Promise<{ groups: UnifiedGroup[]; source: GroupApiSource }> {
+  const result = await listGroups(settings.baseUrl, settings.userToken);
+  const unified: UnifiedGroup[] = result.map((g: WuzapiGroup) => ({
+    jid: g.jid,
+    name: g.name,
+    participants: g.participants.map((p: WuzapiGroupParticipant) => ({
+      jid: p.jid,
+      phone: p.phone,
+      isAdmin: p.isAdmin,
+    })),
+  }));
+  return { groups: unified, source: 'wuzapi' };
+}
+
+async function loadGroupsFromUnoapi(creds: any, phone: string): Promise<{ groups: UnifiedGroup[]; source: GroupApiSource }> {
+  const unoGroups = await listUnoGroups(creds, phone);
+  const unified: UnifiedGroup[] = [];
+  for (const g of unoGroups) {
+    const participants = await getUnoGroupParticipants(creds, phone, g.jid);
+    unified.push({
+      jid: g.jid,
+      name: g.subject,
+      participants: participants.map(p => ({
+        jid: p.jid,
+        phone: p.phone,
+        name: p.name,
+      })),
+    });
+  }
+  return { groups: unified, source: 'unoapi' };
+}
+
+async function getWuzapiInstanceCreds(instanceId: string): Promise<{ baseUrl: string; userToken: string } | null> {
+  const settings = await loadWuzapiSettings();
+  if (!settings) return null;
+  const instances = await loadWuzapiInstances();
+  const inst = instances.find(i => i.id === instanceId);
+  if (!inst) return null;
+  return { baseUrl: settings.baseUrl, userToken: inst.user_token };
+}
 
 export function GroupContacts() {
-  const [instances, setInstances] = useState<WuzapiInstance[]>([]);
-  const [selectedInstance, setSelectedInstance] = useState<string>('');
-  const [groups, setGroups] = useState<WuzapiGroup[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [phoneEntries, setPhoneEntries] = useState<PhoneEntry[]>([]);
+  const [selectedPhone, setSelectedPhone] = useState<string>('');
+  const [groups, setGroups] = useState<UnifiedGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [groupSource, setGroupSource] = useState<GroupApiSource | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    loadInstances();
+    loadPhones();
   }, []);
 
-  async function loadInstances() {
+  async function loadPhones() {
     setLoading(true);
-    const insts = await loadWuzapiInstances();
-    setInstances(insts.filter(i => i.status === 'connected'));
+    const entries: PhoneEntry[] = [];
+    const seen = new Set<string>();
+
+    const wuzapiInsts = (await loadWuzapiInstances()).filter(i => i.status === 'connected');
+    for (const inst of wuzapiInsts) {
+      if (inst.phone && !seen.has(inst.phone)) {
+        seen.add(inst.phone);
+        entries.push({
+          phone: inst.phone,
+          label: `${inst.name} (${inst.phone})`,
+          hasWuzapi: true,
+          hasUnoapi: false,
+          wuzapiInstanceId: inst.id,
+        });
+      } else if (inst.phone) {
+        const existing = entries.find(e => e.phone === inst.phone);
+        if (existing) {
+          existing.hasWuzapi = true;
+          existing.wuzapiInstanceId = inst.id;
+        }
+      }
+    }
+
+    const unoCreds = await loadUnoApiCredentialsWithFallback();
+    if (unoCreds) {
+      const { instances: unoInsts } = await fetchUnoInstances(unoCreds);
+      for (const inst of unoInsts.filter(i => i.status === 'connected')) {
+        if (seen.has(inst.phone)) {
+          const existing = entries.find(e => e.phone === inst.phone);
+          if (existing) existing.hasUnoapi = true;
+        } else {
+          seen.add(inst.phone);
+          entries.push({
+            phone: inst.phone,
+            label: `${inst.name || inst.phone} (${inst.phone})`,
+            hasWuzapi: false,
+            hasUnoapi: true,
+          });
+        }
+      }
+    }
+
+    for (const e of entries) {
+      const apiBadges: string[] = [];
+      if (e.hasWuzapi) apiBadges.push('W');
+      if (e.hasUnoapi) apiBadges.push('U');
+      if (apiBadges.length > 0) e.label += ` [${apiBadges.join('/')}]`;
+    }
+
+    entries.sort((a, b) => a.label.localeCompare(b.label));
+    setPhoneEntries(entries);
     setLoading(false);
-    if (insts.length > 0) setSelectedInstance(insts[0].id);
+    if (entries.length > 0) setSelectedPhone(entries[0].phone);
   }
 
   async function handleLoadGroups() {
-    if (!selectedInstance) return;
+    if (!selectedPhone) return;
     setLoadingGroups(true);
     setGroups([]);
-    try {
-      const creds = await getInstanceCreds(selectedInstance);
-      if (!creds) {
-        toast.error('Credenciais da instância não encontradas');
-        return;
-      }
-      const result = await listGroups(creds.baseUrl, creds.userToken);
-      setGroups(result);
+    setGroupSource(null);
+    const entry = phoneEntries.find(e => e.phone === selectedPhone);
+    if (!entry) {
+      toast.error('Selecione um número');
+      setLoadingGroups(false);
+      return;
+    }
 
-      if (result.length === 0) {
-        toast.info('Nenhum grupo encontrado nesta instância');
+    try {
+      if (entry.hasWuzapi && entry.wuzapiInstanceId) {
+        const creds = await getWuzapiInstanceCreds(entry.wuzapiInstanceId);
+        if (!creds) {
+          toast.error('Credenciais WuzAPI não encontradas');
+          setLoadingGroups(false);
+          return;
+        }
+        const result = await loadGroupsFromWuzapi(creds, entry.wuzapiInstanceId);
+        if (result.groups.length > 0) {
+          setGroups(result.groups);
+          setGroupSource('wuzapi');
+          toast.success(`${result.groups.length} grupo(s) carregado(s) via WuzAPI`);
+          setLoadingGroups(false);
+          return;
+        }
+      }
+
+      if (entry.hasUnoapi) {
+        const unoCreds = await loadUnoApiCredentialsWithFallback();
+        if (unoCreds) {
+          const result = await loadGroupsFromUnoapi(unoCreds, entry.phone);
+          if (result.groups.length > 0) {
+            setGroups(result.groups);
+            setGroupSource('unoapi');
+            toast.success(`${result.groups.length} grupo(s) carregado(s) via UnoAPI`);
+          } else {
+            toast.info('Nenhum grupo encontrado');
+          }
+        }
       } else {
-        toast.success(`${result.length} grupo(s) carregado(s)`);
+        toast.info('Nenhum grupo encontrado');
       }
     } catch (err: any) {
       toast.error('Erro ao carregar grupos: ' + (err.message || ''));
@@ -68,24 +214,26 @@ export function GroupContacts() {
     }
   }
 
-  async function getInstanceCreds(instanceId: string) {
-    const settings = await loadWuzapiSettings();
-    if (!settings) return null;
-    const inst = instances.find(i => i.id === instanceId);
-    if (!inst) return null;
-    return { baseUrl: settings.baseUrl, userToken: inst.user_token };
-  }
-
-  async function toggleGroup(group: WuzapiGroup) {
+  async function toggleGroup(group: UnifiedGroup) {
     if (expandedGroup === group.jid) {
       setExpandedGroup(null);
       return;
     }
     if (group.participants.length === 0) {
-      const creds = await getInstanceCreds(selectedInstance);
-      if (creds) {
-        const info = await getGroupInfo(creds.baseUrl, creds.userToken, group.jid);
-        if (info) group.participants = info.participants;
+      setExpandedGroup(group.jid);
+    }
+    if (group.participants.length === 0 && selectedPhone) {
+      const entry = phoneEntries.find(e => e.phone === selectedPhone);
+      if (entry?.hasUnoapi) {
+        const creds = await loadUnoApiCredentialsWithFallback();
+        if (creds) {
+          const parts = await getUnoGroupParticipants(creds, selectedPhone, group.jid);
+          group.participants = parts.map(p => ({
+            jid: p.jid,
+            phone: p.phone,
+            name: p.name,
+          }));
+        }
       }
     }
     setExpandedGroup(group.jid);
@@ -98,7 +246,7 @@ export function GroupContacts() {
     copyToClipboard(phones.join('\n'));
   }
 
-  function exportGroupPhones(group: WuzapiGroup) {
+  function exportGroupPhones(group: UnifiedGroup) {
     const phones = group.participants.map(p => p.phone).filter(Boolean);
     copyToClipboard(phones.join('\n'));
   }
@@ -158,25 +306,25 @@ export function GroupContacts() {
         </p>
       </div>
 
-      {instances.length === 0 ? (
+      {phoneEntries.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
           <AlertTriangle className="h-10 w-10" />
-          <p className="text-sm">Nenhuma instância WuzAPI conectada.</p>
-          <p className="text-xs">Conecte uma instância na aba WuzAPI primeiro.</p>
+          <p className="text-sm">Nenhum número conectado.</p>
+          <p className="text-xs">Conecte uma instância WuzAPI ou UnoAPI primeiro.</p>
         </div>
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
-              <label className="text-sm font-medium mb-1 block">Instância</label>
+              <label className="text-sm font-medium mb-1 block">Número</label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selectedInstance}
-                onChange={e => setSelectedInstance(e.target.value)}
+                value={selectedPhone}
+                onChange={e => setSelectedPhone(e.target.value)}
               >
-                {instances.map(i => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} {i.phone ? `(${i.phone})` : ''}
+                {phoneEntries.map(e => (
+                  <option key={e.phone} value={e.phone}>
+                    {e.label}
                   </option>
                 ))}
               </select>
@@ -184,7 +332,7 @@ export function GroupContacts() {
             <button
               className="inline-flex items-center gap-2 h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
               onClick={handleLoadGroups}
-              disabled={loadingGroups || !selectedInstance}
+              disabled={loadingGroups || !selectedPhone}
             >
               {loadingGroups ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -194,6 +342,12 @@ export function GroupContacts() {
               Carregar Grupos
             </button>
           </div>
+
+          {groupSource && (
+            <div className="text-xs text-muted-foreground">
+              Dados obtidos via {groupSource === 'wuzapi' ? 'WuzAPI' : 'UnoAPI'}
+            </div>
+          )}
 
           {groups.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -298,7 +452,7 @@ export function GroupContacts() {
             })}
           </div>
 
-          {!loadingGroups && groups.length === 0 && selectedInstance && (
+          {!loadingGroups && groups.length === 0 && selectedPhone && (
             <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
               <Users className="h-8 w-8" />
               <p className="text-sm">Clique em "Carregar Grupos" para buscar os grupos</p>
