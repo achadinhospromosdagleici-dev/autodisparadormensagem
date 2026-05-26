@@ -110,44 +110,50 @@ export function GroupContacts() {
     const entries: PhoneEntry[] = [];
     const seen = new Set<string>();
 
-    const wuzapiInsts = (await loadWuzapiInstances()).filter(i => i.status === 'connected');
-    for (const inst of wuzapiInsts) {
-      if (inst.phone && !seen.has(inst.phone)) {
-        seen.add(inst.phone);
-        entries.push({
-          phone: inst.phone,
-          label: `${inst.name} (${inst.phone})`,
-          hasWuzapi: true,
-          hasUnoapi: false,
-          wuzapiInstanceId: inst.id,
-        });
-      } else if (inst.phone) {
-        const existing = entries.find(e => e.phone === inst.phone);
-        if (existing) {
-          existing.hasWuzapi = true;
-          existing.wuzapiInstanceId = inst.id;
-        }
-      }
-    }
-
-    const unoCreds = await loadUnoApiCredentialsWithFallback();
-    if (unoCreds) {
-      const { instances: unoInsts } = await fetchUnoInstances(unoCreds);
-      for (const inst of unoInsts.filter(i => i.status === 'connected')) {
-        if (seen.has(inst.phone)) {
-          const existing = entries.find(e => e.phone === inst.phone);
-          if (existing) existing.hasUnoapi = true;
-        } else {
-          seen.add(inst.phone);
+    try {
+      const wuzapiInsts = (await loadWuzapiInstances()).filter(i => i.status === 'connected');
+      for (const inst of wuzapiInsts) {
+        const phone = inst.phone || inst.id;
+        if (!phone) continue;
+        if (!seen.has(phone)) {
+          seen.add(phone);
           entries.push({
-            phone: inst.phone,
-            label: `${inst.name || inst.phone} (${inst.phone})`,
-            hasWuzapi: false,
-            hasUnoapi: true,
+            phone,
+            label: `${inst.name || phone} (${phone})`,
+            hasWuzapi: true,
+            hasUnoapi: false,
+            wuzapiInstanceId: inst.id,
           });
+        } else {
+          const existing = entries.find(e => e.phone === phone);
+          if (existing) {
+            existing.hasWuzapi = true;
+            existing.wuzapiInstanceId = inst.id;
+          }
         }
       }
-    }
+    } catch { console.warn('[GroupContacts] Erro ao carregar WuzAPI'); }
+
+    try {
+      const unoCreds = await loadUnoApiCredentialsWithFallback();
+      if (unoCreds) {
+        const { instances: unoInsts } = await fetchUnoInstances(unoCreds);
+        for (const inst of unoInsts.filter(i => i.status === 'connected')) {
+          if (seen.has(inst.phone)) {
+            const existing = entries.find(e => e.phone === inst.phone);
+            if (existing) existing.hasUnoapi = true;
+          } else {
+            seen.add(inst.phone);
+            entries.push({
+              phone: inst.phone,
+              label: `${inst.name || inst.phone} (${inst.phone})`,
+              hasWuzapi: false,
+              hasUnoapi: true,
+            });
+          }
+        }
+      }
+    } catch { console.warn('[GroupContacts] Erro ao carregar UnoAPI'); }
 
     for (const e of entries) {
       const apiBadges: string[] = [];

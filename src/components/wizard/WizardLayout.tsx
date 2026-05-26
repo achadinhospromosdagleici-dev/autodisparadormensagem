@@ -20,6 +20,7 @@ import { GroupSender } from './GroupSender';
 import { ContactLists } from './ContactLists';
 import { GroupScraper } from './GroupScraper';
 import { ChipMaturer } from './ChipMaturer';
+import { BusinessSearch } from './BusinessSearch';
 import { resendCampaign } from '@/services/campaignSender';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -228,6 +229,13 @@ export function WizardLayout() {
         return (
           <div className="space-y-6">
             <ChipMaturer />
+          </div>
+        );
+
+      case 'business-search':
+        return (
+          <div className="space-y-6">
+            <BusinessSearch />
           </div>
         );
 

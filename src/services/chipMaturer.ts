@@ -1,5 +1,5 @@
 import { sendTextMessage, loadUnoApiCredentialsWithFallback } from './unoapi';
-import { sendText } from './wuzapi';
+import { sendText, loadWuzapiSettings, loadWuzapiInstances } from './wuzapi';
 import { sendMessage, loadEvolutionCredentialsWithFallback } from './evolution';
 import { sendEvolutionGoMessage, loadEvolutionGoCredentialsWithFallback } from './evolutionGo';
 
@@ -37,13 +37,12 @@ async function sendSingleText(inst: MaturerInstance, to: string, text: string): 
         return true;
       }
       case 'wuzapi': {
-        const { loadWuzapiSettings, loadWuzapiInstances } = await import('./wuzapi');
         const settings = await loadWuzapiSettings();
-        if (!settings?.url) throw new Error('WuzAPI sem URL');
+        if (!settings?.baseUrl) throw new Error('WuzAPI sem URL');
         const instances = await loadWuzapiInstances();
         const match = instances.find(i => i.phone === inst.phone || i.id === inst.id);
         if (!match?.user_token) throw new Error('WuzAPI sem token');
-        const result = await sendText(settings.url, match.user_token, to, text);
+        const result = await sendText(settings.baseUrl, match.user_token, to, text);
         return result.success;
       }
       case 'evolution': {

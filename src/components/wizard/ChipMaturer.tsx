@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Phone, Play, Square, Clock, Loader2, CheckCircle2, XCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Phone, Play, Square, Clock, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadWuzapiInstances, loadWuzapiSettings } from '@/services/wuzapi';
 import { loadUnoApiCredentialsWithFallback, fetchInstances as fetchUnoInstances } from '@/services/unoapi';
 import { loadEvolutionCredentialsWithFallback, fetchInstances as fetchEvolutionInstances } from '@/services/evolution';
-import { loadEvolutionGoCredentialsWithFallback } from '@/services/evolutionGo';
+import { loadEvolutionGoCredentialsWithFallback, fetchEvolutionGoInstances } from '@/services/evolutionGo';
 import { startMaturation, MaturerInstance, MaturerProgress } from '@/services/chipMaturer';
 
 export function ChipMaturer() {
@@ -16,7 +16,7 @@ export function ChipMaturer() {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<MaturerProgress | null>(null);
   const [log, setLog] = useState<string[]>([]);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
 
   useEffect(() => {
     loadAllInstances();
@@ -24,53 +24,65 @@ export function ChipMaturer() {
 
   async function loadAllInstances() {
     const list: MaturerInstance[] = [];
+    const seen = new Set<string>();
 
-    const unoCreds = await loadUnoApiCredentialsWithFallback();
-    if (unoCreds) {
-      const result = await fetchUnoInstances(unoCreds);
-      for (const inst of result.instances || []) {
-        if (inst.status !== 'connected') continue;
-        list.push({ id: inst.phone, phone: inst.phone, api: 'unoapi', label: `${inst.phone} (UnoAPI)` });
+    try {
+      const unoCreds = await loadUnoApiCredentialsWithFallback();
+      if (unoCreds) {
+        const result = await fetchUnoInstances(unoCreds);
+        for (const inst of result.instances || []) {
+          if (inst.status !== 'connected') continue;
+          if (!seen.has(inst.phone)) {
+            seen.add(inst.phone);
+            list.push({ id: inst.phone, phone: inst.phone, api: 'unoapi', label: `${inst.phone} (UnoAPI)` });
+          }
+        }
       }
-    }
+    } catch { console.warn('[ChipMaturer] UnoAPI erro'); }
 
-    const wuzSettings = await loadWuzapiSettings();
-    if (wuzSettings?.url) {
-      const wuzInsts = await loadWuzapiInstances();
-      for (const inst of wuzInsts) {
-        if (inst.status !== 'connected') continue;
-        const phone = inst.phone || inst.id;
-        if (!phone) continue;
-        if (!list.find(e => e.phone === phone)) {
+    try {
+      const wuzSettings = await loadWuzapiSettings();
+      if (wuzSettings?.baseUrl) {
+        const wuzInsts = await loadWuzapiInstances();
+        for (const inst of wuzInsts) {
+          if (inst.status !== 'connected') continue;
+          const phone = inst.phone || inst.id;
+          if (!phone || seen.has(phone)) continue;
+          seen.add(phone);
           list.push({ id: inst.id, phone, api: 'wuzapi', label: `${phone} (WuzAPI)` });
         }
       }
-    }
+    } catch { console.warn('[ChipMaturer] WuzAPI erro'); }
 
-    const evoCreds = await loadEvolutionCredentialsWithFallback();
-    if (evoCreds) {
-      const evoInsts = await fetchEvolutionInstances(evoCreds);
-      for (const inst of evoInsts) {
-        if (inst.status !== 'connected') continue;
-        if (!list.find(e => e.phone === inst.phone)) {
-          list.push({ id: inst.name || inst.phone, phone: inst.phone, api: 'evolution', label: `${inst.phone} (Evolution)` });
+    try {
+      const evoCreds = await loadEvolutionCredentialsWithFallback();
+      if (evoCreds) {
+        const evoInsts = await fetchEvolutionInstances(evoCreds);
+        for (const inst of evoInsts) {
+          if (inst.status !== 'connected' && inst.status !== 'open') continue;
+          if (!seen.has(inst.phone)) {
+            seen.add(inst.phone);
+            list.push({ id: inst.instanceName, phone: inst.phone, api: 'evolution', label: `${inst.phone} (Evolution)` });
+          }
         }
       }
-    }
+    } catch { console.warn('[ChipMaturer] Evolution erro'); }
 
-    const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
-    if (evoGoCreds) {
-      const { fetchEvolutionGoInstances } = await import('@/services/evolutionGo');
-      const evoGoInsts = await fetchEvolutionGoInstances(evoGoCreds);
-      for (const inst of evoGoInsts) {
-        if (inst.status !== 'connected') continue;
-        if (!list.find(e => e.phone === inst.phone)) {
-          list.push({ id: inst.name || inst.phone, phone: inst.phone, api: 'evolution-go', label: `${inst.phone} (Evolution Go)` });
+    try {
+      const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
+      if (evoGoCreds) {
+        const evoGoInsts = await fetchEvolutionGoInstances(evoGoCreds);
+        for (const inst of evoGoInsts) {
+          if (inst.status !== 'connected' && inst.status !== 'open') continue;
+          if (!seen.has(inst.phone)) {
+            seen.add(inst.phone);
+            list.push({ id: inst.instanceName, phone: inst.phone, api: 'evolution-go', label: `${inst.phone} (Evolution Go)` });
+          }
         }
       }
-    }
+    } catch { console.warn('[ChipMaturer] Evolution Go erro'); }
 
-    list.sort((a, b) => a.phone.localeCompare(b.phone));
+    list.sort((a, b) => a.label.localeCompare(b.label));
     setInstances(list);
   }
 
@@ -151,9 +163,7 @@ export function ChipMaturer() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Setup */}
         <div className="space-y-4">
-          {/* Instance Selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Números disponíveis</label>
             <div className="max-h-48 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
@@ -178,7 +188,6 @@ export function ChipMaturer() {
             )}
           </div>
 
-          {/* Target phones (for single instance) */}
           {selected.length === 1 && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Telefones de destino (um por linha)</label>
@@ -192,7 +201,6 @@ export function ChipMaturer() {
             </div>
           )}
 
-          {/* Text */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Texto para maturação (poema, letra de música, história)</label>
             <textarea
@@ -207,7 +215,6 @@ export function ChipMaturer() {
             </p>
           </div>
 
-          {/* Duration */}
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -227,7 +234,6 @@ export function ChipMaturer() {
             </div>
           </div>
 
-          {/* Start/Stop */}
           <button
             onClick={running ? handleStop : handleStart}
             disabled={!running && (selected.length === 0 || !text.trim())}
@@ -240,9 +246,7 @@ export function ChipMaturer() {
           </button>
         </div>
 
-        {/* Right: Progress */}
         <div className="space-y-4">
-          {/* Status card */}
           <div className="border border-border rounded-lg p-4 space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2">
               {running ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
@@ -271,7 +275,6 @@ export function ChipMaturer() {
             )}
           </div>
 
-          {/* Log */}
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Log</h3>
             <div className="h-64 overflow-y-auto border border-border rounded-lg p-3 space-y-1 bg-muted/20">

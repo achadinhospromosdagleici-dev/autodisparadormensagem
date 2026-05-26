@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu, MessageSquare, Users } from 'lucide-react';
+import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu, MessageSquare, Users, Globe, Key, CheckCircle2, AlertCircle } from 'lucide-react';
 import { ChatwootSettings } from './ChatwootSettings';
 import { EvolutionConnection } from './EvolutionConnection';
 import { EvolutionGoConnection } from './EvolutionGoConnection';
@@ -16,7 +16,7 @@ interface SettingsPageProps {
   onUnoApiConnectionChange: (connected: boolean) => void;
 }
 
-type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway' | 'grupos';
+type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway' | 'grupos' | 'google-places';
 
 const tabs = [
   { id: 'grupos' as SettingsTab, label: 'Grupos', icon: Users, desc: 'Exportar contatos de grupos do WhatsApp' },
@@ -26,6 +26,7 @@ const tabs = [
   { id: 'evolution-go' as SettingsTab, label: 'Evolution Go', icon: Cpu, desc: 'Conectar número via Evolution Go (Go)' },
   { id: 'wuzapi' as SettingsTab, label: 'WuzAPI', icon: MessageSquare, desc: 'Conectar número via WuzAPI (Go/WaProto)' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
+  { id: 'google-places' as SettingsTab, label: 'Google Places', icon: Globe, desc: 'API Key para busca de empresas por palavra-chave' },
 ];
 
 export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConnectionChange }: SettingsPageProps) {
@@ -75,6 +76,76 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
         )}
         {activeTab === 'ai-gateway' && <AIGatewaySettings />}
         {activeTab === 'grupos' && <GroupContacts />}
+        {activeTab === 'google-places' && <GooglePlacesSettings />}
+      </div>
+    </div>
+  );
+}
+
+function GooglePlacesSettings() {
+  const [apiKey, setApiKey] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  React.useEffect(() => {
+    const { loadGoogleSettings } = require('@/services/googleSettings');
+    const current = loadGoogleSettings();
+    if (current?.apiKey) setApiKey(current.apiKey);
+  }, []);
+
+  async function handleSave() {
+    const { saveGoogleSettings } = await import('@/services/googleSettings');
+    await saveGoogleSettings({ apiKey: apiKey.trim() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <div className="glass-card p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <Globe className="h-5 w-5 text-primary" />
+        <div>
+          <h3 className="font-medium">Google Places API</h3>
+          <p className="text-xs text-muted-foreground">
+            Chave necessária para buscar empresas por palavra-chave
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs text-muted-foreground">Chave da API (Google Places API Key)</label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm pr-10"
+            />
+            <button
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showKey ? '🙈' : '👁️'}
+            </button>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={!apiKey.trim()}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saved ? 'Salvo ✓' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="text-xs text-muted-foreground space-y-1 p-3 bg-muted/30 rounded-lg">
+        <p className="font-medium text-foreground">Como obter sua chave:</p>
+        <p>1. Acesse <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" className="text-primary hover:underline">Google Cloud Console</a></p>
+        <p>2. Crie um projeto e ative a <strong>Places API</strong></p>
+        <p>3. Crie uma chave de API (Credentials &gt; Create Credentials &gt; API Key)</p>
+        <p className="text-yellow-600">⚠️ A chave pode gerar custos. O Google oferece US$ 200/mês grátis.</p>
       </div>
     </div>
   );

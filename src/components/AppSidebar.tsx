@@ -17,6 +17,7 @@ import {
   List,
   Globe,
   Phone,
+  Building2,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -51,6 +52,7 @@ export type AppView =
   | 'lists'
   | 'group-scraper'
   | 'chip-maturer'
+  | 'business-search'
   | 'admin';
 
 interface AppSidebarProps {
@@ -72,6 +74,7 @@ const listsItems = [
 ];
 
 const toolsItems = [
+  { id: 'business-search' as AppView, label: 'Buscar Empresas', icon: Building2 },
   { id: 'group-scraper' as AppView, label: 'Buscar Grupos', icon: Globe },
   { id: 'chip-maturer' as AppView, label: 'Maturador de Chip', icon: Phone },
 ];
