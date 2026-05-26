@@ -8,6 +8,9 @@ export interface Business {
   rating: number;
   website: string;
   placeId: string;
+  cnpj: string;
+  razaoSocial: string;
+  cnae: string;
 }
 
 export async function searchBusinesses(keyword: string, maxResults: number = 20): Promise<Business[]> {

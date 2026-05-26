@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Building2, MapPin, Phone as PhoneIcon, Star, Save, AlertCircle, Globe } from 'lucide-react';
+import { Search, Loader2, Building2, MapPin, Phone as PhoneIcon, Star, Save, AlertCircle, Globe, FileText, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchBusinesses, Business } from '@/services/businessSearch';
 import { getContactLists, createContactList, importContactsToLists } from '@/services/contactLists';
@@ -37,13 +37,16 @@ export function BusinessSearch() {
     if (!list) { toast.error('Erro ao criar lista'); return; }
 
     const rows = withPhone.map(r => ({
-      name: r.name,
+      name: r.razaoSocial || r.name,
       phone: r.phone.replace(/\D/g, ''),
       attributes: {
         endereco: r.address,
         avaliacao: r.rating.toString(),
         website: r.website,
         keyword: keyword.trim(),
+        cnpj: r.cnpj || '',
+        cnae: r.cnae || '',
+        razao_social: r.razaoSocial || '',
       },
     }));
 
@@ -52,6 +55,7 @@ export function BusinessSearch() {
   }
 
   const withPhone = results.filter(r => r.phone);
+  const withCnpj = results.filter(r => r.cnpj);
 
   return (
     <div className="space-y-6">
@@ -92,6 +96,11 @@ export function BusinessSearch() {
         </button>
       </div>
 
+      <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-lg space-y-1">
+        <p><strong>Fluxo:</strong> Google Places → nomes/telefones → se tiver site, extrai CNPJ → BrasilAPI enriquece</p>
+        <p>Empresas sem site não terão CNPJ automaticamente. Use <strong>Listas de Contatos &gt; Consultar CNPJ</strong> para enriquecer manualmente.</p>
+      </div>
+
       {loading && (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -104,9 +113,7 @@ export function BusinessSearch() {
           <AlertCircle className="h-8 w-8" />
           <p className="text-sm">Nenhuma empresa encontrada para "{keyword}".</p>
           <p className="text-xs max-w-md text-center">
-            Essa funcionalidade usa a <strong>Google Places API</strong>. 
-            É necessário configurar uma chave de API nas variáveis de ambiente do Supabase:
-            <code className="block mt-1 text-primary">GOOGLE_PLACES_API_KEY</code>
+            Configure a chave Google Places API em <strong>Configurações &gt; Google Places</strong>
           </p>
         </div>
       )}
@@ -115,10 +122,7 @@ export function BusinessSearch() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {results.length} empresas encontradas
-              {withPhone.length < results.length && (
-                <span className="ml-1">({withPhone.length} com telefone)</span>
-              )}
+              {results.length} empresas | {withPhone.length} com telefone | {withCnpj.length} com CNPJ
             </p>
             {withPhone.length > 0 && (
               <button
@@ -137,10 +141,25 @@ export function BusinessSearch() {
               <div key={biz.placeId || i} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium">{biz.name}</div>
+                  {biz.razaoSocial && biz.razaoSocial !== biz.name && (
+                    <div className="text-xs text-muted-foreground">{biz.razaoSocial}</div>
+                  )}
                   <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
                     {biz.address && <p className="flex items-center gap-1"><MapPin className="h-3 w-3" />{biz.address}</p>}
                     {biz.phone && <p className="flex items-center gap-1"><PhoneIcon className="h-3 w-3" />{biz.phone}</p>}
                     {biz.rating > 0 && <p className="flex items-center gap-1"><Star className="h-3 w-3" />{biz.rating}</p>}
+                    {biz.cnpj && (
+                      <p className="flex items-center gap-1 text-success">
+                        <FileText className="h-3 w-3" />
+                        CNPJ: {biz.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                        {biz.cnae && <span className="text-muted-foreground ml-1">| {biz.cnae}</span>}
+                      </p>
+                    )}
+                    {biz.website && (
+                      <a href={biz.website} target="_blank" rel="noopener" className="flex items-center gap-1 text-primary hover:underline">
+                        <ExternalLink className="h-3 w-3" />{biz.website}
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
