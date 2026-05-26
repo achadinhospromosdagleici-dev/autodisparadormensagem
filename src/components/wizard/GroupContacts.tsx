@@ -175,23 +175,6 @@ export function GroupContacts() {
     }
 
     try {
-      if (entry.hasWuzapi && entry.wuzapiInstanceId) {
-        const creds = await getWuzapiInstanceCreds(entry.wuzapiInstanceId);
-        if (!creds) {
-          toast.error('Credenciais WuzAPI não encontradas');
-          setLoadingGroups(false);
-          return;
-        }
-        const result = await loadGroupsFromWuzapi(creds, entry.wuzapiInstanceId);
-        if (result.groups.length > 0) {
-          setGroups(result.groups);
-          setGroupSource('wuzapi');
-          toast.success(`${result.groups.length} grupo(s) carregado(s) via WuzAPI`);
-          setLoadingGroups(false);
-          return;
-        }
-      }
-
       if (entry.hasUnoapi) {
         const unoCreds = await loadUnoApiCredentialsWithFallback();
         if (unoCreds) {
@@ -200,13 +183,27 @@ export function GroupContacts() {
             setGroups(result.groups);
             setGroupSource('unoapi');
             toast.success(`${result.groups.length} grupo(s) carregado(s) via UnoAPI`);
-          } else {
-            toast.info('Nenhum grupo encontrado');
+            setLoadingGroups(false);
+            return;
           }
         }
-      } else {
-        toast.info('Nenhum grupo encontrado');
       }
+
+      if (entry.hasWuzapi && entry.wuzapiInstanceId) {
+        const creds = await getWuzapiInstanceCreds(entry.wuzapiInstanceId);
+        if (creds) {
+          const result = await loadGroupsFromWuzapi(creds, entry.wuzapiInstanceId);
+          if (result.groups.length > 0) {
+            setGroups(result.groups);
+            setGroupSource('wuzapi');
+            toast.success(`${result.groups.length} grupo(s) carregado(s) via WuzAPI`);
+            setLoadingGroups(false);
+            return;
+          }
+        }
+      }
+
+      toast.info('Nenhum grupo encontrado');
     } catch (err: any) {
       toast.error('Erro ao carregar grupos: ' + (err.message || ''));
     } finally {
