@@ -17,6 +17,7 @@ import { CampaignsHome } from './CampaignsHome';
 import { SuperAdminPanel } from './SuperAdminPanel';
 import { LinkGenerator } from './LinkGenerator';
 import { GroupSender } from './GroupSender';
+import { ContactLists } from './ContactLists';
 import { resendCampaign } from '@/services/campaignSender';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -204,6 +205,13 @@ export function WizardLayout() {
         return (
           <div className="space-y-6">
             <GroupSender />
+          </div>
+        );
+
+      case 'lists':
+        return (
+          <div className="space-y-6">
+            <ContactLists />
           </div>
         );
 

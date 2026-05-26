@@ -14,6 +14,7 @@ import {
   Home,
   Link2,
   Users,
+  List,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +46,7 @@ export type AppView =
   | 'blacklist'
   | 'links'
   | 'groups-send'
+  | 'lists'
   | 'admin';
 
 interface AppSidebarProps {
@@ -59,6 +61,10 @@ const mainItems = [
   { id: 'links' as AppView, label: 'Gerador de Links', icon: Link2 },
   { id: 'history' as AppView, label: 'Histórico', icon: History },
   { id: 'blacklist' as AppView, label: 'Blacklist', icon: Shield },
+];
+
+const listsItems = [
+  { id: 'lists' as AppView, label: 'Listas de Contatos', icon: List },
 ];
 
 const settingsItems = [
@@ -114,6 +120,27 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map(item => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    onClick={() => onViewChange(item.id)}
+                    isActive={currentView === item.id}
+                    tooltip={item.label}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Contact Lists */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Contatos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {listsItems.map(item => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => onViewChange(item.id)}
