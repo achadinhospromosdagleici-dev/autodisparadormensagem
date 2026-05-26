@@ -11,6 +11,7 @@ import {
   sendLocation as wuzapiSendLocation,
   sendPoll as wuzapiSendPoll,
   getUserLid,
+  checkPhone,
   getWuzapiInstanceCredentials,
 } from './wuzapi';
 import { downloadMediaAsBase64 } from './mediaHandler';
@@ -95,6 +96,11 @@ export async function sendWuzapiMessage(
     to = lidInfo.lid;
   } else if (lidInfo?.jid) {
     to = lidInfo.jid;
+  } else {
+    const phoneCheck = await checkPhone(baseUrl, userToken, to);
+    if (phoneCheck.isWhatsApp && phoneCheck.jid) {
+      to = phoneCheck.jid;
+    }
   }
 
   const personalizedContent = replaceVariables(msg.content, contact);
