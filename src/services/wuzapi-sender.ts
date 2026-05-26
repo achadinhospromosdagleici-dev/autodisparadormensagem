@@ -10,6 +10,7 @@ import {
   sendSticker as wuzapiSendSticker,
   sendLocation as wuzapiSendLocation,
   sendPoll as wuzapiSendPoll,
+  getUserLid,
   getWuzapiInstanceCredentials,
 } from './wuzapi';
 import { downloadMediaAsBase64 } from './mediaHandler';
@@ -87,6 +88,15 @@ export async function sendWuzapiMessage(
   }
 
   const { baseUrl, userToken } = creds;
+
+  // Resolve LID/JID for contacts without prior conversation
+  const lidInfo = await getUserLid(baseUrl, userToken, to);
+  if (lidInfo?.lid) {
+    to = lidInfo.lid;
+  } else if (lidInfo?.jid) {
+    to = lidInfo.jid;
+  }
+
   const personalizedContent = replaceVariables(msg.content, contact);
   const personalizedCaption = msg.mediaCaption
     ? replaceVariables(msg.mediaCaption, contact)

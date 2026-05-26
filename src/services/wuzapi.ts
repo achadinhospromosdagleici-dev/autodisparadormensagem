@@ -594,6 +594,19 @@ export async function sendSticker(
   return { success: true, id: res.id || res.messageId };
 }
 
+export async function sendPresence(
+  baseUrl: string,
+  userToken: string,
+  to: string,
+  state: 'composing' | 'paused' = 'composing',
+): Promise<void> {
+  try {
+    await apiCall(baseUrl, '/chat/presence', userToken, 'POST', { Phone: to, State: state });
+  } catch {
+    // non-critical
+  }
+}
+
 export async function sendLocation(
   baseUrl: string,
   userToken: string,
@@ -715,7 +728,7 @@ export async function checkPhone(
   phone: string,
 ): Promise<{ isWhatsApp: boolean; jid?: string }> {
   try {
-    const res = await apiCall(baseUrl, '/user/check', userToken, 'POST', { Phone: phone });
+    const res = await apiCall(baseUrl, '/user/check', userToken, 'POST', { Phone: [phone] });
     const users = res?.data?.Users ?? [];
     const found = users.find((u: { IsInWhatsapp?: boolean }) => u.IsInWhatsapp);
     return {
@@ -729,6 +742,27 @@ export async function checkPhone(
 
 export function extractPhoneFromJid(jid: string): string {
   return jid.split('@')[0]?.split(':')[0] || jid;
+}
+
+/**
+ * Retrieves the WhatsApp lid (internal JID) for a phone number.
+ * Necessary for contacts that have never been conversed with before.
+ */
+export async function getUserLid(
+  baseUrl: string,
+  userToken: string,
+  phone: string,
+): Promise<{ jid?: string; lid?: string } | null> {
+  try {
+    const res = await apiCall(baseUrl, `/user/lid/${phone}`, userToken, 'GET');
+    const data = res?.data || res;
+    return {
+      jid: data?.jid || undefined,
+      lid: data?.lid || undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================
