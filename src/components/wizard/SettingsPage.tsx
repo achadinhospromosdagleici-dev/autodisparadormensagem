@@ -19,17 +19,17 @@ interface SettingsPageProps {
 type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway' | 'grupos';
 
 const tabs = [
+  { id: 'grupos' as SettingsTab, label: 'Grupos', icon: Users, desc: 'Exportar contatos de grupos do WhatsApp' },
   { id: 'unoapi' as SettingsTab, label: 'UnoAPI', icon: Zap, desc: 'Envio via WhatsApp Cloud API (texto, mídia, docs)' },
   { id: 'chatwoot' as SettingsTab, label: 'Chatwoot', icon: MessageCircle, desc: 'Integração com Chatwoot para envio e monitoramento' },
   { id: 'evolution' as SettingsTab, label: 'Evolution API', icon: Smartphone, desc: 'Conectar número via Evolution API (Node.js)' },
   { id: 'evolution-go' as SettingsTab, label: 'Evolution Go', icon: Cpu, desc: 'Conectar número via Evolution Go (Go)' },
   { id: 'wuzapi' as SettingsTab, label: 'WuzAPI', icon: MessageSquare, desc: 'Conectar número via WuzAPI (Go/WaProto)' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
-  { id: 'grupos' as SettingsTab, label: 'Grupos', icon: Users, desc: 'Exportar contatos de grupos do WhatsApp' },
 ];
 
 export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConnectionChange }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('unoapi');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('grupos');
 
   return (
     <div className="space-y-6">

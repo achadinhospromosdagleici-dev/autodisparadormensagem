@@ -4,7 +4,7 @@ import { Campaign } from '../CampaignHistory';
 import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
 import { loadUnoApiCredentials } from '@/services/unoapi';
 import { loadEvolutionCredentials } from '@/services/evolution';
-import { ScheduledCampaign } from '../CampaignScheduler';
+import { CampaignScheduler, ScheduledCampaign } from '../CampaignScheduler';
 import {
   Users,
   MessageSquare,
@@ -37,9 +37,6 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
-  const [scheduleName, setScheduleName] = useState('');
-  const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduleTime, setScheduleTime] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
   const validContacts = getValidCount();
@@ -388,82 +385,19 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
 
           {/* Scheduling Form */}
           {isScheduling && (
-            <div className="glass-card p-6 space-y-4 animate-fade-in">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" />
-                Agendar Campanha
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm text-muted-foreground">Nome da Campanha</label>
-                  <input
-                    type="text"
-                    value={scheduleName}
-                    onChange={(e) => setScheduleName(e.target.value)}
-                    placeholder="Minha campanha"
-                    className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm text-muted-foreground">Data</label>
-                    <input
-                      type="date"
-                      value={scheduleDate}
-                      onChange={(e) => setScheduleDate(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-muted-foreground">Horário</label>
-                    <input
-                      type="time"
-                      value={scheduleTime}
-                      onChange={(e) => setScheduleTime(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-muted/50 border border-border/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    if (!scheduleName.trim() || !scheduleDate || !scheduleTime) {
-                      toast.error('Preencha todos os campos');
-                      return;
-                    }
-                    const scheduledDate = new Date(`${scheduleDate}T${scheduleTime}`);
-                    if (scheduledDate <= new Date()) {
-                      toast.error('A data deve ser futura');
-                      return;
-                    }
-                    addScheduledCampaign({
-                      id: crypto.randomUUID(),
-                      status: 'scheduled',
-                      name: scheduleName.trim(),
-                      scheduledDate,
-                      messageIds: messages.map(m => m.id),
-                      contactCount: validContacts,
-                    });
-                    toast.success('Campanha agendada!');
-                    setIsScheduling(false);
-                    setScheduleName('');
-                    setScheduleDate('');
-                    setScheduleTime('');
-                    clearWizard();
-                    onCampaignStarted?.();
-                  }}
-                  className="flex-1 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90"
-                >
-                  Confirmar Agendamento
-                </button>
-                <button
-                  onClick={() => setIsScheduling(false)}
-                  className="px-6 py-3 rounded-lg bg-muted font-medium hover:bg-muted/80"
-                >
-                  Cancelar
-                </button>
-              </div>
+            <div className="space-y-4">
+              <CampaignScheduler
+                scheduledCampaigns={scheduledCampaigns}
+                onSchedule={(c) => {
+                  addScheduledCampaign({ ...c, id: crypto.randomUUID(), status: 'scheduled' });
+                  setIsScheduling(false);
+                  clearWizard();
+                  onCampaignStarted?.();
+                }}
+                onCancel={(id) => {}}
+                contactCount={validContacts}
+                messageCount={messages.length}
+              />
             </div>
           )}
 
