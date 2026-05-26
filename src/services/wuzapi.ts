@@ -766,6 +766,71 @@ export async function getUserLid(
 }
 
 // ============================================================================
+// GROUP ENDPOINTS
+// ============================================================================
+
+export interface WuzapiGroupParticipant {
+  jid: string;
+  phone: string;
+  isAdmin: boolean;
+  isSuperAdmin: boolean;
+}
+
+export interface WuzapiGroup {
+  jid: string;
+  name: string;
+  participants: WuzapiGroupParticipant[];
+}
+
+export async function listGroups(
+  baseUrl: string,
+  userToken: string,
+): Promise<WuzapiGroup[]> {
+  try {
+    const res = await apiCall(baseUrl, '/group/list', userToken, 'GET');
+    const groups: any[] = res?.data?.Groups || res?.Groups || [];
+    return groups.map((g: any) => ({
+      jid: g.JID || g.jid || '',
+      name: g.Name || g.name || '(Sem nome)',
+      participants: (g.Participants || g.participants || []).map((p: any) => ({
+        jid: p.JID || p.jid || '',
+        phone: extractPhoneFromJid(p.JID || p.jid || ''),
+        isAdmin: !!p.IsAdmin || !!p.isAdmin,
+        isSuperAdmin: !!p.IsSuperAdmin || !!p.isSuperAdmin,
+      })),
+    }));
+  } catch (err) {
+    console.error('[WuzAPI] listGroups error:', err);
+    return [];
+  }
+}
+
+export async function getGroupInfo(
+  baseUrl: string,
+  userToken: string,
+  groupJid: string,
+): Promise<WuzapiGroup | null> {
+  try {
+    const res = await apiCall(baseUrl, `/group/info?groupJID=${encodeURIComponent(groupJid)}`, userToken, 'GET');
+    const d = res?.data || res;
+    if (!d) return null;
+    return {
+      jid: d.JID || d.jid || groupJid,
+      name: d.Name || d.name || '(Sem nome)',
+      participants: (d.Participants || d.participants || []).map((p: any) => ({
+        jid: p.JID || p.jid || '',
+        phone: extractPhoneFromJid(p.JID || p.jid || ''),
+        isAdmin: !!p.IsAdmin || !!p.isAdmin,
+        isSuperAdmin: !!p.IsSuperAdmin || !!p.isSuperAdmin,
+      })),
+    };
+  } catch (err) {
+    console.error('[WuzAPI] getGroupInfo error:', err);
+    return null;
+  }
+}
+
+// ============================================================================
 // INSTANCE HELPERS
 // ============================================================================
 

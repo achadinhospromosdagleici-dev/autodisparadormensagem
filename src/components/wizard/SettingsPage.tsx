@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu, MessageSquare } from 'lucide-react';
+import { MessageCircle, Smartphone, Bot, Settings, ChevronRight, Zap, Cpu, MessageSquare, Users } from 'lucide-react';
 import { ChatwootSettings } from './ChatwootSettings';
 import { EvolutionConnection } from './EvolutionConnection';
 import { EvolutionGoConnection } from './EvolutionGoConnection';
 import { UnoApiSettings } from './UnoApiSettings';
 import { WuzapiSettings } from './WuzapiSettings';
 import { WuzapiConnection } from './WuzapiConnection';
+import { GroupContacts } from './GroupContacts';
 import { ChatwootInbox } from '@/services/chatwoot';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,7 +16,7 @@ interface SettingsPageProps {
   onUnoApiConnectionChange: (connected: boolean) => void;
 }
 
-type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway';
+type SettingsTab = 'unoapi' | 'chatwoot' | 'evolution' | 'evolution-go' | 'wuzapi' | 'ai-gateway' | 'grupos';
 
 const tabs = [
   { id: 'unoapi' as SettingsTab, label: 'UnoAPI', icon: Zap, desc: 'Envio via WhatsApp Cloud API (texto, mídia, docs)' },
@@ -24,6 +25,7 @@ const tabs = [
   { id: 'evolution-go' as SettingsTab, label: 'Evolution Go', icon: Cpu, desc: 'Conectar número via Evolution Go (Go)' },
   { id: 'wuzapi' as SettingsTab, label: 'WuzAPI', icon: MessageSquare, desc: 'Conectar número via WuzAPI (Go/WaProto)' },
   { id: 'ai-gateway' as SettingsTab, label: 'AI Gateway', icon: Bot, desc: 'Configurar IA para variação de mensagens' },
+  { id: 'grupos' as SettingsTab, label: 'Grupos', icon: Users, desc: 'Exportar contatos de grupos do WhatsApp' },
 ];
 
 export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConnectionChange }: SettingsPageProps) {
@@ -72,6 +74,7 @@ export function SettingsPage({ onInboxesLoaded, onConnectionChange, onUnoApiConn
           </div>
         )}
         {activeTab === 'ai-gateway' && <AIGatewaySettings />}
+        {activeTab === 'grupos' && <GroupContacts />}
       </div>
     </div>
   );
