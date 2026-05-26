@@ -13,6 +13,30 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
+export interface CampaignSnapshot {
+  contacts: Record<string, any>[];
+  messages: {
+    content: string;
+    mediaType?: string;
+    mediaUrl?: string;
+    mediaCaption?: string;
+    mediaFilename?: string;
+    title?: string;
+    footer?: string;
+    buttons?: any[];
+    linkUrl?: string;
+  }[];
+  settings: {
+    intervalType: 'fixed' | 'random';
+    fixedInterval: number;
+    minInterval: number;
+    maxInterval: number;
+    sendType: 'single' | 'multiple';
+  };
+  selectedInstances: string[];
+  followUpConfig: any;
+}
+
 export interface ActiveCampaign {
   id: string;
   name: string;
@@ -25,6 +49,7 @@ export interface ActiveCampaign {
   currentStep?: number;
   totalSteps?: number;
   currentContact?: string;
+  snapshot?: CampaignSnapshot;
 }
 
 interface ActiveCampaignsProps {

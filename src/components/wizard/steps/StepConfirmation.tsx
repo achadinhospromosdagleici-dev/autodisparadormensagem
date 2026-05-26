@@ -77,18 +77,6 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
     const campaignId = crypto.randomUUID();
     const campaignName = `Campanha ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
-    // Add to active campaigns immediately so the home page shows progress
-    addActiveCampaign({
-      id: campaignId,
-      name: campaignName,
-      status: 'running',
-      totalContacts: validContacts,
-      sentCount: 0,
-      failedCount: 0,
-      repliedCount: 0,
-      createdAt: new Date(),
-    });
-
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -111,6 +99,25 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
       buttons: (m as any).buttons || undefined,
       linkUrl: (m as any).linkUrl || undefined,
     }));
+
+    // Add to active campaigns immediately so the home page shows progress
+    addActiveCampaign({
+      id: campaignId,
+      name: campaignName,
+      status: 'running',
+      totalContacts: validContacts,
+      sentCount: 0,
+      failedCount: 0,
+      repliedCount: 0,
+      createdAt: new Date(),
+      snapshot: {
+        contacts: contactsData,
+        messages: campaignMessages,
+        settings: { ...settings },
+        selectedInstances: [...selectedInstances],
+        followUpConfig: JSON.parse(JSON.stringify(followUpConfig)),
+      },
+    });
 
     // Run send in background so we can close the wizard view
     void (async () => {

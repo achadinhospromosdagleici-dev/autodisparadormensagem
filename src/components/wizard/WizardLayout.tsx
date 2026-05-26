@@ -16,7 +16,9 @@ import { ActiveCampaigns } from './ActiveCampaigns';
 import { CampaignsHome } from './CampaignsHome';
 import { SuperAdminPanel } from './SuperAdminPanel';
 import { LinkGenerator } from './LinkGenerator';
+import { resendCampaign } from '@/services/campaignSender';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { Crown, Clock } from 'lucide-react';
 import {
   SidebarProvider,
@@ -113,7 +115,35 @@ export function WizardLayout() {
               onPause={(id) => updateActiveCampaign(id, { status: 'paused' })}
               onResume={(id) => updateActiveCampaign(id, { status: 'running' })}
               onCancel={(id) => updateActiveCampaign(id, { status: 'cancelled' })}
-              onResend={(id) => updateActiveCampaign(id, { status: 'running', sentCount: 0, failedCount: 0 })}
+               onResend={(id) => {
+                 const campaign = activeCampaigns.find(c => c.id === id);
+                 if (!campaign?.snapshot) {
+                   toast.error('Dados da campanha não disponíveis para reenvio');
+                   return;
+                 }
+                 updateActiveCampaign(id, { status: 'running', sentCount: 0, failedCount: 0 });
+                 void (async () => {
+                   try {
+                     await resendCampaign(
+                       campaign.snapshot!,
+                       (p) => {
+                         updateActiveCampaign(id, {
+                           sentCount: p.sent,
+                           failedCount: p.failed,
+                           repliedCount: p.replied,
+                           status: p.status === 'completed' ? 'completed'
+                             : p.status === 'error' ? 'error'
+                             : 'running',
+                         });
+                       },
+                     );
+                     toast.success('Reenvio concluído!');
+                   } catch (err: any) {
+                     toast.error('Erro no reenvio: ' + (err.message || ''));
+                     updateActiveCampaign(id, { status: 'error' });
+                   }
+                 })();
+               }}
               onNewCampaign={() => setCurrentView('campaign')}
             />
             <Dashboard metrics={metrics} />

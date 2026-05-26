@@ -595,3 +595,31 @@ export async function sendCampaign(
   onProgress({ ...progress });
   return progress;
 }
+
+export async function resendCampaign(
+  snapshot: {
+    contacts: Record<string, any>[];
+    messages: CampaignMessage[];
+    settings: {
+      intervalType: 'fixed' | 'random';
+      fixedInterval: number;
+      minInterval: number;
+      maxInterval: number;
+      sendType: 'single' | 'multiple';
+    };
+    selectedInstances: string[];
+    followUpConfig: any;
+  },
+  onProgress: ProgressCallback,
+  abortSignal?: AbortSignal,
+): Promise<SendProgress> {
+  return sendCampaign(
+    snapshot.contacts,
+    snapshot.messages,
+    snapshot.settings,
+    snapshot.selectedInstances,
+    snapshot.followUpConfig,
+    onProgress,
+    abortSignal,
+  );
+}
