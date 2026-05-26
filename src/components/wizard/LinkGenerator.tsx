@@ -65,8 +65,9 @@ export function LinkGenerator() {
   useEffect(() => { load(); }, []);
 
   const createLink = async () => {
-    const cleanPhone = phone.replace(/\D/g, "");
+    let cleanPhone = phone.replace(/\D/g, "");
     if (!cleanPhone) return toast.error("Informe um número de WhatsApp válido");
+    if (!cleanPhone.startsWith("55") && cleanPhone.length <= 11) cleanPhone = "55" + cleanPhone;
     const slug = (customSlug.trim() || randomSlug()).toLowerCase().replace(/[^a-z0-9-]/g, "");
     if (!slug) return toast.error("Slug inválido");
 

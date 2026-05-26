@@ -101,7 +101,8 @@ Deno.serve(async (req) => {
     }
 
     const { phone, message } = data[0];
-    const cleanPhone = String(phone).replace(/\D/g, "");
+    let cleanPhone = String(phone).replace(/\D/g, "");
+    if (!cleanPhone.startsWith("55") && cleanPhone.length <= 11) cleanPhone = "55" + cleanPhone;
     const url = message
       ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
       : `https://wa.me/${cleanPhone}`;
