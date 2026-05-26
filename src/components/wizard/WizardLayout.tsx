@@ -16,6 +16,7 @@ import { ActiveCampaigns } from './ActiveCampaigns';
 import { CampaignsHome } from './CampaignsHome';
 import { SuperAdminPanel } from './SuperAdminPanel';
 import { LinkGenerator } from './LinkGenerator';
+import { GroupSender } from './GroupSender';
 import { resendCampaign } from '@/services/campaignSender';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -198,6 +199,13 @@ export function WizardLayout() {
 
       case 'links':
         return <LinkGenerator />;
+
+      case 'groups-send':
+        return (
+          <div className="space-y-6">
+            <GroupSender />
+          </div>
+        );
 
       case 'home':
         return (

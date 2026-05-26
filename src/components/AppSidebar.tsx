@@ -13,6 +13,7 @@ import {
   BarChart3,
   Home,
   Link2,
+  Users,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -43,6 +44,7 @@ export type AppView =
   | 'history'
   | 'blacklist'
   | 'links'
+  | 'groups-send'
   | 'admin';
 
 interface AppSidebarProps {
@@ -53,6 +55,7 @@ interface AppSidebarProps {
 const mainItems = [
   { id: 'home' as AppView, label: 'Campanhas', icon: Home },
   { id: 'dashboard' as AppView, label: 'Dashboard', icon: BarChart3 },
+  { id: 'groups-send' as AppView, label: 'Disparo em Grupos', icon: Users },
   { id: 'links' as AppView, label: 'Gerador de Links', icon: Link2 },
   { id: 'history' as AppView, label: 'Histórico', icon: History },
   { id: 'blacklist' as AppView, label: 'Blacklist', icon: Shield },
