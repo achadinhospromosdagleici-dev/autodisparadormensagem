@@ -17,8 +17,16 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let currentAction = 'unknown';
+  let currentBase = '';
+  let currentInstanceName = '';
+
   try {
     const { action, baseUrl, apiKey, instanceName, phoneNumber, to, message, webhookUrl, events } = await req.json();
+
+    currentAction = action || 'unknown';
+    currentBase = baseUrl || '';
+    currentInstanceName = instanceName || '';
 
     if (!baseUrl || !apiKey) {
       return jsonResponse({ error: 'baseUrl and apiKey are required' }, 400);
@@ -381,7 +389,15 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: `Ação desconhecida: ${action}` }, 400);
     }
   } catch (error: any) {
-    console.error('[evolution-proxy] Error:', error);
-    return jsonResponse({ error: error.message }, 500);
+    console.error('[evolution-proxy] Error:', currentAction, currentBase, currentInstanceName, error);
+    return jsonResponse({
+      error: error.message,
+      type: error.constructor?.name || typeof error,
+      action: currentAction,
+      baseUrl: currentBase,
+      instanceName: currentInstanceName,
+      details: error.cause || error.stack,
+      hint: 'Verifique se o servidor Evolution API está acessível pela internet e se a URL está correta.',
+    }, 500);
   }
 });

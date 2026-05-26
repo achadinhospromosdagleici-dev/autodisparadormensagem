@@ -17,8 +17,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let targetUrl = '';
+  let requestMethod = 'GET';
+
   try {
-    const { baseUrl, token, endpoint, method, body, isAdmin } = await req.json();
+    const { baseUrl, token, endpoint, method: reqMethod, body, isAdmin } = await req.json();
+
+    requestMethod = reqMethod || 'GET';
 
     if (!baseUrl || !token) {
       return jsonResponse({ error: 'baseUrl and token are required' }, 400);
@@ -27,7 +32,7 @@ Deno.serve(async (req) => {
     const cleanBase = baseUrl.replace(/\/+$/, '');
     const rawEndpoint = endpoint || '/';
     const cleanEndpoint = rawEndpoint.startsWith('/') ? rawEndpoint : `/${rawEndpoint}`;
-    const targetUrl = `${cleanBase}${cleanEndpoint}`;
+    targetUrl = `${cleanBase}${cleanEndpoint}`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -38,12 +43,12 @@ Deno.serve(async (req) => {
       headers['token'] = token;
     }
 
-    console.log('[wuzapi-proxy]', method || 'GET', targetUrl);
+    console.log('[wuzapi-proxy]', requestMethod, targetUrl);
 
     const response = await fetch(targetUrl, {
-      method: method || 'GET',
+      method: requestMethod,
       headers,
-      ...(body && method !== 'GET' ? { body: JSON.stringify(body) } : {}),
+      ...(body && requestMethod !== 'GET' ? { body: JSON.stringify(body) } : {}),
     });
 
     console.log('[wuzapi-proxy] Response status:', response.status);
@@ -61,13 +66,22 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       return jsonResponse({
         error: `HTTP ${response.status}`,
-        details: data
+        details: data,
+        targetUrl,
+        method: requestMethod,
       }, response.status);
     }
 
     return jsonResponse(data);
   } catch (error: any) {
-    console.error('[wuzapi-proxy] Error:', error);
-    return jsonResponse({ error: error.message }, 500);
+    console.error('[wuzapi-proxy] Error:', requestMethod, targetUrl, error);
+    return jsonResponse({
+      error: error.message,
+      type: error.constructor?.name || typeof error,
+      targetUrl,
+      method: requestMethod,
+      details: error.cause || error.stack,
+      hint: 'Verifique se o servidor WuzAPI está acessível pela internet e se a URL está correta.',
+    }, 500);
   }
 });

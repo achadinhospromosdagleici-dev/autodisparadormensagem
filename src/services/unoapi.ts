@@ -127,20 +127,31 @@ function buildApiUrl(baseUrl: string, phoneNumberId: string): string {
 
 // Proxy call via edge function (avoids CORS)
 async function proxyCall(creds: UnoApiCredentials, endpoint: string, method = 'GET', requestBody?: any): Promise<{ ok: boolean; data: any }> {
+  const projectUrl = import.meta.env.VITE_SUPABASE_URL;
+  const functionUrl = `${projectUrl}/functions/v1/unoapi-proxy`;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   try {
-    const { data, error } = await supabase.functions.invoke('unoapi-proxy', {
-      body: { 
-        baseUrl: creds.baseUrl, 
-        token: creds.token, 
+    const res = await fetch(functionUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': anonKey },
+      body: JSON.stringify({
+        baseUrl: creds.baseUrl,
+        token: creds.token,
         endpoint,
         method,
         body: requestBody,
-      },
+      }),
     });
-    if (error) return { ok: false, data: null };
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[unoapi] proxyCall error:', res.status, data);
+      return { ok: false, data };
+    }
     return { ok: true, data };
-  } catch {
-    return { ok: false, data: null };
+  } catch (err) {
+    console.error('[unoapi] proxyCall catch:', err);
+    return { ok: false, data: err };
   }
 }
 
