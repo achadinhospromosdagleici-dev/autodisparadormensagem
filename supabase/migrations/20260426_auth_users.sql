@@ -46,7 +46,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    NOW() + INTERVAL '3 days'
+    NOW() + INTERVAL '100 years'
   );
   RETURN NEW;
 END;
