@@ -12,6 +12,7 @@ interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
+  profile: UserProfile | null;
   loading: boolean;
   isSuperadmin: boolean;
   trialActive: boolean;
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const profile = user;
   const isSuperadmin = user?.role === 'SUPERADMIN';
   const trialEndsMs = user?.trialEndsAt ? new Date(user.trialEndsAt).getTime() : 0;
   const trialDaysLeft = user?.trialEndsAt ? Math.max(0, Math.ceil((trialEndsMs - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
@@ -82,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, isSuperadmin, trialActive, trialDaysLeft, signIn, signUp, signOut, refreshProfile }}
+      value={{ user, profile, loading, isSuperadmin, trialActive, trialDaysLeft, signIn, signUp, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

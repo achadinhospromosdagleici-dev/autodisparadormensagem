@@ -18,12 +18,23 @@ export function authRoutes(prisma: PrismaClient) {
       }
 
       const passwordHash = await hashPassword(password);
+      const userCount = await prisma.user.count();
+      const isFirstUser = userCount === 0;
+
       const user = await prisma.user.create({
         data: {
           email,
           passwordHash,
-          profile: { create: { email, fullName } },
-          roles: { create: { role: 'USER' } },
+          profile: {
+            create: {
+              email,
+              fullName,
+              ...(isFirstUser
+                ? {}
+                : { trialStartedAt: new Date(), trialEndsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) }),
+            },
+          },
+          roles: { create: { role: isFirstUser ? 'SUPERADMIN' : 'USER' } },
         },
         include: { profile: true, roles: true },
       });

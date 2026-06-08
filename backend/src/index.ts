@@ -35,6 +35,16 @@ await app.register(async function (protectedRoutes) {
     }
   });
 
+  protectedRoutes.addHook('preHandler', async (request, reply) => {
+    const payload = request.user as any;
+    if (payload.role !== 'SUPERADMIN') {
+      const profile = await prisma.profile.findUnique({ where: { userId: payload.sub } });
+      if (profile?.trialEndsAt && new Date() > profile.trialEndsAt) {
+        return reply.status(403).send({ error: 'Trial expirado', code: 'TRIAL_EXPIRED' });
+      }
+    }
+  });
+
   await protectedRoutes.register(proxyRoutes, { prefix: '/api/proxy' });
   await protectedRoutes.register(settingsRoutes(prisma), { prefix: '/api/settings' });
   await protectedRoutes.register(instancesRoutes(prisma), { prefix: '/api/instances' });
