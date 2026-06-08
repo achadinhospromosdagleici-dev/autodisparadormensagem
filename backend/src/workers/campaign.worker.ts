@@ -138,6 +138,24 @@ async function sendViaUnoapi(creds: ApiCredentials, instanceName: string, msg: M
   if (msg.type === 'DOCUMENT' || msg.type === 'document') {
     return waFetch({ ...basePayload, type: 'document', document: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption, filename: msg.mediaFilename || 'document' } });
   }
+  if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
+    return waFetch({
+      ...basePayload, recipient_type: 'individual', type: 'interactive',
+      interactive: {
+        type: 'button', body: { text: msg.text },
+        action: { buttons: [{ type: 'reply', reply: { id: 'btn1', title: msg.mediaCaption || 'Ok' } }] },
+      },
+    });
+  }
+  if (msg.type === 'LIST' || msg.type === 'list') {
+    return waFetch({
+      ...basePayload, recipient_type: 'individual', type: 'interactive',
+      interactive: {
+        type: 'list', body: { text: msg.text },
+        action: { button: 'Ver opções', sections: [{ title: 'Opções', rows: [{ id: 'opt1', title: msg.mediaCaption || 'Ok', description: '' }] }] },
+      },
+    });
+  }
   return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
 }
 
