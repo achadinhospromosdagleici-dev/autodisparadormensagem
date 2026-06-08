@@ -12,6 +12,9 @@ import { instancesRoutes } from './routes/instances.routes.js';
 import { messagesRoutes } from './routes/messages.routes.js';
 import { mediaRoutes } from './routes/media.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
+import { campaignQueue, closeQueue } from './queue/index.js';
+import { campaignRoutes } from './routes/campaign.routes.js';
+import { startCampaignWorker } from './workers/campaign.worker.js';
 
 const prisma = new PrismaClient();
 
@@ -21,7 +24,11 @@ await app.register(cors, { origin: true });
 await app.register(jwt, { secret: env.JWT_SECRET });
 await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 
-app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/health', async () => ({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  redis: await campaignQueue.client.ping() === 'PONG' ? 'connected' : 'disconnected',
+}));
 
 await app.register(authRoutes(prisma), { prefix: '/api/auth' });
 await app.register(webhookRoutes(prisma), { prefix: '/api/webhook' });
@@ -51,12 +58,20 @@ await app.register(async function (protectedRoutes) {
   await protectedRoutes.register(messagesRoutes(prisma), { prefix: '/api/messages' });
   await protectedRoutes.register(mediaRoutes(prisma), { prefix: '/api/media' });
   await protectedRoutes.register(adminRoutes(prisma), { prefix: '/api/admin' });
+  await protectedRoutes.register(campaignRoutes(prisma), { prefix: '/api/campaigns' });
 });
 
 const start = async () => {
   try {
     await prisma.$connect();
     app.log.info('Database connected');
+
+    await campaignQueue.client.ping();
+    app.log.info('Redis connected');
+
+    const worker = startCampaignWorker();
+    app.log.info('Campaign worker started');
+
     await app.listen({ port: env.PORT, host: '0.0.0.0' });
   } catch (err) {
     app.log.error(err);
@@ -68,6 +83,7 @@ const start = async () => {
 ['SIGINT', 'SIGTERM'].forEach((signal) => {
   process.on(signal, async () => {
     await prisma.$disconnect();
+    await closeQueue();
     await app.close();
     process.exit(0);
   });

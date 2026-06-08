@@ -1,10 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWizard } from '@/contexts/WizardContext';
-import { Campaign } from '../CampaignHistory';
-import { sendCampaign, SendProgress, CampaignMessage } from '@/services/campaignSender';
-import { loadUnoApiCredentials } from '@/services/unoapi';
-import { loadEvolutionCredentials } from '@/services/evolution';
-import { CampaignScheduler, ScheduledCampaign } from '../CampaignScheduler';
+import { SendProgress } from '@/services/campaignSender';
+import { CampaignScheduler } from '../CampaignScheduler';
+import { campaignService } from '@/services/campaignService';
 import {
   Users,
   MessageSquare,
@@ -14,11 +12,7 @@ import {
   CheckCircle2,
   Send,
   Loader2,
-  History,
   StopCircle,
-  Zap,
-  XCircle,
-  Reply,
   Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,29 +24,45 @@ interface StepConfirmationProps {
 export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = {}) {
   const {
     data, messages, instances, selectedInstances, settings,
-    getValidCount, campaignHistory, addCampaign,
-    unoApiConnected, followUpConfig, updateMetrics, scheduledCampaigns, addScheduledCampaign,
+    getValidCount,
+    followUpConfig, scheduledCampaigns, addScheduledCampaign,
     addActiveCampaign, updateActiveCampaign, clearWizard,
   } = useWizard();
   const [isSending, setIsSending] = useState(false);
   const [progress, setProgress] = useState<SendProgress | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [serverCampaignId, setServerCampaignId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const validContacts = getValidCount();
   const validData = Array.isArray(data) ? data.filter(r => r.isValid) : [];
   const selectedInstancesData = Array.isArray(instances) ? instances.filter(i => selectedInstances.includes(i.id)) : [];
 
-  // Detect API source from selected instances (evo_ → Evolution, uno_ → UnoAPI)
-  const usesEvolution = selectedInstances.some(id => id.startsWith('evo_'));
-  const usesUnoApi = selectedInstances.some(id => id.startsWith('uno_'));
-  const evoCreds = loadEvolutionCredentials();
-  const unoCreds = loadUnoApiCredentials();
-  const hasRequiredCreds =
-    (usesEvolution && !!evoCreds) ||
-    (usesUnoApi && !!unoCreds) ||
-    (!usesEvolution && !usesUnoApi && (unoApiConnected || !!evoCreds));
-  const apiLabel = usesEvolution ? 'Evolution API' : usesUnoApi ? 'UnoAPI' : 'WhatsApp API';
+  useEffect(() => {
+    if (serverCampaignId && isSending) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const c = await campaignService.getById(serverCampaignId);
+          setProgress(prev => ({
+            ...prev || { current: 0, total: c.totalContacts, percent: 0, status: 'sending', sent: 0, failed: 0, replied: 0, errors: [], log: [] },
+            current: c.sentCount + c.failedCount,
+            total: c.totalContacts,
+            percent: c.totalContacts > 0 ? Math.round(((c.sentCount + c.failedCount) / c.totalContacts) * 100) : 0,
+            sent: c.sentCount,
+            failed: c.failedCount,
+            replied: c.repliedCount,
+            status: c.status === 'COMPLETED' ? 'completed' : c.status === 'FAILED' ? 'error' : c.status === 'PAUSED' ? 'paused' : 'sending',
+          }));
+          if (c.status === 'COMPLETED' || c.status === 'CANCELLED' || c.status === 'FAILED') {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setIsSending(false);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 2000);
+      return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    }
+  }, [serverCampaignId, isSending]);
 
   const calculateTotalTime = () => {
     const messageCount = settings.sendType === 'multiple' ? messages.length : 1;
@@ -66,16 +76,16 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
 
   const handleStartSending = async () => {
     if (selectedInstances.length === 0) { toast.error('Selecione ao menos um número remetente!'); return; }
-    if (usesEvolution && !evoCreds) { toast.error('Credenciais da Evolution API não configuradas'); return; }
-    if (usesUnoApi && !unoCreds) { toast.error('Credenciais da UnoAPI não configuradas'); return; }
     if (validContacts === 0) { toast.error('Nenhum contato válido para envio'); return; }
     if (messages.length === 0) { toast.error('Configure ao menos uma mensagem'); return; }
 
-    const campaignId = crypto.randomUUID();
     const campaignName = `Campanha ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+    setIsSending(true);
+    setProgress({
+      current: 0, total: validContacts, percent: 0, status: 'sending',
+      sent: 0, failed: 0, replied: 0, errors: [], log: [],
+    });
 
     const contactsData = validData.map(row => {
       const obj: Record<string, any> = {};
@@ -85,108 +95,64 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
       return obj;
     });
 
-    const campaignMessages: CampaignMessage[] = messages.map(m => ({
-      content: m.content,
-      mediaType: (m as any).mediaType || 'text',
-      mediaUrl: (m as any).mediaUrl || undefined,
-      mediaCaption: (m as any).mediaCaption || undefined,
-      mediaFilename: (m as any).mediaFilename || undefined,
-      title: (m as any).mediaType === 'buttons' ? (m as any).mediaCaption : undefined,
-      footer: (m as any).mediaType === 'buttons' ? (m as any).mediaFilename : undefined,
-      buttons: (m as any).buttons || undefined,
-      linkUrl: (m as any).linkUrl || undefined,
-    }));
+    try {
+      const response = await campaignService.create({
+        name: campaignName,
+        contacts: contactsData.map(c => ({
+          phone: String(c.numero || c.phone || '').replace(/\D/g, ''),
+          name: c.nome || c.name || '',
+        })),
+        config: {
+          content: messages[0]?.content || '',
+          messageType: (messages[0] as any)?.mediaType || 'TEXT',
+          delayBetween: settings.intervalType === 'fixed' ? settings.fixedInterval * 1000 : settings.minInterval * 1000,
+          maxRetries: 3,
+        },
+      });
 
-    // Add to active campaigns immediately so the home page shows progress
-    addActiveCampaign({
-      id: campaignId,
-      name: campaignName,
-      status: 'running',
-      totalContacts: validContacts,
-      sentCount: 0,
-      failedCount: 0,
-      repliedCount: 0,
-      createdAt: new Date(),
-      snapshot: {
-        contacts: contactsData,
-        messages: campaignMessages,
-        settings: { ...settings },
-        selectedInstances: [...selectedInstances],
-        followUpConfig: JSON.parse(JSON.stringify(followUpConfig)),
-      },
-    });
+      setServerCampaignId(response.id);
 
-    // Run send in background so we can close the wizard view
-    void (async () => {
-      try {
-        const result = await sendCampaign(
-          contactsData,
-          campaignMessages,
-          settings,
-          selectedInstances,
-          followUpConfig,
-          (p) => {
-            updateActiveCampaign(campaignId, {
-              sentCount: p.sent,
-              failedCount: p.failed,
-              repliedCount: p.replied,
-              currentContact: p.currentContact,
-              status: p.status === 'completed' ? 'completed'
-                : p.status === 'error' ? 'error'
-                : p.status === 'paused' ? 'paused'
-                : 'running',
-            });
-          },
-          controller.signal,
-        );
+      addActiveCampaign({
+        id: response.id,
+        name: campaignName,
+        status: 'running',
+        totalContacts: validContacts,
+        sentCount: 0, failedCount: 0, repliedCount: 0,
+        createdAt: new Date(),
+        snapshot: {
+          contacts: contactsData,
+          messages: messages.map(m => ({
+            content: m.content,
+            mediaType: (m as any).mediaType,
+            mediaUrl: (m as any).mediaUrl,
+            mediaCaption: (m as any).mediaCaption,
+            mediaFilename: (m as any).mediaFilename,
+          })),
+          settings: { ...settings },
+          selectedInstances: [...selectedInstances],
+          followUpConfig: JSON.parse(JSON.stringify(followUpConfig)),
+        },
+      });
 
-        const newCampaign: Campaign = {
-          id: campaignId,
-          name: campaignName,
-          date: new Date(),
-          totalContacts: validContacts,
-          sentCount: result.sent,
-          successCount: result.sent - result.failed,
-          failedCount: result.failed,
-          messages: messages.map(m => m.content),
-          status: result.failed === 0 ? 'completed' : 'partial',
-        };
-        addCampaign(newCampaign);
+      toast.success('Campanha iniciada no servidor');
+    } catch (err: any) {
+      setIsSending(false);
+      toast.error(`Erro ao iniciar campanha: ${err.message}`);
+      return;
+    }
 
-        updateActiveCampaign(campaignId, {
-          status: result.failed === 0 ? 'completed' : (result.sent > 0 ? 'completed' : 'error'),
-          sentCount: result.sent,
-          failedCount: result.failed,
-          repliedCount: result.replied,
-        });
-
-        updateMetrics({
-          totalSent: result.sent,
-          totalFailed: result.failed,
-          totalReplied: result.replied,
-          deliveryRate: result.sent > 0 ? Math.round(((result.sent - result.failed) / result.sent) * 1000) / 10 : 0,
-          replyRate: result.sent > 0 ? Math.round((result.replied / result.sent) * 1000) / 10 : 0,
-          failRate: result.sent > 0 ? Math.round((result.failed / result.sent) * 1000) / 10 : 0,
-        });
-
-        toast.success(`Campanha finalizada! ${result.sent} enviadas.`);
-      } catch (err: any) {
-        updateActiveCampaign(campaignId, { status: 'error' });
-        toast.error(`Erro: ${err.message}`);
-      } finally {
-        abortRef.current = null;
-      }
-    })();
-
-    toast.success('Campanha iniciada — acompanhe o progresso na página inicial');
-    // Reset wizard state and close the creation view
     clearWizard();
     onCampaignStarted?.();
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    if (serverCampaignId) {
+      try {
+        await campaignService.pause(serverCampaignId);
+        toast.warning('Campanha pausada no servidor');
+      } catch { toast.error('Erro ao pausar'); }
+    }
     abortRef.current?.abort();
-    toast.warning('Campanha pausada');
   };
 
   const summaryItems = [
@@ -217,23 +183,6 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
                 <p className="text-xs text-muted-foreground">{item.label}</p>
               </div>
             ))}
-          </div>
-
-          {/* API Status */}
-          <div className={`glass-card p-4 flex items-center gap-3 ${hasRequiredCreds ? 'border-success/30' : 'border-destructive/30'}`}>
-            <Zap className={`w-5 h-5 ${hasRequiredCreds ? 'text-success' : 'text-destructive'}`} />
-            <div className="flex-1">
-              <p className="text-sm font-medium">
-                {hasRequiredCreds
-                  ? `${apiLabel} pronta para envio`
-                  : 'Nenhuma API configurada'}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {selectedInstances.length > 0
-                  ? `${selectedInstances.length} número(s) selecionado(s) — envio via ${apiLabel}`
-                  : 'Selecione um número remetente na etapa anterior'}
-              </p>
-            </div>
           </div>
 
           {/* Config Details */}
@@ -277,23 +226,10 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
             </div>
           </div>
 
-          {/* Warning */}
-          {!hasRequiredCreds && (
-            <div className="glass-card p-4 border-destructive/30 bg-destructive/5">
-              <div className="flex items-start gap-3">
-                <XCircle className="w-5 h-5 text-destructive shrink-0" />
-                <div>
-                  <p className="font-medium text-destructive">API não configurada</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Vá em Configurações e conecte a Evolution API ou UnoAPI para habilitar o envio.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* Live Progress */}
-          {progress && isSending && (
+          {(progress && isSending) || (progress && progress.status === 'completed') ? (
             <div className="glass-card p-6 space-y-4 animate-fade-in">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -362,9 +298,9 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
             ) : (
               <>
                 <button onClick={handleStartSending}
-                  disabled={validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0}
+                  disabled={validContacts === 0 || messages.length === 0 || selectedInstances.length === 0}
                   className={`flex-1 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-3 transition-all ${
-                    validContacts === 0 || messages.length === 0 || !hasRequiredCreds || selectedInstances.length === 0
+                    validContacts === 0 || messages.length === 0 || selectedInstances.length === 0
                       ? 'bg-muted text-muted-foreground cursor-not-allowed'
                       : 'bg-primary text-primary-foreground hover:bg-primary/90 glow-effect'
                   }`}>
@@ -401,10 +337,7 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
             </div>
           )}
 
-          {!hasRequiredCreds && (
-            <p className="text-center text-sm text-muted-foreground">Conecte a Evolution API ou UnoAPI nas Configurações para habilitar o envio</p>
-          )}
-          {hasRequiredCreds && selectedInstances.length === 0 && (
+          {selectedInstances.length === 0 && (
             <p className="text-center text-sm text-muted-foreground">Volte e selecione ao menos um número remetente</p>
           )}
     </div>

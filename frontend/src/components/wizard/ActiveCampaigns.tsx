@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Send,
   Pause,
@@ -6,12 +6,8 @@ import {
   X,
   RefreshCw,
   Settings,
-  Clock,
-  Users,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
 } from 'lucide-react';
+import { campaignService, CampaignResponse } from '@/services/campaignService';
 
 export interface CampaignSnapshot {
   contacts: Record<string, any>[];
@@ -63,15 +59,57 @@ interface ActiveCampaignsProps {
 
 export function ActiveCampaigns({
   campaigns,
-  onPause,
-  onResume,
-  onCancel,
+  onPause: _onPause,
+  onResume: _onResume,
+  onCancel: _onCancel,
   onResend,
   onNewCampaign,
 }: ActiveCampaignsProps) {
-  const drafts = campaigns.filter(c => c.status === 'paused');
-  const running = campaigns.filter(c => c.status === 'running');
-  const all = campaigns;
+  const [serverCampaigns, setServerCampaigns] = useState<CampaignResponse[]>([]);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    loadServerCampaigns();
+    pollRef.current = setInterval(loadServerCampaigns, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  async function loadServerCampaigns() {
+    try {
+      const list = await campaignService.list();
+      setServerCampaigns(list);
+    } catch { /* ignore */ }
+  }
+
+  const handlePause = async (id: string) => {
+    try { await campaignService.pause(id); await loadServerCampaigns(); } catch { }
+  };
+
+  const handleResume = async (id: string) => {
+    try { await campaignService.resume(id); await loadServerCampaigns(); } catch { }
+  };
+
+  const handleCancel = async (id: string) => {
+    try { await campaignService.cancel(id); await loadServerCampaigns(); } catch { }
+  };
+
+  const mergedCampaigns = [
+    ...campaigns.filter(ac => !serverCampaigns.find(sc => sc.id === ac.id)),
+    ...serverCampaigns.map(sc => ({
+      id: sc.id,
+      name: sc.name,
+      status: (sc.status === 'RUNNING' ? 'running' : sc.status === 'PAUSED' ? 'paused' : sc.status === 'COMPLETED' ? 'completed' : sc.status === 'CANCELLED' ? 'cancelled' : 'error') as ActiveCampaign['status'],
+      totalContacts: sc.totalContacts,
+      sentCount: sc.sentCount,
+      failedCount: sc.failedCount,
+      repliedCount: sc.repliedCount,
+      createdAt: new Date(sc.createdAt),
+    })),
+  ];
+
+  const drafts = mergedCampaigns.filter(c => c.status === 'paused');
+  const running = mergedCampaigns.filter(c => c.status === 'running');
+  const all = mergedCampaigns;
 
   const getStatusBadge = (status: ActiveCampaign['status']) => {
     switch (status) {
@@ -127,28 +165,28 @@ export function ActiveCampaigns({
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1">
             {drafts.map(draft => (
-              <div key={draft.id} className="flex items-center gap-3 bg-muted/30 rounded-xl p-4 min-w-[280px]">
-                <div className="flex-1">
-                  <p className="font-bold text-sm">{draft.name}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-warning" />
-                    PASSO {draft.currentStep || 0}/{draft.totalSteps || 4} •{' '}
-                    {new Date(draft.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}{' '}
-                    {new Date(draft.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <button
-                  onClick={() => onCancel(draft.id)}
-                  className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onResume(draft.id)}
-                  className="w-10 h-10 rounded-full bg-warning text-warning-foreground flex items-center justify-center hover:bg-warning/80 transition-colors"
-                >
-                  <Play className="w-5 h-5" />
-                </button>
+                  <div key={draft.id} className="flex items-center gap-3 bg-muted/30 rounded-xl p-4 min-w-[280px]">
+                    <div className="flex-1">
+                      <p className="font-bold text-sm">{draft.name}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-warning" />
+                        {draft.sentCount}/{draft.totalContacts} •{' '}
+                        {new Date(draft.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}{' '}
+                        {new Date(draft.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleCancel(draft.id)}
+                      className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleResume(draft.id)}
+                      className="w-10 h-10 rounded-full bg-warning text-warning-foreground flex items-center justify-center hover:bg-warning/80 transition-colors"
+                    >
+                      <Play className="w-5 h-5" />
+                    </button>
               </div>
             ))}
           </div>
@@ -260,7 +298,7 @@ export function ActiveCampaigns({
                       <div className="flex items-center justify-end gap-2">
                         {campaign.status === 'running' && (
                           <button
-                            onClick={() => onPause(campaign.id)}
+                            onClick={() => handlePause(campaign.id)}
                             className="w-9 h-9 rounded-full bg-warning text-warning-foreground flex items-center justify-center hover:bg-warning/80 transition-colors"
                             title="Pausar"
                           >
@@ -269,7 +307,7 @@ export function ActiveCampaigns({
                         )}
                         {campaign.status === 'paused' && (
                           <button
-                            onClick={() => onResume(campaign.id)}
+                            onClick={() => handleResume(campaign.id)}
                             className="w-9 h-9 rounded-full bg-success text-success-foreground flex items-center justify-center hover:bg-success/80 transition-colors"
                             title="Retomar"
                           >
@@ -287,7 +325,7 @@ export function ActiveCampaigns({
                         )}
                         {campaign.status !== 'cancelled' && campaign.status !== 'completed' && (
                           <button
-                            onClick={() => onCancel(campaign.id)}
+                            onClick={() => handleCancel(campaign.id)}
                             className="w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors"
                             title="Cancelar"
                           >
@@ -323,13 +361,13 @@ export function ActiveCampaigns({
           </div>
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-success">
-              {campaigns.filter(c => c.status === 'completed').length}
+              {mergedCampaigns.filter(c => c.status === 'completed').length}
             </p>
             <p className="text-xs text-muted-foreground">Concluídas</p>
           </div>
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-destructive">
-              {campaigns.filter(c => c.status === 'error').length}
+              {mergedCampaigns.filter(c => c.status === 'error').length}
             </p>
             <p className="text-xs text-muted-foreground">Com erro</p>
           </div>
