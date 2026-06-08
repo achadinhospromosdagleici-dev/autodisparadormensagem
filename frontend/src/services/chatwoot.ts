@@ -3,6 +3,7 @@
 
 import { api } from '@/lib/api';
 import { getCurrentUserId } from '@/lib/jwt';
+import { normalizeUrl } from '@/lib/utils';
 
 export interface ChatwootCredentials {
   baseUrl: string; // e.g. https://app.chatwoot.com
@@ -51,7 +52,7 @@ async function saveChatwootToDb(creds: ChatwootCredentials): Promise<void> {
   const userId = getCurrentUserId();
   if (!userId) return;
   await api.post('/settings/chatwoot', {
-    baseUrl: creds.baseUrl,
+    baseUrl: normalizeUrl(creds.baseUrl),
     apiToken: creds.apiToken,
     accountId: creds.accountId,
   });

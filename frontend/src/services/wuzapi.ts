@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import { getCurrentUserId } from '@/lib/jwt';
+import { normalizeUrl } from '@/lib/utils';
 
 export interface WuzapiCredentials {
   baseUrl: string;
@@ -51,7 +52,7 @@ export async function saveWuzapiSettings(creds: WuzapiCredentials): Promise<{ su
 
   try {
     await api.post('/settings/wuzapi', {
-      baseUrl: creds.baseUrl,
+      baseUrl: normalizeUrl(creds.baseUrl),
       adminToken: creds.adminToken,
     });
     return { success: true };

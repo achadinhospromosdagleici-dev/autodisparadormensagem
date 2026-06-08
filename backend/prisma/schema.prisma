@@ -174,7 +174,7 @@ model ApiSetting {
 model WuzapiSetting {
   id         String   @id @default(uuid())
   userId     String   @unique
-  baseUrl    String   @default("https://wuzapi.bigcreditos.com.br")
+  baseUrl    String
   adminToken String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt

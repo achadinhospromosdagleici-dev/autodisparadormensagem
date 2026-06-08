@@ -1,9 +1,5 @@
 import { FastifyInstance } from 'fastify';
-
-function normalizeUrl(url: string): string {
-  if (!url) return url;
-  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
-}
+import { normalizeUrl } from '../../lib/url.js';
 
 export async function wuzapiRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {

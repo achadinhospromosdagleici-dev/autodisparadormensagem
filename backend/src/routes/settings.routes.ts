@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
+import { normalizeUrl } from '../lib/url.js';
 
 export function settingsRoutes(prisma: PrismaClient) {
   return async function (app: FastifyInstance) {
@@ -18,8 +19,8 @@ export function settingsRoutes(prisma: PrismaClient) {
       const { baseUrl, adminToken } = request.body as any;
       return prisma.wuzapiSetting.upsert({
         where: { userId },
-        update: { baseUrl, adminToken },
-        create: { userId, baseUrl, adminToken },
+        update: { baseUrl: normalizeUrl(baseUrl), adminToken },
+        create: { userId, baseUrl: normalizeUrl(baseUrl), adminToken },
       });
     });
 
@@ -38,7 +39,9 @@ export function settingsRoutes(prisma: PrismaClient) {
     app.post('/:provider', async (request) => {
       const userId = (request as any).user.sub;
       const { provider } = request.params as any;
-      const { settings } = request.body as any;
+      const body = request.body as any;
+      let settings = body.settings || body;
+      if (settings.baseUrl) settings = { ...settings, baseUrl: normalizeUrl(settings.baseUrl) };
       return prisma.apiSetting.upsert({
         where: { userId_provider: { userId, provider } },
         update: { settings },

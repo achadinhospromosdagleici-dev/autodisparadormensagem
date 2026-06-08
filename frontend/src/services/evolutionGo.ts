@@ -3,6 +3,7 @@
 
 import { api } from '@/lib/api';
 import { getCurrentUserId } from '@/lib/jwt';
+import { normalizeUrl } from '@/lib/utils';
 
 export interface EvolutionGoCredentials {
   baseUrl: string;
@@ -24,7 +25,7 @@ async function saveEvoGoToDb(creds: EvolutionGoCredentials): Promise<void> {
   const userId = getCurrentUserId();
   if (!userId) return;
   await api.post('/settings/evolution-go', {
-    baseUrl: creds.baseUrl,
+    baseUrl: normalizeUrl(creds.baseUrl),
     apiKey: creds.apiKey,
     instanceName: creds.instanceName,
   });

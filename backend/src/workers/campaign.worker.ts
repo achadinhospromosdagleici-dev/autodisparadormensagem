@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { campaignQueue, createWorker } from '../queue/index.js';
+import { normalizeUrl } from '../lib/url.js';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +18,7 @@ async function loadApiSettings(userId: string): Promise<Record<string, ApiCreden
   for (const s of settings) {
     const parsed = s.settings as any;
     map[s.provider] = {
-      baseUrl: parsed.baseUrl || '',
+      baseUrl: normalizeUrl(parsed.baseUrl || ''),
       apiKey: parsed.apiKey,
       token: parsed.token,
       accountId: parsed.accountId ? Number(parsed.accountId) : undefined,
@@ -26,7 +27,7 @@ async function loadApiSettings(userId: string): Promise<Record<string, ApiCreden
 
   const wuzapi = await (prisma as any).wuzapiSetting.findUnique({ where: { userId } });
   if (wuzapi) {
-    map.wuzapi = { baseUrl: wuzapi.baseUrl, token: wuzapi.adminToken };
+    map.wuzapi = { baseUrl: normalizeUrl(wuzapi.baseUrl), token: wuzapi.adminToken };
   }
 
   return map;

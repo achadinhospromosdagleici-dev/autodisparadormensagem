@@ -3,6 +3,7 @@
 // API follows WhatsApp Cloud API format: https://github.com/clairton/unoapi-cloud
 import { api } from '@/lib/api';
 import { getCurrentUserId } from '@/lib/jwt';
+import { normalizeUrl } from '@/lib/utils';
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
@@ -52,7 +53,7 @@ async function saveUnoApiToDb(creds: UnoApiCredentials): Promise<void> {
   const userId = getCurrentUserId();
   if (!userId) return;
   await api.post('/settings/unoapi', {
-    baseUrl: creds.baseUrl,
+    baseUrl: normalizeUrl(creds.baseUrl),
     token: creds.token,
     s3Enabled: creds.s3Enabled || false,
     s3Endpoint: creds.s3Endpoint,

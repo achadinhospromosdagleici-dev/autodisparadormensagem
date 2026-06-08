@@ -1,5 +1,13 @@
 import { FastifyInstance } from 'fastify';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, InstanceStatus } from '@prisma/client';
+
+function toInstanceStatus(s?: string): InstanceStatus {
+  const map: Record<string, InstanceStatus> = {
+    connected: 'CONNECTED', disconnected: 'DISCONNECTED', connecting: 'CONNECTING', error: 'ERROR',
+    CONNECTED: 'CONNECTED', DISCONNECTED: 'DISCONNECTED', CONNECTING: 'CONNECTING', ERROR: 'ERROR',
+  };
+  return (s ? map[s.toLowerCase()] : undefined) || 'DISCONNECTED';
+}
 
 export function wuzapiInstancesRoutes(prisma: PrismaClient) {
   return async function (app: FastifyInstance) {
@@ -22,7 +30,7 @@ export function wuzapiInstancesRoutes(prisma: PrismaClient) {
       const userId = (request as any).user.sub;
       const { settingsId, userToken, name, phone, status } = request.body as any;
       return prisma.wuzapiInstance.create({
-        data: { userId, settingsId, userToken, name, phone, status: status || 'DISCONNECTED' },
+        data: { userId, settingsId, userToken, name, phone, status: toInstanceStatus(status) },
       });
     });
 
@@ -30,10 +38,12 @@ export function wuzapiInstancesRoutes(prisma: PrismaClient) {
       const userId = (request as any).user.sub;
       const { id } = request.params as any;
       const { phone, name, status, userToken } = request.body as any;
-      return prisma.wuzapiInstance.updateMany({
-        where: { id, userId },
-        data: { ...(phone !== undefined && { phone }), ...(name !== undefined && { name }), ...(status !== undefined && { status }), ...(userToken !== undefined && { userToken }) },
-      });
+      const data: any = {};
+      if (phone !== undefined) data.phone = phone;
+      if (name !== undefined) data.name = name;
+      if (status !== undefined) data.status = toInstanceStatus(status);
+      if (userToken !== undefined) data.userToken = userToken;
+      return prisma.wuzapiInstance.updateMany({ where: { id, userId }, data });
     });
 
     app.delete('/:id', async (request) => {
@@ -53,6 +63,7 @@ export function wuzapiInstancesRoutes(prisma: PrismaClient) {
     app.post('/full', async (request) => {
       const userId = (request as any).user.sub;
       const { userToken, phone, name, status } = request.body as any;
+      const normalizedStatus = toInstanceStatus(status);
 
       const setting = await prisma.wuzapiSetting.findUnique({ where: { userId } });
       if (!setting) {
@@ -61,14 +72,14 @@ export function wuzapiInstancesRoutes(prisma: PrismaClient) {
 
       const instance = await prisma.wuzapiInstance.upsert({
         where: { settingsId_userToken: { settingsId: setting.id, userToken } },
-        update: { phone, name, status: status || 'DISCONNECTED' },
-        create: { userId, settingsId: setting.id, userToken, phone, name, status: status || 'DISCONNECTED' },
+        update: { phone, name, status: normalizedStatus },
+        create: { userId, settingsId: setting.id, userToken, phone, name, status: normalizedStatus },
       });
 
       await prisma.userInstance.upsert({
         where: { userId_instanceName: { userId, instanceName: name } },
-        update: { phone, status: status || 'DISCONNECTED', source: 'wuzapi' },
-        create: { userId, instanceName: name, phone, status: status || 'DISCONNECTED', source: 'wuzapi' },
+        update: { phone, status: normalizedStatus, source: 'wuzapi' },
+        create: { userId, instanceName: name, phone, status: normalizedStatus, source: 'wuzapi' },
       });
 
       return instance;
