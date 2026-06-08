@@ -133,8 +133,8 @@ export function ActiveCampaigns({
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-warning" />
                     PASSO {draft.currentStep || 0}/{draft.totalSteps || 4} •{' '}
-                    {draft.createdAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}{' '}
-                    {draft.createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(draft.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}{' '}
+                    {new Date(draft.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <button
@@ -248,10 +248,10 @@ export function ActiveCampaigns({
                     {/* Date */}
                     <td className="px-5 py-4">
                       <p className="text-sm font-medium">
-                        {campaign.createdAt.toLocaleDateString('pt-BR')}
+                        {new Date(campaign.createdAt).toLocaleDateString('pt-BR')}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {campaign.createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(campaign.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </td>
 

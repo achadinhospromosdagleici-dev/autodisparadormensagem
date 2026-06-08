@@ -24,7 +24,7 @@ export function CampaignHistory({ campaigns, onReuse }: CampaignHistoryProps) {
 
   // Agrupar campanhas por mês
   const groupedByMonth = campaigns.reduce((acc, campaign) => {
-    const monthKey = campaign.date.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
+    const monthKey = new Date(campaign.date).toLocaleDateString('pt-BR', { year: 'numeric', month: 'long' });
     if (!acc[monthKey]) acc[monthKey] = [];
     acc[monthKey].push(campaign);
     return acc;
@@ -105,11 +105,11 @@ export function CampaignHistory({ campaigns, onReuse }: CampaignHistoryProps) {
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {campaign.date.toLocaleDateString('pt-BR')}
+                        {new Date(campaign.date).toLocaleDateString('pt-BR')}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {campaign.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(campaign.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </div>

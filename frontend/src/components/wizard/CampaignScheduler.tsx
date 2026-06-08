@@ -293,11 +293,11 @@ export function CampaignScheduler({
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {campaign.scheduledDate.toLocaleDateString('pt-BR')}
+                        {new Date(campaign.scheduledDate).toLocaleDateString('pt-BR')}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {campaign.scheduledDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(campaign.scheduledDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       <span>{campaign.contactCount} contatos</span>
                     </div>
