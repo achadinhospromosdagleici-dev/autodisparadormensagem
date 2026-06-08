@@ -1,8 +1,14 @@
 import { FastifyInstance } from 'fastify';
 
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+}
+
 export async function evolutionGoRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
-    const { action, baseUrl, apiKey, instanceName, to, message, webhookUrl, events } = request.body as any;
+    const { action, baseUrl: rawBaseUrl, apiKey, instanceName, to, message, webhookUrl, events } = request.body as any;
+    const baseUrl = normalizeUrl(rawBaseUrl);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

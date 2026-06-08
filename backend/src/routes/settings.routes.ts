@@ -3,6 +3,32 @@ import { PrismaClient } from '@prisma/client';
 
 export function settingsRoutes(prisma: PrismaClient) {
   return async function (app: FastifyInstance) {
+    app.get('/evolution/shared', async () => {
+      const setting = await prisma.systemSetting.findUnique({ where: { key: 'evolution_shared' } });
+      return setting?.value || { enabled: false };
+    });
+
+    app.get('/wuzapi', async (request) => {
+      const userId = (request as any).user.sub;
+      return prisma.wuzapiSetting.findUnique({ where: { userId } });
+    });
+
+    app.post('/wuzapi', async (request) => {
+      const userId = (request as any).user.sub;
+      const { baseUrl, adminToken } = request.body as any;
+      return prisma.wuzapiSetting.upsert({
+        where: { userId },
+        update: { baseUrl, adminToken },
+        create: { userId, baseUrl, adminToken },
+      });
+    });
+
+    app.delete('/wuzapi', async (request) => {
+      const userId = (request as any).user.sub;
+      await prisma.wuzapiSetting.delete({ where: { userId } }).catch(() => {});
+      return { success: true };
+    });
+
     app.get('/:provider', async (request) => {
       const userId = (request as any).user.sub;
       const { provider } = request.params as any;

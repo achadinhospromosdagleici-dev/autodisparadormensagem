@@ -1,11 +1,16 @@
 import { FastifyInstance } from 'fastify';
 
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+}
+
 export async function unoapiRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
     const { baseUrl, token, endpoint, method, body } = request.body as any;
 
     try {
-      const res = await fetch(`${baseUrl}/${endpoint}`, {
+      const res = await fetch(`${normalizeUrl(baseUrl)}/${endpoint}`, {
         method: method || 'GET',
         headers: {
           'Content-Type': 'application/json',

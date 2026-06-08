@@ -14,6 +14,7 @@ import { mediaRoutes } from './routes/media.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
 import { campaignQueue, closeQueue } from './queue/index.js';
 import { campaignRoutes } from './routes/campaign.routes.js';
+import { wuzapiInstancesRoutes } from './routes/wuzapi-instances.routes.js';
 import { startCampaignWorker } from './workers/campaign.worker.js';
 
 const prisma = new PrismaClient();
@@ -63,6 +64,7 @@ await app.register(async function (protectedRoutes) {
   await protectedRoutes.register(mediaRoutes(prisma), { prefix: '/api/media' });
   await protectedRoutes.register(adminRoutes(prisma), { prefix: '/api/admin' });
   await protectedRoutes.register(campaignRoutes(prisma), { prefix: '/api/campaigns' });
+  await protectedRoutes.register(wuzapiInstancesRoutes(prisma), { prefix: '/api/wuzapi/instances' });
 });
 
 const start = async () => {
