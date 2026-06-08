@@ -325,23 +325,25 @@ model Campaign {
 }
 
 model CampaignMessage {
-  id           String        @id @default(uuid())
-  campaignId   String
-  contactPhone String
-  contactName  String?
-  content      String
-  messageType  String         @default("TEXT")
-  status       MessageStatus  @default(PENDING)
-  attempts     Int            @default(0)
-  maxRetries   Int            @default(3)
-  error        String?
-  externalId   String?
-  sentAt       DateTime?
-  deliveredAt  DateTime?
-  readAt       DateTime?
-  repliedAt    DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String        @id @default(uuid())
+  campaignId     String
+  contactPhone   String
+  contactName    String?
+  content        String
+  messageType    String         @default("TEXT")
+  mediaUrl       String?
+  mediaCaption   String?
+  mediaFilename  String?
+  attempts       Int            @default(0)
+  maxRetries     Int            @default(3)
+  error          String?
+  externalId     String?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  repliedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 

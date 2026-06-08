@@ -11,6 +11,16 @@ interface ApiCredentials {
   accountId?: number;
 }
 
+interface MessagePayload {
+  to: string;
+  text: string;
+  type: string;
+  mediaUrl?: string;
+  mediaCaption?: string;
+  mediaFilename?: string;
+  contactName?: string;
+}
+
 async function loadApiSettings(userId: string): Promise<Record<string, ApiCredentials>> {
   const settings = await prisma.apiSetting.findMany({ where: { userId } });
   const map: Record<string, ApiCredentials> = {};
@@ -33,72 +43,119 @@ async function loadApiSettings(userId: string): Promise<Record<string, ApiCreden
   return map;
 }
 
-async function sendViaEvolution(
-  creds: ApiCredentials, instanceName: string, to: string, text: string,
-) {
-  const url = `${creds.baseUrl}/message/sendText/${instanceName}`;
-  const body = { number: to, text, options: { delay: 1, presence: 'composing' } };
+async function evoFetch(creds: ApiCredentials, url: string, body?: any) {
   const res = await fetch(url, {
-    method: 'POST',
+    method: body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', apikey: creds.apiKey || '' },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw new Error(`Evolution API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-async function sendViaEvolutionGo(
-  creds: ApiCredentials, instanceName: string, to: string, text: string,
-) {
-  const url = `${creds.baseUrl}/message/sendText/${instanceName}`;
-  const body = { number: to, text, delay: 1, presence: 'composing' };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: creds.apiKey || '',
-      Authorization: `Bearer ${creds.apiKey || ''}`,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Evolution Go API ${res.status}: ${await res.text()}`);
-  return res.json();
+async function sendViaEvolution(creds: ApiCredentials, instanceName: string, msg: MessagePayload) {
+  const b = { number: msg.to, options: { delay: 1, presence: 'composing' } };
+  const base = creds.baseUrl;
+  const name = instanceName;
+
+  if (msg.type === 'TEXT' || msg.type === 'text') {
+    return evoFetch(creds, `${base}/message/sendText/${name}`, { ...b, text: msg.text });
+  }
+  if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
+    return evoFetch(creds, `${base}/message/sendMedia/${name}`, { number: msg.to, options: { mediatype: msg.type.toLowerCase(), media: msg.mediaUrl, caption: msg.mediaCaption, fileName: msg.mediaFilename } });
+  }
+  if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
+    return evoFetch(creds, `${base}/message/sendButtons/${name}`, { number: msg.to, options: { title: msg.text, description: msg.mediaCaption, footer: '', buttons: [] } });
+  }
+  if (msg.type === 'CONTACT' || msg.type === 'contact') {
+    return evoFetch(creds, `${base}/message/sendContact/${name}`, { number: msg.to, options: { displayName: msg.contactName || msg.text, vcard: '' } });
+  }
+  return evoFetch(creds, `${base}/message/sendText/${name}`, { ...b, text: msg.text });
 }
 
-async function sendViaUnoapi(
-  creds: ApiCredentials, instanceName: string, to: string, text: string,
-) {
+async function sendViaEvolutionGo(creds: ApiCredentials, instanceName: string, msg: MessagePayload) {
+  const base = creds.baseUrl;
+  const name = instanceName;
+  const headers = { 'Content-Type': 'application/json', apikey: creds.apiKey || '', Authorization: `Bearer ${creds.apiKey || ''}` };
+
+  async function goFetch(url: string, body?: any) {
+    const res = await fetch(url, {
+      method: body ? 'POST' : 'GET',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) throw new Error(`Evolution Go API ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  if (msg.type === 'TEXT' || msg.type === 'text') {
+    return goFetch(`${base}/message/sendText/${name}`, { number: msg.to, text: msg.text, delay: 1, presence: 'composing' });
+  }
+  if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
+    return goFetch(`${base}/message/sendMedia/${name}`, { number: msg.to, mediatype: msg.type.toLowerCase(), media: msg.mediaUrl, caption: msg.mediaCaption, fileName: msg.mediaFilename });
+  }
+  if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
+    return goFetch(`${base}/message/sendButtons/${name}`, { number: msg.to, title: msg.text, description: msg.mediaCaption, footer: '', buttons: [] });
+  }
+  if (msg.type === 'LIST' || msg.type === 'list') {
+    return goFetch(`${base}/message/sendList/${name}`, { number: msg.to, title: msg.text, description: msg.mediaCaption, buttonText: 'Ver opções', sections: [] });
+  }
+  if (msg.type === 'CONTACT' || msg.type === 'contact') {
+    return goFetch(`${base}/message/sendContact/${name}`, { number: msg.to, contact: { displayName: msg.contactName || msg.text, vcard: '' } });
+  }
+  if (msg.type === 'CAROUSEL' || msg.type === 'carousel') {
+    return goFetch(`${base}/send/carousel/${name}`, { number: msg.to, cards: [] });
+  }
+  return goFetch(`${base}/message/sendText/${name}`, { number: msg.to, text: msg.text, delay: 1, presence: 'composing' });
+}
+
+async function sendViaUnoapi(creds: ApiCredentials, instanceName: string, msg: MessagePayload) {
   const url = `${creds.baseUrl}/v15.0/${instanceName}/messages`;
-  const body = { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: creds.token || '' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`UnoAPI ${res.status}: ${await res.text()}`);
-  return res.json();
+  const basePayload: any = { messaging_product: 'whatsapp', to: msg.to };
+
+  async function waFetch(payload: any) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: creds.token || '' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`UnoAPI ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  if (msg.type === 'TEXT' || msg.type === 'text') {
+    return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
+  }
+  if (msg.type === 'IMAGE' || msg.type === 'image') {
+    return waFetch({ ...basePayload, type: 'image', image: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
+  }
+  if (msg.type === 'AUDIO' || msg.type === 'audio') {
+    return waFetch({ ...basePayload, type: 'audio', audio: { link: msg.mediaUrl || msg.text } });
+  }
+  if (msg.type === 'VIDEO' || msg.type === 'video') {
+    return waFetch({ ...basePayload, type: 'video', video: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
+  }
+  if (msg.type === 'DOCUMENT' || msg.type === 'document') {
+    return waFetch({ ...basePayload, type: 'document', document: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption, filename: msg.mediaFilename || 'document' } });
+  }
+  return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
 }
 
-async function sendViaChatwoot(
-  creds: ApiCredentials, instanceName: string, to: string, text: string, contactName?: string,
-) {
+async function sendViaChatwoot(creds: ApiCredentials, instanceName: string, msg: MessagePayload) {
   const accountId = creds.accountId || 1;
   const baseUrl = creds.baseUrl;
   const headers = { 'Content-Type': 'application/json', api_access_token: creds.token || '' };
+  const to = msg.to;
 
-  const contactRes = await fetch(
-    `${baseUrl}/api/v1/accounts/${accountId}/contacts?phone=${encodeURIComponent(to)}`,
-    { headers },
-  );
+  const contactRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/contacts?phone=${encodeURIComponent(to)}`, { headers });
   const contactData = await contactRes.json();
   let contactId: number | null = null;
   if (contactData.payload?.length > 0) {
     contactId = contactData.payload[0].id;
   } else {
     const createRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/contacts`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ name: contactName || to, phone_number: to, inbox_id: Number(instanceName) }),
+      method: 'POST', headers,
+      body: JSON.stringify({ name: msg.contactName || to, phone_number: to, inbox_id: Number(instanceName) }),
     });
     const createData = await createRes.json();
     contactId = createData.payload?.contact?.id;
@@ -106,16 +163,13 @@ async function sendViaChatwoot(
 
   if (!contactId) throw new Error('Chatwoot: could not find or create contact');
 
-  const convRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/contacts/${contactId}/conversations`, {
-    headers,
-  });
+  const convRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/contacts/${contactId}/conversations`, { headers });
   const convData = await convRes.json();
   let conversationId: number | null = convData.payload?.[0]?.id || null;
 
   if (!conversationId) {
     const createConvRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/conversations`, {
-      method: 'POST',
-      headers,
+      method: 'POST', headers,
       body: JSON.stringify({ contact_id: contactId, inbox_id: Number(instanceName) }),
     });
     const createConvData = await createConvRes.json();
@@ -124,34 +178,46 @@ async function sendViaChatwoot(
 
   if (!conversationId) throw new Error('Chatwoot: could not find or create conversation');
 
-  const msgRes = await fetch(
-    `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`,
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ content: text, message_type: 'outgoing' }),
-    },
-  );
+  const msgRes = await fetch(`${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ content: msg.text, message_type: 'outgoing' }),
+  });
   if (!msgRes.ok) throw new Error(`Chatwoot API ${msgRes.status}: ${await msgRes.text()}`);
   return msgRes.json();
 }
 
-async function sendViaWuzapi(
-  creds: ApiCredentials, instanceName: string, to: string, text: string,
-) {
-  const instance = await (prisma as any).wuzapiInstance.findFirst({
-    where: { name: instanceName },
-  });
+async function sendViaWuzapi(creds: ApiCredentials, instanceName: string, msg: MessagePayload) {
+  const instance = await (prisma as any).wuzapiInstance.findFirst({ where: { name: instanceName } });
   const token = instance?.userToken || creds.token || '';
-  const url = `${creds.baseUrl}/api/send`;
-  const body = { phone: to, message: text, instanceName };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', token },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`WuzAPI ${res.status}: ${await res.text()}`);
-  return res.json();
+  const baseUrl = creds.baseUrl;
+
+  async function wuzapiCall(endpoint: string, payload: any) {
+    const res = await fetch(`${baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', token },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`WuzAPI ${res.status}: ${await res.text()}`);
+    return res.json();
+  }
+
+  if (msg.type === 'TEXT' || msg.type === 'text') {
+    return wuzapiCall('/chat/send/text', { Phone: msg.to, Body: msg.text });
+  }
+  if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
+    const mediaMap: Record<string, string> = { image: 'Image', audio: 'Audio', video: 'Video', document: 'Document' };
+    return wuzapiCall('/chat/send/media', { Phone: msg.to, Media: msg.mediaUrl, Type: mediaMap[msg.type.toLowerCase()] || 'Image', Caption: msg.mediaCaption });
+  }
+  if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
+    return wuzapiCall('/chat/send/buttons', { Phone: msg.to, Title: msg.text, Body: msg.mediaCaption || '', Buttons: [] });
+  }
+  if (msg.type === 'LIST' || msg.type === 'list') {
+    return wuzapiCall('/chat/send/list', { Phone: msg.to, Title: msg.text, Body: msg.mediaCaption || '', ButtonText: 'Ver opções', Sections: [] });
+  }
+  if (msg.type === 'CONTACT' || msg.type === 'contact') {
+    return wuzapiCall('/chat/send/contact', { Phone: msg.to, Contact: { displayName: msg.contactName || msg.text, vcard: '' } });
+  }
+  return wuzapiCall('/chat/send/text', { Phone: msg.to, Body: msg.text });
 }
 
 const senders: Record<string, Function> = {
@@ -215,22 +281,18 @@ export function startCampaignWorker() {
       return;
     }
 
-    let contactName = msg.contactName || undefined;
+    const messagePayload: MessagePayload = {
+      to: msg.contactPhone,
+      text: msg.content,
+      type: msg.messageType || 'TEXT',
+      mediaUrl: msg.mediaUrl || undefined,
+      mediaCaption: msg.mediaCaption || undefined,
+      mediaFilename: msg.mediaFilename || undefined,
+      contactName: msg.contactName || undefined,
+    };
 
     try {
-      let result: any;
-
-      if (source === 'chatwoot') {
-        result = await sendViaChatwoot(creds, userInstance.instanceName, msg.contactPhone, msg.content, contactName);
-      } else if (source === 'wuzapi') {
-        result = await sendViaWuzapi(creds, userInstance.instanceName, msg.contactPhone, msg.content);
-      } else if (source === 'evolution-go') {
-        result = await sendViaEvolutionGo(creds, userInstance.instanceName, msg.contactPhone, msg.content);
-      } else if (source === 'evolution') {
-        result = await sendViaEvolution(creds, userInstance.instanceName, msg.contactPhone, msg.content);
-      } else {
-        result = await sendViaUnoapi(creds, userInstance.instanceName, msg.contactPhone, msg.content);
-      }
+      let result = await sender(creds, userInstance.instanceName, messagePayload);
 
       await (prisma as any).campaignMessage.update({
         where: { id: msg.id },

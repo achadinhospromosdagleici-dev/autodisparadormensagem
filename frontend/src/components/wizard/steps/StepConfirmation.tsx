@@ -105,6 +105,9 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
         config: {
           content: messages[0]?.content || '',
           messageType: (messages[0] as any)?.mediaType || 'TEXT',
+          mediaUrl: (messages[0] as any)?.mediaUrl,
+          mediaCaption: (messages[0] as any)?.mediaCaption,
+          mediaFilename: (messages[0] as any)?.mediaFilename,
           delayBetween: settings.intervalType === 'fixed' ? settings.fixedInterval * 1000 : settings.minInterval * 1000,
           maxRetries: 3,
         },
