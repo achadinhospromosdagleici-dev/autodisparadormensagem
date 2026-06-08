@@ -5,7 +5,7 @@ import multipart from '@fastify/multipart';
 import { PrismaClient } from '@prisma/client';
 import { env } from './config/env.js';
 import { authRoutes } from './routes/auth.routes.js';
-import { proxyRoutes } from './routes/proxy/index.js';
+import proxyRoutes from './routes/proxy/index.js';
 import { webhookRoutes } from './routes/webhook.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
 import { instancesRoutes } from './routes/instances.routes.js';

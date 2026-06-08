@@ -32,7 +32,7 @@ model User {
   settings       UserSetting[]
   wuzapiSettings  WuzapiSetting[]
   wuzapiInstances WuzapiInstance[]
-  conversations  Conversation[]
+  apiSettings    ApiSetting[]
   templates      MessageTemplate[]
   blacklist      Blacklist[]
   phoneMappings  PhoneMapping[]

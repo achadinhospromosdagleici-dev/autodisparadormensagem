@@ -59,7 +59,7 @@ export async function s3UploadRoutes(app: FastifyInstance) {
           'Authorization': authorization,
           'Content-Length': buffer.length.toString(),
         },
-        body: buffer,
+        body: new Blob([new Uint8Array(buffer)]),
       });
 
       if (!uploadRes.ok) {
