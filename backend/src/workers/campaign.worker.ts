@@ -68,11 +68,11 @@ async function sendViaEvolutionGo(
 async function sendViaUnoapi(
   creds: ApiCredentials, instanceName: string, to: string, text: string,
 ) {
-  const url = `${creds.baseUrl}/api/${instanceName}/messages/send`;
-  const body = { content: text, to };
+  const url = `${creds.baseUrl}/v15.0/${instanceName}/messages`;
+  const body = { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } };
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${creds.token || ''}` },
+    headers: { 'Content-Type': 'application/json', Authorization: creds.token || '' },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`UnoAPI ${res.status}: ${await res.text()}`);
