@@ -39,14 +39,16 @@ export function authRoutes(prisma: PrismaClient) {
         include: { profile: true, roles: true },
       });
 
-      const token = signToken({ sub: user.id, email: user.email, role: user.roles[0].role });
+      const getRole = (roles: { role: string }[]) => roles.find(r => r.role === 'SUPERADMIN')?.role || roles[0]?.role || 'USER';
+
+      const token = signToken({ sub: user.id, email: user.email, role: getRole(user.roles) });
       return {
         token,
         user: {
           id: user.id,
           email: user.email,
           fullName: user.profile?.fullName,
-          role: user.roles[0].role,
+          role: getRole(user.roles),
         },
       };
     });
@@ -71,14 +73,16 @@ export function authRoutes(prisma: PrismaClient) {
         return reply.status(401).send({ error: 'Invalid credentials' });
       }
 
-      const token = signToken({ sub: user.id, email: user.email, role: user.roles[0].role });
+      const getRole = (roles: { role: string }[]) => roles.find(r => r.role === 'SUPERADMIN')?.role || roles[0]?.role || 'USER';
+
+      const token = signToken({ sub: user.id, email: user.email, role: getRole(user.roles) });
       return {
         token,
         user: {
           id: user.id,
           email: user.email,
           fullName: user.profile?.fullName,
-          role: user.roles[0].role,
+          role: getRole(user.roles),
           isActive: user.profile?.isActive,
           trialEndsAt: user.profile?.trialEndsAt,
         },
@@ -100,11 +104,12 @@ export function authRoutes(prisma: PrismaClient) {
         if (!user) {
           return reply.status(404).send({ error: 'User not found' });
         }
+        const getRole = (roles: { role: string }[]) => roles.find(r => r.role === 'SUPERADMIN')?.role || roles[0]?.role || 'USER';
         return {
           id: user.id,
           email: user.email,
           fullName: user.profile?.fullName,
-          role: user.roles[0].role,
+          role: getRole(user.roles),
           isActive: user.profile?.isActive,
           trialEndsAt: user.profile?.trialEndsAt,
         };

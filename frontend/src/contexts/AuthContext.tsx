@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isSuperadmin = user?.role === 'SUPERADMIN';
   const trialEndsMs = user?.trialEndsAt ? new Date(user.trialEndsAt).getTime() : 0;
   const trialDaysLeft = user?.trialEndsAt ? Math.max(0, Math.ceil((trialEndsMs - Date.now()) / (1000 * 60 * 60 * 24))) : 0;
-  const trialActive = isSuperadmin || (!!user?.isActive && trialEndsMs > Date.now());
+  const trialActive = isSuperadmin || (!!user?.isActive && (!user?.trialEndsAt || trialEndsMs > Date.now()));
 
   const refreshProfile = useCallback(async () => {
     try {
