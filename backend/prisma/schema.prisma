@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  SUPERADMIN
+  USER
+}
+
+enum InstanceStatus {
+  CONNECTING
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile        Profile?
+  roles          UserRole[]
+  instances      UserInstance[]
+  settings       UserSetting[]
+  wuzapiSettings  WuzapiSetting[]
+  wuzapiInstances WuzapiInstance[]
+  conversations  Conversation[]
+  templates      MessageTemplate[]
+  blacklist      Blacklist[]
+  phoneMappings  PhoneMapping[]
+  shortLinks     ShortLink[]
+  mediaLibrary   MediaLibrary[]
+  stickers       Sticker[]
+}
+
+model Profile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  email          String?
+  fullName       String?
+  isActive       Boolean  @default(true)
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  lastSeenAt     DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserRole {
+  id     String  @id @default(uuid())
+  userId String
+  role   AppRole @default(USER)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model UserInstance {
+  id           String         @id @default(uuid())
+  userId       String
+  instanceName String
+  phone        String?
+  profileName  String?
+  status       InstanceStatus @default(CONNECTING)
+  source       String         @default("unoapi")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instanceName])
+}
+
+model UserSetting {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Conversation {
+  id                 String    @id @default(uuid())
+  instanceName       String
+  phoneNumber        String
+  contactName        String?
+  profilePicture     String?
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  unreadCount        Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  messages Message[]
+
+  @@unique([instanceName, phoneNumber])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  instanceName   String
+  messageId      String?
+  fromMe         Boolean  @default(false)
+  phoneNumber    String
+  content        String?
+  messageType    String   @default("TEXT")
+  mediaUrl       String?
+  mediaCaption   String?
+  timestamp      BigInt?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model ApiSetting {
+  id        String   @id @default(uuid())
+  userId    String
+  provider  String
+  settings  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model WuzapiSetting {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  baseUrl    String   @default("https://wuzapi.bigcreditos.com.br")
+  adminToken String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instances WuzapiInstance[]
+}
+
+model WuzapiInstance {
+  id          String         @id @default(uuid())
+  userId      String
+  settingsId  String
+  userToken   String
+  phone       String?
+  name        String
+  status      InstanceStatus @default(DISCONNECTED)
+  connectedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  setting WuzapiSetting @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, userToken])
+}
+
+model MessageTemplate {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  content   String?
+  mediaType String?
+  mediaUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+model Blacklist {
+  id        String   @id @default(uuid())
+  userId    String
+  phone     String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, phone])
+}
+
+model PhoneMapping {
+  id            String   @id @default(uuid())
+  userId        String
+  originalPhone String
+  mappedPhone   String
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, originalPhone])
+}
+
+model ShortLink {
+  id         String   @id @default(uuid())
+  userId     String
+  slug       String   @unique
+  title      String?
+  phone      String?
+  message    String?
+  clickCount Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks LinkClick[]
+}
+
+model LinkClick {
+  id          String   @id @default(uuid())
+  linkId      String
+  ip          String?
+  country     String?
+  countryCode String?
+  city        String?
+  region      String?
+  device      String?
+  browser     String?
+  os          String?
+  referrer    String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  userAgent   String?
+  clickedAt   DateTime @default(now())
+
+  link ShortLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+}
+
+model MediaLibrary {
+  id              String   @id @default(uuid())
+  userId          String
+  mediaType       String
+  url             String
+  filename        String?
+  durationSeconds Int?
+  sizeBytes       BigInt?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Sticker {
+  id        String   @id @default(uuid())
+  userId    String
+  url       String
+  name      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
