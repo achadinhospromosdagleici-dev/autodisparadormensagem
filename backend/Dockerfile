@@ -7,7 +7,8 @@ FROM node:20-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
-COPY tsconfig.json prisma/ ./
+COPY tsconfig.json ./
+COPY prisma/ ./prisma/
 RUN npx prisma generate
 COPY src/ ./src/
 RUN npx tsc
