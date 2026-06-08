@@ -24,11 +24,15 @@ await app.register(cors, { origin: true });
 await app.register(jwt, { secret: env.JWT_SECRET });
 await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 
-app.get('/health', async () => ({
-  status: 'ok',
-  timestamp: new Date().toISOString(),
-  redis: await campaignQueue.client.ping() === 'PONG' ? 'connected' : 'disconnected',
-}));
+app.get('/health', async () => {
+  try {
+    const redisClient = await campaignQueue.client;
+    await (redisClient as any).ping();
+    return { status: 'ok', timestamp: new Date().toISOString(), redis: 'connected' };
+  } catch {
+    return { status: 'ok', timestamp: new Date().toISOString(), redis: 'disconnected' };
+  }
+});
 
 await app.register(authRoutes(prisma), { prefix: '/api/auth' });
 await app.register(webhookRoutes(prisma), { prefix: '/api/webhook' });
@@ -66,7 +70,8 @@ const start = async () => {
     await prisma.$connect();
     app.log.info('Database connected');
 
-    await campaignQueue.client.ping();
+    const redisClient = await campaignQueue.client;
+    await (redisClient as any).ping();
     app.log.info('Redis connected');
 
     const worker = startCampaignWorker();

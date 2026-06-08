@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { createWorker } from '../queue/index.js';
+import { campaignQueue, createWorker } from '../queue/index.js';
 
 const prisma = new PrismaClient();
 
@@ -24,7 +24,7 @@ async function loadApiSettings(userId: string): Promise<Record<string, ApiCreden
     };
   }
 
-  const wuzapi = await prisma.wuzapiSetting.findUnique({ where: { userId } });
+  const wuzapi = await (prisma as any).wuzapiSetting.findUnique({ where: { userId } });
   if (wuzapi) {
     map.wuzapi = { baseUrl: wuzapi.baseUrl, token: wuzapi.adminToken };
   }
@@ -138,7 +138,7 @@ async function sendViaChatwoot(
 async function sendViaWuzapi(
   creds: ApiCredentials, instanceName: string, to: string, text: string,
 ) {
-  const instance = await prisma.wuzapiInstance.findFirst({
+  const instance = await (prisma as any).wuzapiInstance.findFirst({
     where: { name: instanceName },
   });
   const token = instance?.userToken || creds.token || '';
@@ -165,7 +165,7 @@ export function startCampaignWorker() {
   const worker = createWorker(async (job) => {
     const { campaignId } = job.data;
 
-    const campaign = await prisma.campaign.findUnique({
+    const campaign = await (prisma as any).campaign.findUnique({
       where: { id: campaignId },
       include: {
         messages: {
@@ -189,7 +189,7 @@ export function startCampaignWorker() {
 
     const apiSettings = await loadApiSettings(campaign.userId);
 
-    const userInstance = await prisma.userInstance.findFirst({
+    const userInstance = await (prisma as any).userInstance.findFirst({
       where: { userId: campaign.userId, status: 'CONNECTED' },
     });
 
@@ -231,32 +231,32 @@ export function startCampaignWorker() {
         result = await sendViaUnoapi(creds, userInstance.instanceName, msg.contactPhone, msg.content);
       }
 
-      await prisma.campaignMessage.update({
+      await (prisma as any).campaignMessage.update({
         where: { id: msg.id },
         data: { status: 'SENT', sentAt: new Date(), externalId: String(result?.id || result?.key?.id || '') },
       });
 
-      await prisma.campaign.update({
+      await (prisma as any).campaign.update({
         where: { id: campaignId },
         data: { sentCount: { increment: 1 } },
       });
 
       const delay = Number((campaign.config as any)?.delayBetween) || 3000;
-      await worker.queue.add(campaignId, { campaignId }, { delay, jobId: campaignId });
+      await campaignQueue.add(campaignId, { campaignId }, { delay, jobId: campaignId });
     } catch (err: any) {
       if (msg.attempts < msg.maxRetries) {
-        await prisma.campaignMessage.update({
+        await (prisma as any).campaignMessage.update({
           where: { id: msg.id },
           data: { attempts: { increment: 1 }, error: err.message },
         });
         const retryDelay = 5000 * (msg.attempts + 1);
-        await worker.queue.add(campaignId, { campaignId }, { delay: retryDelay, jobId: campaignId });
+        await campaignQueue.add(campaignId, { campaignId }, { delay: retryDelay, jobId: campaignId });
       } else {
-        await prisma.campaignMessage.update({
+        await (prisma as any).campaignMessage.update({
           where: { id: msg.id },
           data: { status: 'FAILED', attempts: { increment: 1 }, error: err.message },
         });
-        await prisma.campaign.update({
+        await (prisma as any).campaign.update({
           where: { id: campaignId },
           data: { failedCount: { increment: 1 } },
         });
@@ -270,25 +270,24 @@ export function startCampaignWorker() {
 }
 
 async function failMessage(msg: any, campaignId: string, error: string) {
-  await prisma.campaignMessage.update({
+  await (prisma as any).campaignMessage.update({
     where: { id: msg.id },
     data: { status: 'FAILED', error },
   });
-  await prisma.campaign.update({
+  await (prisma as any).campaign.update({
     where: { id: campaignId },
     data: { failedCount: { increment: 1 } },
   });
 }
 
 async function enqueueNextOrComplete(campaignId: string) {
-  const pending = await prisma.campaignMessage.count({
+  const pending = await (prisma as any).campaignMessage.count({
     where: { campaignId, status: 'PENDING' },
   });
   if (pending > 0) {
-    const { campaignQueue } = await import('../queue/index.js');
     await campaignQueue.add(campaignId, { campaignId }, { jobId: campaignId });
   } else {
-    await prisma.campaign.update({
+    await (prisma as any).campaign.update({
       where: { id: campaignId },
       data: { status: 'COMPLETED', completedAt: new Date() },
     });

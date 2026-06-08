@@ -58,6 +58,7 @@ model User {
   shortLinks     ShortLink[]
   mediaLibrary   MediaLibrary[]
   stickers       Sticker[]
+  campaigns      Campaign[]
 }
 
 model Profile {

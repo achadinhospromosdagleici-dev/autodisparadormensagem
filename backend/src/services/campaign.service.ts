@@ -1,11 +1,11 @@
-import { PrismaClient, CampaignStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { campaignQueue } from '../queue/index.js';
 
 export class CampaignService {
   constructor(private prisma: PrismaClient) {}
 
   async list(userId: string) {
-    return this.prisma.campaign.findMany({
+    return (this.prisma as any).campaign.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { messages: true } } },
@@ -13,7 +13,7 @@ export class CampaignService {
   }
 
   async getById(userId: string, id: string) {
-    return this.prisma.campaign.findFirstOrThrow({
+    return (this.prisma as any).campaign.findFirstOrThrow({
       where: { id, userId },
       include: {
         messages: { orderBy: { createdAt: 'asc' }, take: 500 },
@@ -27,22 +27,22 @@ export class CampaignService {
     contacts: { phone: string; name?: string }[];
     scheduledAt?: Date;
   }) {
-    const config = { delayBetween: 3000, maxRetries: 3, ...data.config };
-    const campaign = await this.prisma.campaign.create({
+    const cfg = { delayBetween: 3000, maxRetries: 3, ...data.config };
+    const campaign = await (this.prisma as any).campaign.create({
       data: {
         userId,
         name: data.name,
         status: data.scheduledAt ? 'SCHEDULED' : 'PENDING',
         totalContacts: data.contacts.length,
-        config,
+        config: cfg,
         scheduledAt: data.scheduledAt || null,
         messages: {
           create: data.contacts.map(c => ({
             contactPhone: c.phone,
             contactName: c.name || null,
-            content: String(config.content || ''),
-            messageType: String(config.messageType || 'TEXT'),
-            maxRetries: Number(config.maxRetries) || 3,
+            content: String(data.config.content || ''),
+            messageType: String(data.config.messageType || 'TEXT'),
+            maxRetries: Number(cfg.maxRetries) || 3,
           })),
         },
       },
@@ -58,7 +58,7 @@ export class CampaignService {
 
   async start(id: string) {
     await campaignQueue.add(id, { campaignId: id }, { jobId: id });
-    return this.prisma.campaign.update({
+    return (this.prisma as any).campaign.update({
       where: { id },
       data: { status: 'RUNNING', startedAt: new Date() },
     });
@@ -66,7 +66,7 @@ export class CampaignService {
 
   async pause(userId: string, id: string) {
     await campaignQueue.remove(id);
-    return this.prisma.campaign.update({
+    return (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'PAUSED' },
     });
@@ -74,7 +74,7 @@ export class CampaignService {
 
   async resume(userId: string, id: string) {
     await campaignQueue.add(id, { campaignId: id }, { jobId: id });
-    return this.prisma.campaign.update({
+    return (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'RUNNING' },
     });
@@ -82,7 +82,7 @@ export class CampaignService {
 
   async cancel(userId: string, id: string) {
     await campaignQueue.remove(id);
-    return this.prisma.campaign.update({
+    return (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'CANCELLED' },
     });
@@ -90,6 +90,6 @@ export class CampaignService {
 
   async delete(userId: string, id: string) {
     await campaignQueue.remove(id);
-    return this.prisma.campaign.delete({ where: { id, userId } });
+    return (this.prisma as any).campaign.delete({ where: { id, userId } });
   }
 }
