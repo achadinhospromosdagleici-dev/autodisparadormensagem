@@ -204,18 +204,26 @@ async function sendViaWuzapi(creds: ApiCredentials, instanceName: string, msg: M
   if (msg.type === 'TEXT' || msg.type === 'text') {
     return wuzapiCall('/chat/send/text', { Phone: msg.to, Body: msg.text });
   }
-  if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
-    const mediaMap: Record<string, string> = { image: 'Image', audio: 'Audio', video: 'Video', document: 'Document' };
-    return wuzapiCall('/chat/send/media', { Phone: msg.to, Media: msg.mediaUrl, Type: mediaMap[msg.type.toLowerCase()] || 'Image', Caption: msg.mediaCaption });
+  if (msg.type === 'IMAGE' || msg.type === 'image') {
+    return wuzapiCall('/chat/send/image', { Phone: msg.to, Image: msg.mediaUrl || msg.text, Caption: msg.mediaCaption || '' });
+  }
+  if (msg.type === 'AUDIO' || msg.type === 'audio') {
+    return wuzapiCall('/chat/send/audio', { Phone: msg.to, Audio: msg.mediaUrl || msg.text, PTT: false });
+  }
+  if (msg.type === 'VIDEO' || msg.type === 'video') {
+    return wuzapiCall('/chat/send/video', { Phone: msg.to, Video: msg.mediaUrl || msg.text, Caption: msg.mediaCaption || '' });
+  }
+  if (msg.type === 'DOCUMENT' || msg.type === 'document') {
+    return wuzapiCall('/chat/send/document', { Phone: msg.to, Document: msg.mediaUrl || msg.text, FileName: msg.mediaFilename || 'document', Caption: msg.mediaCaption || '' });
   }
   if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
     return wuzapiCall('/chat/send/buttons', { Phone: msg.to, Title: msg.text, Body: msg.mediaCaption || '', Buttons: [] });
   }
   if (msg.type === 'LIST' || msg.type === 'list') {
-    return wuzapiCall('/chat/send/list', { Phone: msg.to, Title: msg.text, Body: msg.mediaCaption || '', ButtonText: 'Ver opções', Sections: [] });
+    return wuzapiCall('/chat/send/list', { Phone: msg.to, ButtonText: 'Ver opções', Desc: msg.mediaCaption || '', TopText: msg.text, FooterText: '', Sections: [] });
   }
   if (msg.type === 'CONTACT' || msg.type === 'contact') {
-    return wuzapiCall('/chat/send/contact', { Phone: msg.to, Contact: { displayName: msg.contactName || msg.text, vcard: '' } });
+    return wuzapiCall('/chat/send/contact', { Phone: msg.to, Contact: { Name: msg.contactName || msg.text, Vcard: '' } });
   }
   return wuzapiCall('/chat/send/text', { Phone: msg.to, Body: msg.text });
 }
