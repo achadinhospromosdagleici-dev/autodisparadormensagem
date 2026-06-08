@@ -325,12 +325,13 @@ model Campaign {
 }
 
 model CampaignMessage {
-  id             String        @id @default(uuid())
+  id             String         @id @default(uuid())
   campaignId     String
   contactPhone   String
   contactName    String?
   content        String
   messageType    String         @default("TEXT")
+  status         MessageStatus  @default(PENDING)
   mediaUrl       String?
   mediaCaption   String?
   mediaFilename  String?
