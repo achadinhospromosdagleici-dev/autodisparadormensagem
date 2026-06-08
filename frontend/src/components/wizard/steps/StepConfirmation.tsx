@@ -229,7 +229,7 @@ export function StepConfirmation({ onCampaignStarted }: StepConfirmationProps = 
 
 
           {/* Live Progress */}
-          {(progress && isSending) || (progress && progress.status === 'completed') ? (
+          {progress && (isSending || progress.status === 'completed') && (
             <div className="glass-card p-6 space-y-4 animate-fade-in">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
