@@ -116,7 +116,7 @@ async function sendViaUnoapi(creds: ApiCredentials, instanceName: string, msg: M
   async function waFetch(payload: any) {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: creds.token || '' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${creds.token || ''}` },
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`UnoAPI ${res.status}: ${await res.text()}`);
@@ -284,6 +284,7 @@ export function startCampaignWorker() {
 
     const userInstance = await (prisma as any).userInstance.findFirst({
       where: { userId: campaign.userId, status: 'CONNECTED' },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!userInstance) {

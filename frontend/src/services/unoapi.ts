@@ -121,7 +121,7 @@ export async function clearUnoApiCredentials(): Promise<void> {
 function getHeaders(token: string) {
   return {
     'Content-Type': 'application/json',
-    Authorization: token,
+    Authorization: `Bearer ${token}`,
   };
 }
 
