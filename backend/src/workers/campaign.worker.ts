@@ -269,7 +269,10 @@ export function startCampaignWorker() {
       },
     });
 
-    if (!campaign || campaign.status !== 'RUNNING') return;
+    if (!campaign || campaign.status !== 'RUNNING') {
+      console.log(`[CampaignWorker] Campanha ${campaignId} ignorada: status=${campaign?.status}`);
+      return;
+    }
 
     const msg = campaign.messages[0];
     if (!msg) {

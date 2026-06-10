@@ -60,11 +60,11 @@ export class CampaignService {
   }
 
   async start(id: string) {
-    await campaignQueue.add(id, { campaignId: id }, { jobId: id });
-    return (this.prisma as any).campaign.update({
+    await (this.prisma as any).campaign.update({
       where: { id },
       data: { status: 'RUNNING', startedAt: new Date() },
     });
+    await campaignQueue.add(id, { campaignId: id }, { jobId: id });
   }
 
   async pause(userId: string, id: string) {
@@ -76,11 +76,11 @@ export class CampaignService {
   }
 
   async resume(userId: string, id: string) {
-    await campaignQueue.add(id, { campaignId: id }, { jobId: id });
-    return (this.prisma as any).campaign.update({
+    await (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'RUNNING' },
     });
+    await campaignQueue.add(id, { campaignId: id }, { jobId: id });
   }
 
   async cancel(userId: string, id: string) {
