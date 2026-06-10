@@ -107,8 +107,8 @@ export function StepMessages() {
     if (mediaType === 'buttons') {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
       if (buttons.length === 0) { toast.error('Adicione pelo menos um botão'); return; }
-      const invalid = buttons.find(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim()));
-      if (invalid) { toast.error('Preencha o texto e o valor de todos os botões'); return; }
+      const invalid = buttons.find(b => !(b.label ?? '').trim());
+      if (invalid) { toast.error('Preencha o texto de todos os botões'); return; }
     }
     if (mediaType === 'link') {
       if (!newMessage.trim()) { toast.error('Digite o texto da mensagem'); return; }
@@ -130,12 +130,12 @@ export function StepMessages() {
       const invalidCard = carouselCards.find(c => !c.title?.trim() || !c.buttons || c.buttons.length === 0);
       if (invalidCard) { toast.error('Cada card precisa de um título e pelo menos um botão'); return; }
       
-      const invalidBtn = carouselCards.some(c => c.buttons.some(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim())));
-      if (invalidBtn) { toast.error('Preencha o texto e o valor de todos os botões do carrossel'); return; }
+      const invalidBtn = carouselCards.some(c => c.buttons.some(b => !(b.label ?? '').trim()));
+      if (invalidBtn) { toast.error('Preencha o texto de todos os botões do carrossel'); return; }
     }
     if (['image', 'video', 'sticker', 'document'].includes(mediaType) && buttons.length > 0) {
-      const invalid = buttons.find(b => !(b.label ?? '').trim() || (b.type !== 'reply' && !(b.value ?? '').trim()));
-      if (invalid) { toast.error('Preencha o texto e o valor de todos os botões da mídia'); return; }
+      const invalid = buttons.find(b => !(b.label ?? '').trim());
+      if (invalid) { toast.error('Preencha o texto de todos os botões'); return; }
     }
 
     const isEditing = !!editingMessageId;
@@ -150,10 +150,12 @@ export function StepMessages() {
     if (isEditing) {
       const cleanButtons = buttons.map(b => {
         let val = (b.value ?? '').trim();
-        if (b.type === 'phone') {
-          val = val.replace(/\D/g, '');
-        } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
-          val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+        if (!val.includes('{{')) {
+          if (b.type === 'phone') {
+            val = val.replace(/\D/g, '');
+          } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
+            val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+          }
         }
         return { ...b, label: (b.label ?? '').trim(), value: val };
       });
@@ -174,10 +176,12 @@ export function StepMessages() {
     } else {
         const cleanButtons = buttons.map(b => {
           let val = (b.value ?? '').trim();
-          if (b.type === 'phone') {
-            val = val.replace(/\D/g, '');
-          } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
-            val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+          if (!val.includes('{{')) {
+            if (b.type === 'phone') {
+              val = val.replace(/\D/g, '');
+            } else if (b.type === 'url' && (val.includes('wa.me/') || val.includes('api.whatsapp.com'))) {
+              val = val.replace(/(wa\.me\/|phone=)\+?(\d+)/g, '$1$2');
+            }
           }
           return { ...b, label: (b.label ?? '').trim(), value: val };
         });
@@ -186,7 +190,7 @@ export function StepMessages() {
           addRichMessage({
             content: newMessage.trim(),
             mediaType: 'buttons',
-            buttons: cleanButtons,
+            buttons: cleanButtons.map(b => ({ ...b, type: 'reply', value: b.label })),
             mediaCaption: btnTitle.trim() || undefined,
             mediaFilename: btnFooter.trim() || undefined,
           });
@@ -588,7 +592,7 @@ return result;
                       {buttons.length < 3 && (
                         <button
                           type="button"
-                          onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                          onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'reply', label: '', value: '' }])}
                           className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
                         >
                           <Plus className="w-3 h-3" /> Adicionar botão
@@ -597,26 +601,15 @@ return result;
                     </div>
                     {buttons.length === 0 && (
                       <p className="text-[11px] text-muted-foreground">
-                        💡 Adicione um botão (ex: "CLIQUE AQUI") com link, telefone ou resposta rápida — igual ao exemplo do BemCash.
+                        💡 Adicione um botão de resposta rápida (ex: "SIM, ACEITO") ou escolha link/telefone no tipo.
                       </p>
                     )}
                     {buttons.map((btn, idx) => (
                       <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
                         <div className="flex items-center gap-2">
-                          <select
-                            value={btn.type}
-                            onChange={(e) => {
-                              const next = [...buttons];
-                              next[idx] = { ...btn, type: e.target.value as MessageButton['type'], value: '' };
-                              setButtons(next);
-                            }}
-                            className="px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
-                          >
-                            <option value="url">🔗 URL</option>
-                            <option value="phone">📞 Telefone</option>
-                            <option value="reply">💬 Resposta</option>
-                            <option value="copy">📋 Copiar Texto</option>
-                          </select>
+                          <div className="px-2 py-1.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" /> Resposta Rápida
+                          </div>
                           <input
                             type="text"
                             value={btn.label}
@@ -637,19 +630,9 @@ return result;
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        {btn.type !== 'reply' && (
-                          <input
-                            type={btn.type === 'phone' ? 'tel' : btn.type === 'url' ? 'url' : 'text'}
-                            value={btn.value}
-                            onChange={(e) => {
-                              const next = [...buttons];
-                              next[idx] = { ...btn, value: e.target.value };
-                              setButtons(next);
-                            }}
-                            placeholder={btn.type === 'url' ? 'https://seusite.com/oferta' : btn.type === 'copy' ? 'Texto para copiar' : '+5511999999999'}
-                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
-                          />
-                        )}
+                        <p className="text-[10px] text-muted-foreground/60 px-1">
+                          Este botão envia o texto acima quando o cliente clicar.
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -711,7 +694,7 @@ return result;
                     {buttons.length < 3 && (
                       <button
                         type="button"
-                        onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'url', label: '', value: '' }])}
+                        onClick={() => setButtons([...buttons, { id: crypto.randomUUID(), type: 'reply', label: '', value: '' }])}
                         className="text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" /> Adicionar botão
@@ -721,35 +704,25 @@ return result;
 
                   {buttons.length === 0 && (
                     <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/50 rounded-lg">
-                      Adicione até 3 botões (URL, telefone ou resposta rápida)
+                      Adicione até 3 botões de resposta rápida (ex: "Sim", "Não", "Falar com Atendente")
                     </p>
                   )}
 
                   {buttons.map((btn, idx) => (
                     <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
                       <div className="flex items-center gap-2">
-                        <select
-                          value={btn.type}
-                          onChange={(e) => {
-                            const next = [...buttons];
-                            next[idx] = { ...btn, type: e.target.value as MessageButton['type'], value: '' };
-                            setButtons(next);
-                          }}
-                          className="px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none"
-                        >
-                          <option value="url">🔗 URL</option>
-                          <option value="phone">📞 Telefone</option>
-                          <option value="reply">💬 Resposta</option>
-                        </select>
+                        <div className="px-2 py-1.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase flex items-center gap-1 shrink-0">
+                          <MessageSquare className="w-3 h-3" /> Resposta
+                        </div>
                         <input
                           type="text"
                           value={btn.label}
                           onChange={(e) => {
                             const next = [...buttons];
-                            next[idx] = { ...btn, label: e.target.value };
+                            next[idx] = { ...btn, label: e.target.value, type: 'reply', value: e.target.value };
                             setButtons(next);
                           }}
-                          placeholder="Texto do botão"
+                          placeholder="Texto do botão (ex: Sim, aceito)"
                           maxLength={20}
                           className="flex-1 px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                         />
@@ -761,19 +734,9 @@ return result;
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      {btn.type !== 'reply' && (
-                        <input
-                          type={btn.type === 'phone' ? 'text' : 'url'}
-                          value={btn.value}
-                          onChange={(e) => {
-                            const next = [...buttons];
-                            next[idx] = { ...btn, value: e.target.value };
-                            setButtons(next);
-                          }}
-                          placeholder={btn.type === 'url' ? 'https://seusite.com/...' : '{{contato}} ou +5511999999999'}
-                          className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
-                        />
-                      )}
+                      <p className="text-[10px] text-muted-foreground/60 px-1">
+                        Este botão envia o texto acima quando o cliente clicar. Para links ou telefone, use as opções no menu superior.
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -1076,29 +1039,18 @@ return result;
 
                       {(card.buttons || []).map((btn, bIdx) => (
                         <div key={btn.id} className="flex items-center gap-1 pl-2">
-                          <select
-                            value={btn.type}
-                            onChange={(e) => {
-                              const next = [...carouselCards];
-                              next[cIdx].buttons[bIdx].type = e.target.value as MessageButton['type'];
-                              setCarouselCards(next);
-                            }}
-                            className="px-1 py-0.5 rounded bg-background border border-border/50 text-[10px]"
-                          >
-                            <option value="reply">Resposta</option>
-                            <option value="url">URL</option>
-                            <option value="phone">Telefone</option>
-                            <option value="copy">Copiar Texto</option>
-                          </select>
+                          <div className="px-1 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold uppercase shrink-0">
+                            Reply
+                          </div>
                           <input
                             type="text"
                             value={btn.label}
                             onChange={(e) => {
                               const next = [...carouselCards];
-                              next[cIdx].buttons[bIdx].label = e.target.value;
+                              next[cIdx].buttons[bIdx] = { ...btn, label: e.target.value, type: 'reply', value: e.target.value };
                               setCarouselCards(next);
                             }}
-                            placeholder="Label"
+                            placeholder="Texto do botão"
                             className="flex-1 px-1 py-0.5 rounded bg-background border border-border/50 text-[10px]"
                           />
                           <button
