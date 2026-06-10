@@ -294,6 +294,40 @@ export function StepInstances() {
     }
 
     await Promise.all(promises);
+
+    // Register connected instances in the database (for the campaign worker)
+    const registerInstance = async (instanceName: string, phone: string, profileName: string, source: string) => {
+      try {
+        await api.post('/instances', { instanceName, phone, profileName, source });
+      } catch {
+        // 409 = already exists (upsert handled server-side), ignore
+      }
+    };
+
+    const registerPromises: Promise<void>[] = [];
+
+    for (const ei of evoGoInstances) {
+      if (ei.status === 'open' || ei.status === 'connected') {
+        registerPromises.push(registerInstance(ei.instanceName, ei.phone || '', ei.profileName || '', 'evolution-go'));
+      }
+    }
+    for (const ei of evoInstances) {
+      if (ei.status === 'open' || ei.status === 'connected') {
+        registerPromises.push(registerInstance(ei.instanceName, ei.phone || '', ei.profileName || '', 'evolution'));
+      }
+    }
+    for (const ui of unoInstances) {
+      if (ui.status === 'connected') {
+        registerPromises.push(registerInstance(ui.phone, ui.phone, ui.name || '', 'unoapi'));
+      }
+    }
+    for (const wi of wuzInstances) {
+      if (wi.status === 'connected') {
+        registerPromises.push(registerInstance(String(wi.id), wi.phone || '', wi.name || '', 'wuzapi'));
+      }
+    }
+
+    await Promise.allSettled(registerPromises);
     if (showLoading) setLoading(false);
   };
 

@@ -107,13 +107,14 @@ export function EvolutionConnection({ onInstancesLoaded }: EvolutionConnectionPr
   const registerUserInstance = async (instance: EvolutionInstance) => {
     if (!user?.id) return;
     try {
-      await api.post('/evolution/register-instance', {
-        instance_name: instance.instanceName,
+      await api.post('/instances', {
+        instanceName: instance.instanceName,
         phone: instance.phone || '',
-        profile_name: instance.profileName || ''
+        profileName: instance.profileName || '',
+        source: 'evolution',
       });
-    } catch (err) {
-      console.error('Error registering user instance:', err);
+    } catch {
+      // 409 = already exists (upsert handled server-side), ignore
     }
   };
 

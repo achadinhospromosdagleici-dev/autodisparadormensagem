@@ -16,6 +16,7 @@ import {
   HardDrive,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import {
   UnoApiCredentials,
   UnoApiInstance,
@@ -74,6 +75,23 @@ export function UnoApiSettings({ onConnectionChange }: UnoApiSettingsProps) {
     if (fetched.length > 0) {
       setInstances(fetched);
       saveManualInstances(fetched);
+
+      // Register connected instances in the DB for the campaign worker
+      for (const inst of fetched) {
+        if (inst.status === 'connected') {
+          try {
+            await api.post('/instances', {
+              instanceName: inst.phone,
+              phone: inst.phone,
+              profileName: inst.name || '',
+              source: 'unoapi',
+            });
+          } catch {
+            // 409 = already exists, ignore
+          }
+        }
+      }
+
       setFetchError(null);
     } else {
       // Only show error, don't fallback to manual cache

@@ -12,8 +12,13 @@ export function instancesRoutes(prisma: PrismaClient) {
       const userId = (request as any).user.sub;
       const { instanceName, phone, profileName, source } = request.body as any;
       const existing = await prisma.userInstance.findUnique({ where: { userId_instanceName: { userId, instanceName } } });
-      if (existing) return reply.status(409).send({ error: 'Instance already exists' });
-      return prisma.userInstance.create({ data: { userId, instanceName, phone, profileName, source: source || 'unoapi' } });
+      if (existing) {
+        return prisma.userInstance.update({
+          where: { id: existing.id },
+          data: { phone: phone || existing.phone, profileName: profileName || existing.profileName, status: existing.status || 'CONNECTED' },
+        });
+      }
+      return prisma.userInstance.create({ data: { userId, instanceName, phone, profileName, source: source || 'unoapi', status: 'CONNECTED' } });
     });
 
     app.put('/:id', async (request) => {
