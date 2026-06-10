@@ -127,9 +127,9 @@ export function StepInstances() {
     async function fetchUserInstances() {
       if (!user?.id) return;
       try {
-        const { data } = await api.get('/user-instances');
+        const { data } = await api.get('/instances');
         if (data && Array.isArray(data)) {
-          setUserInstances(data.map((r: any) => r.instance_name));
+          setUserInstances(data.map((r: any) => r.instanceName));
         }
       } catch (err) {
         console.error('Error fetching user instances:', err);
