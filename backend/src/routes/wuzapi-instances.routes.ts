@@ -60,6 +60,23 @@ export function wuzapiInstancesRoutes(prisma: PrismaClient) {
       return { success: true };
     });
 
+    app.get('/by-name/:name', async (request) => {
+      const userId = (request as any).user.sub;
+      const { name } = request.params as any;
+      return prisma.wuzapiInstance.findFirst({ where: { name, userId }, include: { setting: true } });
+    });
+
+    app.get('/by-name/:name/credentials', async (request) => {
+      const userId = (request as any).user.sub;
+      const { name } = request.params as any;
+      const instance = await prisma.wuzapiInstance.findFirst({
+        where: { name, userId },
+        include: { setting: true },
+      });
+      if (!instance) return { error: 'Instance not found' };
+      return { baseUrl: instance.setting.baseUrl, userToken: instance.userToken };
+    });
+
     app.post('/full', async (request) => {
       const userId = (request as any).user.sub;
       const { userToken, phone, name, status } = request.body as any;

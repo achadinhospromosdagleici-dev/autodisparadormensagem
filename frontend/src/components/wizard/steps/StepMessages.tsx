@@ -447,11 +447,11 @@ return result;
                           }
                           setUploading(true);
                           try {
-                            // Upload to Supabase Storage (default - works with UnoAPI too!)
+                            // Upload via S3 proxy
                             const formData = new FormData();
                             formData.append('file', file);
                             formData.append('folder', mediaType || 'general');
-                            const { data: uploadResult } = await api.post('/media/upload', formData, {
+                            const { data: uploadResult } = await api.post('/proxy/s3-upload', formData, {
                               headers: { 'Content-Type': 'multipart/form-data' },
                             });
                             setMediaUrl(uploadResult.url);
@@ -954,7 +954,7 @@ return result;
                                 const formData = new FormData();
                                 formData.append('file', file);
                                 formData.append('folder', 'carousel');
-                                const { data: uploadResult } = await api.post('/media/upload', formData, {
+                                const { data: uploadResult } = await api.post('/proxy/s3-upload', formData, {
                                   headers: { 'Content-Type': 'multipart/form-data' },
                                 });
                                 

@@ -7,6 +7,12 @@ import { normalizeUrl } from '@/lib/utils';
 export interface UnoApiCredentials {
   baseUrl: string;       // e.g. https://your-unoapi.com
   token: string;         // Authorization token
+  s3Enabled?: boolean;
+  s3Endpoint?: string;
+  s3AccessKey?: string;
+  s3SecretKey?: string;
+  s3Bucket?: string;
+  s3Region?: string;
 }
 
 export type MediaType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'contact';

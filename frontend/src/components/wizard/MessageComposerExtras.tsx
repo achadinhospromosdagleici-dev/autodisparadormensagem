@@ -80,7 +80,7 @@ export function MessageComposerExtras({ onInsertText, onMediaReady }: Props) {
     formData.append('file', file);
     formData.append('folder', folder);
     formData.append('filename', filename);
-    const { data } = await api.post('/media/upload', formData, {
+    const { data } = await api.post('/proxy/s3-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return data.url;
