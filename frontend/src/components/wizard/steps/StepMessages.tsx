@@ -620,7 +620,6 @@ return result;
                             <option value="reply">💬 Resposta</option>
                             <option value="url">🔗 Link</option>
                             <option value="phone">📞 Telefone</option>
-                            <option value="copy">📋 Copiar</option>
                           </select>
                           <input
                             type="text"
@@ -777,7 +776,6 @@ return result;
                           <option value="reply">💬 Resposta</option>
                           <option value="url">🔗 Link</option>
                           <option value="phone">📞 Telefone</option>
-                          <option value="copy">📋 Copiar</option>
                         </select>
                         <input
                           type="text"
