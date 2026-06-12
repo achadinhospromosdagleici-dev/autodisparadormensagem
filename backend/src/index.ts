@@ -17,6 +17,18 @@ import { campaignRoutes } from './routes/campaign.routes.js';
 import { wuzapiInstancesRoutes } from './routes/wuzapi-instances.routes.js';
 import { phoneMappingsRoutes } from './routes/phone-mappings.routes.js';
 import { startCampaignWorker } from './workers/campaign.worker.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const UPLOADS_DIR = resolve(__dirname, '../uploads');
+const MIME_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.pdf': 'application/pdf',
+  '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
 
 const prisma = new PrismaClient();
 
@@ -38,6 +50,19 @@ app.get('/health', async () => {
 
 await app.register(authRoutes(prisma), { prefix: '/api/auth' });
 await app.register(webhookRoutes(prisma), { prefix: '/api/webhook' });
+
+app.get('/api/uploads/:file', async (request, reply) => {
+  const { file } = request.params as any;
+  const safeName = file.replace(/\.\./g, '').replace(/[<>"|?*]/g, '');
+  const filePath = resolve(UPLOADS_DIR, safeName);
+  if (!filePath.startsWith(UPLOADS_DIR) || !existsSync(filePath)) {
+    return reply.status(404).send({ error: 'Not found' });
+  }
+  const ext = extname(filePath).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+  const content = readFileSync(filePath);
+  return reply.type(contentType).send(content);
+});
 
 await app.register(async function (protectedRoutes) {
   protectedRoutes.addHook('preValidation', async (request, reply) => {

@@ -58,6 +58,8 @@ services:
     image: ghcr.io/achadinhospromosdagleici-dev/autodisparadormensagem/backend:latest
     networks:
       - minha_rede
+    volumes:
+      - uploads_data:/app/uploads
     environment:
       - PORT=3000
       - NODE_ENV=production
@@ -157,6 +159,8 @@ volumes:
     name: nexiacred_pgdata
   nexiacred_pgadmin_data:
     name: nexiacred_pgadmin_data
+  uploads_data:
+    name: uploads_data
 
 networks:
   minha_rede:
