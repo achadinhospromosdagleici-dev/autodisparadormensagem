@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { campaignQueue, createWorker } from '../queue/index.js';
 import { normalizeUrl } from '../lib/url.js';
+import { isWithinSchedule, msUntilNextSlot } from '../lib/schedule.js';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,13 @@ interface ApiCredentials {
   accountId?: number;
 }
 
+interface ButtonData {
+  id: string;
+  type: 'url' | 'phone' | 'reply' | 'copy';
+  label: string;
+  value: string;
+}
+
 interface MessagePayload {
   to: string;
   text: string;
@@ -19,6 +27,23 @@ interface MessagePayload {
   mediaCaption?: string;
   mediaFilename?: string;
   contactName?: string;
+  title?: string;
+  footer?: string;
+  buttons?: ButtonData[];
+  linkUrl?: string;
+  sections?: any;
+  cards?: any;
+}
+
+function replaceVariables(template: string, contactName: string, contactPhone: string): string {
+  const firstName = contactName ? contactName.trim().split(/\s+/)[0] : '';
+  return template
+    .replace(/\{\{nome\}\}/gi, contactName || '')
+    .replace(/\{\{name\}\}/gi, contactName || '')
+    .replace(/\{\{primeiro_nome\}\}/gi, firstName)
+    .replace(/\{\{telefone\}\}/gi, contactPhone || '')
+    .replace(/\{\{phone\}\}/gi, contactPhone || '')
+    .replace(/\{\{tel\}\}/gi, contactPhone || '');
 }
 
 async function loadApiSettings(userId: string): Promise<Record<string, ApiCredentials>> {
@@ -62,10 +87,43 @@ async function sendViaEvolution(creds: ApiCredentials, instanceName: string, msg
     return evoFetch(creds, `${base}/message/sendText/${name}`, { ...b, text: msg.text });
   }
   if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
+    const hasBtn = msg.buttons && msg.buttons.length > 0;
+    if (hasBtn) {
+      return evoFetch(creds, `${base}/message/sendMedia/${name}`, {
+        number: msg.to,
+        options: {
+          mediatype: msg.type.toLowerCase(),
+          media: msg.mediaUrl,
+          caption: msg.mediaCaption,
+          fileName: msg.mediaFilename,
+          buttons: msg.buttons!.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })),
+        },
+      });
+    }
     return evoFetch(creds, `${base}/message/sendMedia/${name}`, { number: msg.to, options: { mediatype: msg.type.toLowerCase(), media: msg.mediaUrl, caption: msg.mediaCaption, fileName: msg.mediaFilename } });
   }
   if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
-    return evoFetch(creds, `${base}/message/sendButtons/${name}`, { number: msg.to, options: { title: msg.text, description: msg.mediaCaption, footer: '', buttons: [] } });
+    return evoFetch(creds, `${base}/message/sendButtons/${name}`, {
+      number: msg.to,
+      options: {
+        title: msg.title || msg.text,
+        description: msg.text,
+        footer: msg.footer || '',
+        buttons: msg.buttons?.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })) || [],
+      },
+    });
+  }
+  if (msg.type === 'LIST' || msg.type === 'list') {
+    return evoFetch(creds, `${base}/message/sendList/${name}`, {
+      number: msg.to,
+      options: {
+        title: msg.title || '',
+        description: msg.text,
+        footer: msg.footer || '',
+        buttonText: msg.buttons?.[0]?.label || 'Ver opções',
+        sections: (msg.sections as any[]) || [],
+      },
+    });
   }
   if (msg.type === 'CONTACT' || msg.type === 'contact') {
     return evoFetch(creds, `${base}/message/sendContact/${name}`, { number: msg.to, options: { displayName: msg.contactName || msg.text, vcard: '' } });
@@ -88,23 +146,36 @@ async function sendViaEvolutionGo(creds: ApiCredentials, instanceName: string, m
     return res.json();
   }
 
+  function mapButtons(buttons?: ButtonData[]) {
+    return buttons?.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })) || [];
+  }
+
   if (msg.type === 'TEXT' || msg.type === 'text') {
     return goFetch(`${base}/message/sendText/${name}`, { number: msg.to, text: msg.text, delay: 1, presence: 'composing' });
   }
   if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
+    const hasBtn = msg.buttons && msg.buttons.length > 0;
+    if (hasBtn) {
+      return goFetch(`${base}/message/sendMedia/${name}`, { number: msg.to, mediatype: msg.type.toLowerCase(), media: msg.mediaUrl, caption: msg.mediaCaption, fileName: msg.mediaFilename, buttons: mapButtons(msg.buttons) });
+    }
     return goFetch(`${base}/message/sendMedia/${name}`, { number: msg.to, mediatype: msg.type.toLowerCase(), media: msg.mediaUrl, caption: msg.mediaCaption, fileName: msg.mediaFilename });
   }
   if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
-    return goFetch(`${base}/message/sendButtons/${name}`, { number: msg.to, title: msg.text, description: msg.mediaCaption, footer: '', buttons: [] });
+    return goFetch(`${base}/message/sendButtons/${name}`, {
+      number: msg.to, title: msg.title || msg.text, description: msg.text, footer: msg.footer || '', buttons: mapButtons(msg.buttons),
+    });
   }
   if (msg.type === 'LIST' || msg.type === 'list') {
-    return goFetch(`${base}/message/sendList/${name}`, { number: msg.to, title: msg.text, description: msg.mediaCaption, buttonText: 'Ver opções', sections: [] });
+    return goFetch(`${base}/message/sendList/${name}`, {
+      number: msg.to, title: msg.title || msg.text, description: msg.text, footer: msg.footer || '',
+      buttonText: msg.buttons?.[0]?.label || 'Ver opções', sections: (msg.sections as any[]) || [],
+    });
   }
   if (msg.type === 'CONTACT' || msg.type === 'contact') {
     return goFetch(`${base}/message/sendContact/${name}`, { number: msg.to, contact: { displayName: msg.contactName || msg.text, vcard: '' } });
   }
   if (msg.type === 'CAROUSEL' || msg.type === 'carousel') {
-    return goFetch(`${base}/send/carousel/${name}`, { number: msg.to, cards: [] });
+    return goFetch(`${base}/send/carousel/${name}`, { number: msg.to, cards: (msg.cards as any[]) || [] });
   }
   return goFetch(`${base}/message/sendText/${name}`, { number: msg.to, text: msg.text, delay: 1, presence: 'composing' });
 }
@@ -123,38 +194,92 @@ async function sendViaUnoapi(creds: ApiCredentials, instanceName: string, msg: M
     return res.json();
   }
 
-  if (msg.type === 'TEXT' || msg.type === 'text') {
-    return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
+  const mediaTypes = ['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'];
+  const hasButtons = msg.buttons && msg.buttons.length > 0;
+  const isMediaWithButtons = mediaTypes.includes(msg.type) && hasButtons;
+
+  if (isMediaWithButtons || msg.type === 'BUTTONS' || msg.type === 'buttons') {
+    const interactive: any = { type: 'button', body: { text: msg.text } };
+
+    if (msg.title) interactive.header = { type: 'text', text: msg.title };
+    if (msg.footer) interactive.footer = { type: 'text', text: msg.footer };
+
+    interactive.action = {
+      buttons: msg.buttons!.map(b => {
+        if (b.type === 'url') {
+          return { type: 'cta_url', url: { title: b.label, link: b.value } };
+        }
+        if (b.type === 'phone') {
+          const clean = b.value.replace(/\D/g, '');
+          return { type: 'cta_call', call: { title: b.label, phone_number: `+${clean}` } };
+        }
+        if (b.type === 'copy') {
+          return { type: 'cta_copy', copy_code: { title: b.label, code: b.value } };
+        }
+        return { type: 'reply', reply: { id: b.id || 'btn1', title: b.label } };
+      }),
+    };
+
+    if (isMediaWithButtons) {
+      const mt = msg.type.toLowerCase();
+      const mediaKey = mt === 'document' ? 'document' : mt;
+      interactive.header = {
+        type: mt,
+        [mediaKey]: { link: msg.mediaUrl, caption: msg.mediaCaption },
+      };
+    }
+
+    return waFetch({ ...basePayload, recipient_type: 'individual', type: 'interactive', interactive });
   }
-  if (msg.type === 'IMAGE' || msg.type === 'image') {
-    return waFetch({ ...basePayload, type: 'image', image: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
-  }
-  if (msg.type === 'AUDIO' || msg.type === 'audio') {
-    return waFetch({ ...basePayload, type: 'audio', audio: { link: msg.mediaUrl || msg.text } });
-  }
-  if (msg.type === 'VIDEO' || msg.type === 'video') {
-    return waFetch({ ...basePayload, type: 'video', video: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
-  }
-  if (msg.type === 'DOCUMENT' || msg.type === 'document') {
-    return waFetch({ ...basePayload, type: 'document', document: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption, filename: msg.mediaFilename || 'document' } });
-  }
-  if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
-    return waFetch({
-      ...basePayload, recipient_type: 'individual', type: 'interactive',
-      interactive: {
-        type: 'button', body: { text: msg.text },
-        action: { buttons: [{ type: 'reply', reply: { id: 'btn1', title: msg.mediaCaption || 'Ok' } }] },
-      },
-    });
-  }
+
   if (msg.type === 'LIST' || msg.type === 'list') {
+    const sections = (msg.sections as any[]) || [{ title: 'Opções', rows: [{ id: 'opt1', title: msg.mediaCaption || 'Ok', description: '' }] }];
     return waFetch({
       ...basePayload, recipient_type: 'individual', type: 'interactive',
       interactive: {
         type: 'list', body: { text: msg.text },
-        action: { button: 'Ver opções', sections: [{ title: 'Opções', rows: [{ id: 'opt1', title: msg.mediaCaption || 'Ok', description: '' }] }] },
+        header: msg.title ? { type: 'text', text: msg.title } : undefined,
+        footer: msg.footer ? { type: 'text', text: msg.footer } : undefined,
+        action: { button: msg.buttons?.[0]?.label || 'Ver opções', sections },
       },
     });
+  }
+
+  if (msg.type === 'CAROUSEL' || msg.type === 'carousel') {
+    return waFetch({
+      ...basePayload, type: 'interactive',
+      interactive: {
+        type: 'carousel', body: { text: msg.text },
+        action: { cards: (msg.cards as any[]) || [] },
+      },
+    });
+  }
+
+  if (msg.type === 'CONTACT' || msg.type === 'contact') {
+    return waFetch({
+      ...basePayload, type: 'contacts',
+      contacts: [{ name: { formatted_name: msg.contactName || msg.text }, phones: [{ wa_id: msg.to, phone: msg.to }] }],
+    });
+  }
+
+  if (msg.linkUrl && (msg.type === 'TEXT' || msg.type === 'text' || msg.type === 'link')) {
+    return waFetch({ ...basePayload, type: 'text', text: { body: `${msg.text}\n\n${msg.linkUrl}` } });
+  }
+
+  if (msg.type === 'TEXT' || msg.type === 'text') {
+    return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
+  }
+  if (['IMAGE', 'image'].includes(msg.type)) {
+    return waFetch({ ...basePayload, type: 'image', image: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
+  }
+  if (['AUDIO', 'audio'].includes(msg.type)) {
+    return waFetch({ ...basePayload, type: 'audio', audio: { link: msg.mediaUrl || msg.text } });
+  }
+  if (['VIDEO', 'video'].includes(msg.type)) {
+    return waFetch({ ...basePayload, type: 'video', video: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption } });
+  }
+  if (['DOCUMENT', 'document'].includes(msg.type)) {
+    return waFetch({ ...basePayload, type: 'document', document: { link: msg.mediaUrl || msg.text, caption: msg.mediaCaption, filename: msg.mediaFilename || 'document' } });
   }
   return waFetch({ ...basePayload, type: 'text', text: { body: msg.text } });
 }
@@ -235,10 +360,17 @@ async function sendViaWuzapi(creds: ApiCredentials, instanceName: string, msg: M
     return wuzapiCall('/chat/send/document', { Phone: msg.to, Document: msg.mediaUrl || msg.text, FileName: msg.mediaFilename || 'document', Caption: msg.mediaCaption || '' });
   }
   if (msg.type === 'BUTTONS' || msg.type === 'buttons') {
-    return wuzapiCall('/chat/send/buttons', { Phone: msg.to, Title: msg.text, Body: msg.mediaCaption || '', Buttons: [] });
+    return wuzapiCall('/chat/send/buttons', {
+      Phone: msg.to, Title: msg.title || msg.text, Body: msg.text, FooterText: msg.footer || '',
+      Buttons: msg.buttons?.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })) || [],
+    });
   }
   if (msg.type === 'LIST' || msg.type === 'list') {
-    return wuzapiCall('/chat/send/list', { Phone: msg.to, ButtonText: 'Ver opções', Desc: msg.mediaCaption || '', TopText: msg.text, FooterText: '', Sections: [] });
+    return wuzapiCall('/chat/send/list', {
+      Phone: msg.to, ButtonText: msg.buttons?.[0]?.label || 'Ver opções',
+      Desc: msg.text, TopText: msg.title || '', FooterText: msg.footer || '',
+      Sections: (msg.sections as any[]) || [],
+    });
   }
   if (msg.type === 'CONTACT' || msg.type === 'contact') {
     return wuzapiCall('/chat/send/contact', { Phone: msg.to, Contact: { Name: msg.contactName || msg.text, Vcard: '' } });
@@ -280,6 +412,7 @@ export function startCampaignWorker() {
         where: { id: campaignId },
         data: { status: 'COMPLETED', completedAt: new Date() },
       });
+      await addAudit(campaignId, 'completed', { reason: 'all_messages_sent' });
       return;
     }
 
@@ -313,16 +446,22 @@ export function startCampaignWorker() {
 
     const messagePayload: MessagePayload = {
       to: msg.contactPhone,
-      text: msg.content,
+      text: replaceVariables(msg.content, msg.contactName, msg.contactPhone),
       type: msg.messageType || 'TEXT',
       mediaUrl: msg.mediaUrl || undefined,
-      mediaCaption: msg.mediaCaption || undefined,
+      mediaCaption: msg.mediaCaption ? replaceVariables(msg.mediaCaption, msg.contactName, msg.contactPhone) : undefined,
       mediaFilename: msg.mediaFilename || undefined,
       contactName: msg.contactName || undefined,
+      title: msg.title || undefined,
+      footer: msg.footer || undefined,
+      buttons: msg.buttons || undefined,
+      linkUrl: msg.linkUrl || undefined,
+      sections: msg.sections || undefined,
+      cards: msg.cards || undefined,
     };
 
     try {
-      let result = await sender(creds, userInstance.instanceName, messagePayload);
+      const result = await sender(creds, userInstance.instanceName, messagePayload);
 
       await (prisma as any).campaignMessage.update({
         where: { id: msg.id },
@@ -334,8 +473,7 @@ export function startCampaignWorker() {
         data: { sentCount: { increment: 1 } },
       });
 
-      const delay = Number((campaign.config as any)?.delayBetween) || 3000;
-      await campaignQueue.add(campaignId, { campaignId }, { delay, jobId: campaignId });
+      await enqueueNextOrComplete(campaignId);
     } catch (err: any) {
       if (msg.attempts < msg.maxRetries) {
         await (prisma as any).campaignMessage.update({
@@ -343,7 +481,7 @@ export function startCampaignWorker() {
           data: { attempts: { increment: 1 }, error: err.message },
         });
         const retryDelay = 5000 * (msg.attempts + 1);
-        await campaignQueue.add(campaignId, { campaignId }, { delay: retryDelay, jobId: campaignId });
+        await campaignQueue.add(campaignId, { campaignId }, { delay: retryDelay });
       } else {
         await (prisma as any).campaignMessage.update({
           where: { id: msg.id },
@@ -362,6 +500,12 @@ export function startCampaignWorker() {
   return worker;
 }
 
+async function addAudit(campaignId: string, action: string, details?: any) {
+  await (prisma as any).campaignAudit.create({
+    data: { campaignId, action, details: details || undefined },
+  });
+}
+
 async function failMessage(msg: any, campaignId: string, error: string) {
   await (prisma as any).campaignMessage.update({
     where: { id: msg.id },
@@ -371,6 +515,7 @@ async function failMessage(msg: any, campaignId: string, error: string) {
     where: { id: campaignId },
     data: { failedCount: { increment: 1 } },
   });
+  await addAudit(campaignId, 'message_failed', { contact: msg.contactPhone, error });
 }
 
 async function enqueueNextOrComplete(campaignId: string) {
@@ -378,11 +523,12 @@ async function enqueueNextOrComplete(campaignId: string) {
     where: { campaignId, status: 'PENDING' },
   });
   if (pending > 0) {
-    await campaignQueue.add(campaignId, { campaignId }, { jobId: campaignId });
+    await campaignQueue.add(campaignId, { campaignId }, {});
   } else {
     await (prisma as any).campaign.update({
       where: { id: campaignId },
       data: { status: 'COMPLETED', completedAt: new Date() },
     });
+    await addAudit(campaignId, 'completed', { reason: 'all_messages_processed' });
   }
 }

@@ -18,6 +18,8 @@ import {
   Globe,
   Phone,
   Building2,
+  ShoppingCart,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -185,6 +187,18 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <a
+                  href="https://chipsms.com.br/cadastro/?indicacao=gleicileneteixeira.gd@gmail.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 px-2 py-1.5 rounded-lg text-sm text-green-500 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                >
+                  <ShoppingCart className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">Comprar Número</span>
+                  <ExternalLink className="w-3 h-3 shrink-0 opacity-60" />
+                </a>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

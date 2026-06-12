@@ -47,5 +47,16 @@ export function campaignRoutes(prisma: PrismaClient) {
       const { id } = request.params as any;
       return service.delete(userId, id);
     });
+
+    app.get('/:id/audit', async (request) => {
+      const { sub: userId } = request.user as any;
+      const { id } = request.params as any;
+      const campaign = await (prisma as any).campaign.findFirst({ where: { id, userId } });
+      if (!campaign) return { error: 'Not found' };
+      return (prisma as any).campaignAudit.findMany({
+        where: { campaignId: id },
+        orderBy: { createdAt: 'asc' },
+      });
+    });
   };
 }

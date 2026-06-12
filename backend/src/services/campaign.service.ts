@@ -45,6 +45,12 @@ export class CampaignService {
             mediaUrl: data.config.mediaUrl ? String(data.config.mediaUrl) : null,
             mediaCaption: data.config.mediaCaption ? String(data.config.mediaCaption) : null,
             mediaFilename: data.config.mediaFilename ? String(data.config.mediaFilename) : null,
+            title: data.config.title ? String(data.config.title) : null,
+            footer: data.config.footer ? String(data.config.footer) : null,
+            buttons: data.config.buttons || undefined,
+            linkUrl: data.config.linkUrl ? String(data.config.linkUrl) : null,
+            sections: data.config.sections || undefined,
+            cards: data.config.cards || undefined,
             maxRetries: Number(cfg.maxRetries) || 3,
           })),
         },
@@ -64,11 +70,17 @@ export class CampaignService {
       where: { id },
       data: { status: 'RUNNING', startedAt: new Date() },
     });
+    await (this.prisma as any).campaignAudit.create({
+      data: { campaignId: id, action: 'started' },
+    });
     await campaignQueue.add(id, { campaignId: id }, { jobId: id });
   }
 
   async pause(userId: string, id: string) {
     await campaignQueue.remove(id);
+    await (this.prisma as any).campaignAudit.create({
+      data: { campaignId: id, action: 'paused' },
+    });
     return (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'PAUSED' },
@@ -80,11 +92,17 @@ export class CampaignService {
       where: { id, userId },
       data: { status: 'RUNNING' },
     });
-    await campaignQueue.add(id, { campaignId: id }, { jobId: id });
+    await (this.prisma as any).campaignAudit.create({
+      data: { campaignId: id, action: 'resumed' },
+    });
+    await campaignQueue.add(id, { campaignId: id }, { });
   }
 
   async cancel(userId: string, id: string) {
     await campaignQueue.remove(id);
+    await (this.prisma as any).campaignAudit.create({
+      data: { campaignId: id, action: 'cancelled' },
+    });
     return (this.prisma as any).campaign.update({
       where: { id, userId },
       data: { status: 'CANCELLED' },

@@ -601,21 +601,33 @@ return result;
                     </div>
                     {buttons.length === 0 && (
                       <p className="text-[11px] text-muted-foreground">
-                        💡 Adicione um botão de resposta rápida (ex: "SIM, ACEITO") ou escolha link/telefone no tipo.
+                        Adicione um botão: Resposta, Link, Telefone ou Copiar — escolha o tipo ao lado.
                       </p>
                     )}
                     {buttons.map((btn, idx) => (
                       <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
                         <div className="flex items-center gap-2">
-                          <div className="px-2 py-1.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3" /> Resposta Rápida
-                          </div>
+                          <select
+                            value={btn.type}
+                            onChange={(e) => {
+                              const newType = e.target.value as MessageButton['type'];
+                              const next = [...buttons];
+                              next[idx] = { ...btn, type: newType, value: newType === 'reply' ? btn.label : '' };
+                              setButtons(next);
+                            }}
+                            className="px-2 py-1.5 rounded-md bg-muted text-foreground text-[10px] font-bold uppercase border border-border/30 cursor-pointer shrink-0 outline-none"
+                          >
+                            <option value="reply">Resposta</option>
+                            <option value="url">Link</option>
+                            <option value="phone">Telefone</option>
+                            <option value="copy">Copiar</option>
+                          </select>
                           <input
                             type="text"
                             value={btn.label}
                             onChange={(e) => {
                               const next = [...buttons];
-                              next[idx] = { ...btn, label: e.target.value };
+                              next[idx] = { ...btn, label: e.target.value, value: btn.type === 'reply' ? e.target.value : btn.value };
                               setButtons(next);
                             }}
                             placeholder="Ex: CLIQUE AQUI"
@@ -630,9 +642,50 @@ return result;
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <p className="text-[10px] text-muted-foreground/60 px-1">
-                          Este botão envia o texto acima quando o cliente clicar.
-                        </p>
+                        {btn.type === 'reply' && (
+                          <p className="text-[10px] text-muted-foreground/60 px-1">
+                            Envia este texto quando o cliente clicar no botão.
+                          </p>
+                        )}
+                        {btn.type === 'url' && (
+                          <input
+                            type="url"
+                            value={btn.value}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, value: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder="https://seusite.com/pagina"
+                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        )}
+                        {btn.type === 'phone' && (
+                          <input
+                            type="tel"
+                            value={btn.value}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, value: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder="+5511999999999"
+                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        )}
+                        {btn.type === 'copy' && (
+                          <input
+                            type="text"
+                            value={btn.value}
+                            onChange={(e) => {
+                              const next = [...buttons];
+                              next[idx] = { ...btn, value: e.target.value };
+                              setButtons(next);
+                            }}
+                            placeholder="Texto a ser copiado"
+                            className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -704,22 +757,34 @@ return result;
 
                   {buttons.length === 0 && (
                     <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/50 rounded-lg">
-                      Adicione até 3 botões de resposta rápida (ex: "Sim", "Não", "Falar com Atendente")
+                      Adicione até 3 botões: Resposta, Link, Telefone ou Copiar
                     </p>
                   )}
 
                   {buttons.map((btn, idx) => (
                     <div key={btn.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50 space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="px-2 py-1.5 rounded-md bg-muted text-muted-foreground text-[10px] font-bold uppercase flex items-center gap-1 shrink-0">
-                          <MessageSquare className="w-3 h-3" /> Resposta
-                        </div>
+                        <select
+                          value={btn.type}
+                          onChange={(e) => {
+                            const newType = e.target.value as MessageButton['type'];
+                            const next = [...buttons];
+                            next[idx] = { ...btn, type: newType, value: newType === 'reply' ? btn.label : '' };
+                            setButtons(next);
+                          }}
+                          className="px-2 py-1.5 rounded-md bg-muted text-foreground text-[10px] font-bold uppercase border border-border/30 cursor-pointer shrink-0 outline-none"
+                        >
+                          <option value="reply">Resposta</option>
+                          <option value="url">Link</option>
+                          <option value="phone">Telefone</option>
+                          <option value="copy">Copiar</option>
+                        </select>
                         <input
                           type="text"
                           value={btn.label}
                           onChange={(e) => {
                             const next = [...buttons];
-                            next[idx] = { ...btn, label: e.target.value, type: 'reply', value: e.target.value };
+                            next[idx] = { ...btn, label: e.target.value, value: btn.type === 'reply' ? e.target.value : btn.value };
                             setButtons(next);
                           }}
                           placeholder="Texto do botão (ex: Sim, aceito)"
@@ -734,9 +799,50 @@ return result;
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
-                      <p className="text-[10px] text-muted-foreground/60 px-1">
-                        Este botão envia o texto acima quando o cliente clicar. Para links ou telefone, use as opções no menu superior.
-                      </p>
+                      {btn.type === 'reply' && (
+                        <p className="text-[10px] text-muted-foreground/60 px-1">
+                          Envia este texto quando o cliente clicar no botão.
+                        </p>
+                      )}
+                      {btn.type === 'url' && (
+                        <input
+                          type="url"
+                          value={btn.value}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, value: e.target.value };
+                            setButtons(next);
+                          }}
+                          placeholder="https://seusite.com/pagina"
+                          className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                      )}
+                      {btn.type === 'phone' && (
+                        <input
+                          type="tel"
+                          value={btn.value}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, value: e.target.value };
+                            setButtons(next);
+                          }}
+                          placeholder="+5511999999999"
+                          className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                      )}
+                      {btn.type === 'copy' && (
+                        <input
+                          type="text"
+                          value={btn.value}
+                          onChange={(e) => {
+                            const next = [...buttons];
+                            next[idx] = { ...btn, value: e.target.value };
+                            setButtons(next);
+                          }}
+                          placeholder="Texto a ser copiado"
+                          className="w-full px-2 py-1.5 rounded-md bg-background border border-border/50 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

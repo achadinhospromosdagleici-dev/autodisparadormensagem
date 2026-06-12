@@ -319,6 +319,7 @@ model Campaign {
 
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages CampaignMessage[]
+  audit    CampaignAudit[]
 
   @@index([userId, status])
   @@index([status, scheduledAt])
@@ -335,6 +336,12 @@ model CampaignMessage {
   mediaUrl       String?
   mediaCaption   String?
   mediaFilename  String?
+  title          String?
+  footer         String?
+  buttons        Json?
+  linkUrl        String?
+  sections       Json?
+  cards          Json?
   attempts       Int            @default(0)
   maxRetries     Int            @default(3)
   error          String?
@@ -350,4 +357,17 @@ model CampaignMessage {
 
   @@index([campaignId, status])
   @@index([campaignId, contactPhone])
+}
+
+model CampaignAudit {
+  id         String   @id @default(uuid())
+  campaignId String
+  action     String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([createdAt])
 }

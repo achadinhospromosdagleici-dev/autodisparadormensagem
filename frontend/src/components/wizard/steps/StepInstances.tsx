@@ -13,6 +13,8 @@ import {
   Phone,
   Zap,
   MessageCircle,
+  ExternalLink,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -501,6 +503,23 @@ export function StepInstances() {
               </p>
             </div>
           </div>
+          <a
+            href="https://chipsms.com.br/cadastro/?indicacao=gleicileneteixeira.gd@gmail.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 hover:border-green-500/60 transition-all group"
+          >
+            <ShoppingCart className="w-5 h-5 text-green-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-green-500 group-hover:text-green-400 leading-tight">
+                Adquirir Número Virtual
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                Compre números WhatsApp verificados para disparo
+              </p>
+            </div>
+            <ExternalLink className="w-4 h-4 text-green-500 shrink-0" />
+          </a>
         </div>
       )}
 
