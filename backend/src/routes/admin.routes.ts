@@ -4,8 +4,11 @@ import { PrismaClient } from '@prisma/client';
 export function adminRoutes(prisma: PrismaClient) {
   return async function (app: FastifyInstance) {
     app.addHook('preValidation', async (request, reply) => {
-      const user = (request as any).user;
-      if (user.role !== 'SUPERADMIN') {
+      const decoded = (request as any).user;
+      const userId = decoded?.sub;
+      if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+      const userRole = await prisma.userRole.findFirst({ where: { userId, role: 'SUPERADMIN' } });
+      if (!userRole) {
         return reply.status(403).send({ error: 'Forbidden' });
       }
     });
