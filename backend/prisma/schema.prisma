@@ -59,6 +59,8 @@ model User {
   mediaLibrary   MediaLibrary[]
   stickers       Sticker[]
   campaigns      Campaign[]
+  conversations  Conversation[]
+  messages       Message[]
 }
 
 model Profile {
@@ -126,6 +128,7 @@ model UserSetting {
 
 model Conversation {
   id                 String    @id @default(uuid())
+  userId             String?
   instanceName       String
   phoneNumber        String
   contactName        String?
@@ -137,12 +140,14 @@ model Conversation {
   updatedAt          DateTime  @updatedAt
 
   messages Message[]
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([instanceName, phoneNumber])
 }
 
 model Message {
   id             String   @id @default(uuid())
+  userId         String?
   conversationId String
   instanceName   String
   messageId      String?
@@ -156,6 +161,7 @@ model Message {
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ApiSetting {
