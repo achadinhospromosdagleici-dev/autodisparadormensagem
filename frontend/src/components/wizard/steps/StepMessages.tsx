@@ -617,10 +617,10 @@ return result;
                             }}
                             className="px-2 py-1.5 rounded-md bg-muted text-foreground text-[10px] font-bold uppercase border border-border/30 cursor-pointer shrink-0 outline-none"
                           >
-                            <option value="reply">Resposta</option>
-                            <option value="url">Link</option>
-                            <option value="phone">Telefone</option>
-                            <option value="copy">Copiar</option>
+                            <option value="reply">💬 Resposta</option>
+                            <option value="url">🔗 Link</option>
+                            <option value="phone">📞 Telefone</option>
+                            <option value="copy">📋 Copiar</option>
                           </select>
                           <input
                             type="text"
@@ -774,10 +774,10 @@ return result;
                           }}
                           className="px-2 py-1.5 rounded-md bg-muted text-foreground text-[10px] font-bold uppercase border border-border/30 cursor-pointer shrink-0 outline-none"
                         >
-                          <option value="reply">Resposta</option>
-                          <option value="url">Link</option>
-                          <option value="phone">Telefone</option>
-                          <option value="copy">Copiar</option>
+                          <option value="reply">💬 Resposta</option>
+                          <option value="url">🔗 Link</option>
+                          <option value="phone">📞 Telefone</option>
+                          <option value="copy">📋 Copiar</option>
                         </select>
                         <input
                           type="text"

@@ -84,6 +84,18 @@ async function sendViaEvolution(creds: ApiCredentials, instanceName: string, msg
   const name = instanceName;
 
   if (msg.type === 'TEXT' || msg.type === 'text') {
+    const hasBtn = msg.buttons && msg.buttons.length > 0;
+    if (hasBtn) {
+      return evoFetch(creds, `${base}/message/sendButtons/${name}`, {
+        number: msg.to,
+        options: {
+          title: msg.title || msg.text,
+          description: msg.text,
+          footer: msg.footer || '',
+          buttons: msg.buttons!.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })),
+        },
+      });
+    }
     return evoFetch(creds, `${base}/message/sendText/${name}`, { ...b, text: msg.text });
   }
   if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
@@ -151,6 +163,12 @@ async function sendViaEvolutionGo(creds: ApiCredentials, instanceName: string, m
   }
 
   if (msg.type === 'TEXT' || msg.type === 'text') {
+    const hasBtn = msg.buttons && msg.buttons.length > 0;
+    if (hasBtn) {
+      return goFetch(`${base}/message/sendButtons/${name}`, {
+        number: msg.to, title: msg.title || msg.text, description: msg.text, footer: msg.footer || '', buttons: mapButtons(msg.buttons),
+      });
+    }
     return goFetch(`${base}/message/sendText/${name}`, { number: msg.to, text: msg.text, delay: 1, presence: 'composing' });
   }
   if (['IMAGE', 'image', 'AUDIO', 'audio', 'VIDEO', 'video', 'DOCUMENT', 'document'].includes(msg.type)) {
@@ -198,7 +216,7 @@ async function sendViaUnoapi(creds: ApiCredentials, instanceName: string, msg: M
   const hasButtons = msg.buttons && msg.buttons.length > 0;
   const isMediaWithButtons = mediaTypes.includes(msg.type) && hasButtons;
 
-  if (isMediaWithButtons || msg.type === 'BUTTONS' || msg.type === 'buttons') {
+  if (hasButtons && (isMediaWithButtons || msg.type === 'BUTTONS' || msg.type === 'buttons' || msg.type === 'TEXT' || msg.type === 'text')) {
     const interactive: any = { type: 'button', body: { text: msg.text } };
 
     if (msg.title) interactive.header = { type: 'text', text: msg.title };
@@ -345,6 +363,13 @@ async function sendViaWuzapi(creds: ApiCredentials, instanceName: string, msg: M
   }
 
   if (msg.type === 'TEXT' || msg.type === 'text') {
+    const hasBtn = msg.buttons && msg.buttons.length > 0;
+    if (hasBtn) {
+      return wuzapiCall('/chat/send/buttons', {
+        Phone: msg.to, Title: msg.title || msg.text, Body: msg.text, FooterText: msg.footer || '',
+        Buttons: msg.buttons?.map(b => ({ type: b.type === 'url' ? 'cta_url' : b.type, label: b.label, value: b.value })) || [],
+      });
+    }
     return wuzapiCall('/chat/send/text', { Phone: msg.to, Body: msg.text });
   }
   if (msg.type === 'IMAGE' || msg.type === 'image') {
