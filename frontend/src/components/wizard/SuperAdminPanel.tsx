@@ -21,11 +21,19 @@ interface ProfileRow {
   roles?: string[];
 }
 
-interface SharedEvolution {
+interface SharedApiConfig {
   baseUrl: string;
   apiKey: string;
   enabled: boolean;
 }
+type ApiType = 'evolution' | 'evolution-go' | 'unoapi' | 'wuzapi';
+
+const SHARED_APIS: { key: ApiType; label: string; icon: string; tokenLabel: string }[] = [
+  { key: 'evolution', label: 'Evolution', icon: '📱', tokenLabel: 'API Key' },
+  { key: 'evolution-go', label: 'EvolutionGo', icon: '⚡', tokenLabel: 'API Key' },
+  { key: 'unoapi', label: 'UnoAPI', icon: '🌐', tokenLabel: 'Token' },
+  { key: 'wuzapi', label: 'WuzAPI', icon: '💬', tokenLabel: 'Admin Token' },
+];
 
 export function SuperAdminPanel() {
   const { user } = useAuth();
@@ -34,10 +42,10 @@ export function SuperAdminPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTrial, setEditTrial] = useState('');
 
-  // Shared Evolution
-  const [shared, setShared] = useState<SharedEvolution>({ baseUrl: '', apiKey: '', enabled: false });
-  const [showKey, setShowKey] = useState(false);
-  const [savingShared, setSavingShared] = useState(false);
+  // Shared APIs
+  const [sharedSettings, setSharedSettings] = useState<Record<string, SharedApiConfig>>({});
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [savingShared, setSavingShared] = useState<Record<string, boolean>>({});
 
   // Create user
   const [newEmail, setNewEmail] = useState('');
@@ -48,10 +56,10 @@ export function SuperAdminPanel() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [profRes, rolesRes, settingsRes] = await Promise.all([
+      const [profRes, rolesRes, ...sharedRes] = await Promise.all([
         api.get('/admin/profiles'),
         api.get('/admin/user-roles'),
-        api.get('/admin/system-settings/shared_evolution'),
+        ...SHARED_APIS.map(a => api.get(`/admin/system-settings/shared_${a.key}`).catch(() => ({ data: null }))),
       ]);
 
       const rolesMap = new Map<string, string[]>();
@@ -63,10 +71,12 @@ export function SuperAdminPanel() {
       const list = ((profRes.data as ProfileRow[]) || []).map(p => ({ ...p, roles: rolesMap.get(p.id) || [] }));
       setProfiles(list);
 
-      if (settingsRes.data?.value) {
-        const v = settingsRes.data.value as SharedEvolution;
-        setShared({ baseUrl: v.baseUrl || '', apiKey: v.apiKey || '', enabled: !!v.enabled });
-      }
+      const settings: Record<string, SharedApiConfig> = {};
+      SHARED_APIS.forEach((a, i) => {
+        const data = sharedRes[i]?.data?.value as SharedApiConfig | undefined;
+        settings[a.key] = { baseUrl: data?.baseUrl || '', apiKey: data?.apiKey || '', enabled: !!data?.enabled };
+      });
+      setSharedSettings(settings);
     } catch (err: any) {
       toast.error('Erro ao carregar: ' + err.message);
     } finally {
@@ -128,16 +138,24 @@ export function SuperAdminPanel() {
     }
   };
 
-  const saveShared = async () => {
-    setSavingShared(true);
+  const saveShared = async (apiKey: string) => {
+    setSavingShared(prev => ({ ...prev, [apiKey]: true }));
     try {
-      await api.put('/admin/system-settings/shared_evolution', { value: shared, updated_by: user?.id });
-      toast.success('Evolution compartilhada salva');
+      await api.put(`/admin/system-settings/shared_${apiKey}`, { value: sharedSettings[apiKey], updated_by: user?.id });
+      const apiLabel = SHARED_APIS.find(a => a.key === apiKey)?.label || apiKey;
+      toast.success(`${apiLabel} compartilhada salva`);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
-      setSavingShared(false);
+      setSavingShared(prev => ({ ...prev, [apiKey]: false }));
     }
+  };
+
+  const updateShared = (apiKey: string, field: keyof SharedApiConfig, value: any) => {
+    setSharedSettings(prev => ({
+      ...prev,
+      [apiKey]: { ...prev[apiKey], [field]: value },
+    }));
   };
 
   const createUser = async () => {
@@ -168,50 +186,60 @@ export function SuperAdminPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Shared Evolution */}
-      <div className="glass-card p-6 space-y-4">
+      {/* Shared APIs */}
+      <div className="glass-card p-6 space-y-6">
         <div className="flex items-center gap-3">
           <Server className="w-5 h-5 text-primary" />
           <div>
-            <h3 className="font-semibold">Evolution compartilhada (trial)</h3>
-            <p className="text-xs text-muted-foreground">Usada automaticamente por contas em período de teste que não configuraram sua própria Evolution.</p>
+            <h3 className="font-semibold">APIs compartilhadas (trial)</h3>
+            <p className="text-xs text-muted-foreground">Usadas automaticamente por contas em período de teste que não configuraram sua própria API.</p>
           </div>
         </div>
-        <div className="grid gap-3">
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="shared-enabled" checked={shared.enabled}
-              onChange={e => setShared({ ...shared, enabled: e.target.checked })} />
-            <label htmlFor="shared-enabled" className="text-sm font-medium">Ativar Evolution compartilhada para trial</label>
-          </div>
-          
-          {shared.enabled && (
-            <div className="pl-6 space-y-3 border-l-2 border-primary/30 animate-fade-in">
-              <div>
-                <label className="text-xs text-muted-foreground">URL Evolution</label>
-                <input value={shared.baseUrl} onChange={e => setShared({ ...shared, baseUrl: e.target.value })}
-                  placeholder="https://sua-evolution-api.com"
-                  className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm" />
+        {SHARED_APIS.map(api => {
+          const cfg = sharedSettings[api.key] || { baseUrl: '', apiKey: '', enabled: false };
+          return (
+            <div key={api.key} className="space-y-3 p-4 rounded-lg border border-border/50">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id={`shared-${api.key}-enabled`}
+                  checked={cfg.enabled}
+                  onChange={e => updateShared(api.key, 'enabled', e.target.checked)} />
+                <label htmlFor={`shared-${api.key}-enabled`} className="text-sm font-medium flex items-center gap-1">
+                  {api.icon} {api.label} compartilhada
+                </label>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">API Key</label>
-                <div className="relative">
-                  <input type={showKey ? 'text' : 'password'} value={shared.apiKey}
-                    onChange={e => setShared({ ...shared, apiKey: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 rounded-lg bg-muted/50 border border-border/50 text-sm" />
-                  <button type="button" onClick={() => setShowKey(!showKey)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              
+              {cfg.enabled && (
+                <div className="pl-6 space-y-3 border-l-2 border-primary/30 animate-fade-in">
+                  <div>
+                    <label className="text-xs text-muted-foreground">URL {api.label}</label>
+                    <input value={cfg.baseUrl}
+                      onChange={e => updateShared(api.key, 'baseUrl', e.target.value)}
+                      placeholder={`https://sua-${api.label.toLowerCase().replace(/\s/g, '-')}-api.com`}
+                      className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/50 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">{api.tokenLabel}</label>
+                    <div className="relative">
+                      <input type={showKeys[api.key] ? 'text' : 'password'}
+                        value={cfg.apiKey}
+                        onChange={e => updateShared(api.key, 'apiKey', e.target.value)}
+                        className="w-full px-3 py-2 pr-10 rounded-lg bg-muted/50 border border-border/50 text-sm" />
+                      <button type="button" onClick={() => setShowKeys(prev => ({ ...prev, [api.key]: !prev[api.key] }))}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        {showKeys[api.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <button onClick={() => saveShared(api.key)}
+                    disabled={savingShared[api.key] || !cfg.enabled}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    {savingShared[api.key] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar {api.label}
                   </button>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-          
-          <button onClick={saveShared} disabled={savingShared || !shared.enabled}
-            className="self-start flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
-            {savingShared ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar
-          </button>
-        </div>
+          );
+        })}
       </div>
 
       {/* Create user */}

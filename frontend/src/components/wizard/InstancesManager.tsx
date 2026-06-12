@@ -5,7 +5,7 @@ import {
   PanelLeftClose, PanelLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { loadUnoApiCredentials, testConnection, UnoApiInstance, fetchInstances as fetchUnoInstances } from '@/services/unoapi';
+import { loadUnoApiCredentials, testConnection, UnoApiInstance, fetchInstances as fetchUnoInstances, registerUnoapiSession, getUnoapiQRCode, getUnoapiSessionStatus, requestUnoapiPairingCode } from '@/services/unoapi';
 import { 
   loadEvolutionCredentials, 
   fetchInstances as fetchEvoInstances, 
@@ -180,6 +180,18 @@ export function InstancesManager() {
         } else {
           throw new Error('Credenciais da WuzAPI não configuradas');
         }
+      } else if (source === 'unoapi') {
+        const creds = loadUnoApiCredentials();
+        if (!creds) throw new Error('Credenciais da UnoAPI não configuradas');
+        await registerUnoapiSession(creds, instanceName);
+        try {
+          const qr = await getUnoapiQRCode(creds, instanceName);
+          data = { qrcode: qr };
+        } catch {
+          const code = await requestUnoapiPairingCode(creds, instanceName);
+          toast.success(`Código de pareamento enviado: ${code}`);
+          data = { qrcode: '' };
+        }
       }
       
       setQrCode(data.qrcode || '');
@@ -230,6 +242,19 @@ export function InstancesManager() {
                   await saveWuzapiInstanceDb(matched.user_token, phone, matched.name, 'connected');
                 }
               }
+          }
+        } else if (source === 'unoapi') {
+          const creds = loadUnoApiCredentials();
+          if (creds) {
+            const status = await getUnoapiSessionStatus(creds, instanceName);
+            connected = status.connected;
+            if (connected) {
+              const { data: existing } = await api.get('/instances');
+              const alreadyRegistered = existing?.some((r: any) => r.instanceName === instanceName);
+              if (!alreadyRegistered) {
+                await api.post('/instances', { instanceName, phone: instanceName, profileName: status.profileName || '', source: 'unoapi' });
+              }
+            }
           }
         }
         
@@ -402,9 +427,7 @@ export function InstancesManager() {
             <div className="text-center py-8 text-muted-foreground">
               <Smartphone className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">Nenhuma instância encontrada</p>
-              {activeApi !== 'unoapi' && (
-                <p className="text-xs mt-1">Va em Configurações para conectar</p>
-              )}
+              <p className="text-xs mt-1">Va em Configurações para conectar</p>
             </div>
           ) : (
             instances.filter(i => i.source === activeApi).map(inst => (
@@ -424,7 +447,7 @@ export function InstancesManager() {
                 </div>
                 
                 <div className="flex gap-2 mt-2">
-                  {inst.status !== 'connected' && activeApi !== 'unoapi' && (
+                  {inst.status !== 'connected' && (
                     <button
                       onClick={() => handleGenerateQR(inst.source, inst.phone)}
                       className="flex-1 py-1.5 rounded-md bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 flex items-center justify-center gap-1"

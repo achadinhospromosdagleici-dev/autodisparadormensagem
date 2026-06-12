@@ -117,6 +117,91 @@ export async function clearUnoApiCredentials(): Promise<void> {
   await api.delete('/settings/unoapi');
 }
 
+// ── UnoAPI QR / Pairing Code ──
+
+/** Register a new session (QR pairing). Returns success/failure. */
+export async function registerUnoapiSession(creds: UnoApiCredentials, phone: string): Promise<boolean> {
+  try {
+    const result = await proxyCall(creds, `/v15.0/${phone}/register`, 'POST', { connectionType: 'qr' });
+    return result.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Fetch the session HTML page containing QR code, return base64 QR data URL. */
+export async function getUnoapiQRCode(creds: UnoApiCredentials, phone: string): Promise<string> {
+  try {
+    const response = await api.post('/proxy/unoapi', {
+      baseUrl: creds.baseUrl,
+      token: creds.token,
+      endpoint: `sessions/${phone}`,
+      method: 'GET',
+    });
+    const html = response.data?.text || '';
+    const match = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
+    if (match?.[1]) return match[1];
+    const base64Match = html.match(/data:image[^"']+/);
+    if (base64Match?.[0]) return base64Match[0];
+    // If we got an HTML page with a redirect or script, show it
+    if (html.includes('qrcode') || html.includes('QR')) {
+      return `data:text/html;base64,${btoa(html)}`;
+    }
+    throw new Error('QR code não encontrado na página da sessão');
+  } catch (err: any) {
+    console.error('[UnoAPI] QR fetch error:', err);
+    throw err;
+  }
+}
+
+/** Request a pairing code (alternative to QR — sends code to phone via WhatsApp). */
+export async function requestUnoapiPairingCode(creds: UnoApiCredentials, phone: string): Promise<string> {
+  try {
+    const response = await api.post('/proxy/unoapi', {
+      baseUrl: creds.baseUrl,
+      token: creds.token,
+      endpoint: `${phone}/request_code`,
+      method: 'POST',
+    });
+    return response.data?.text || 'Código enviado para seu WhatsApp';
+  } catch (err: any) {
+    console.error('[UnoAPI] Pairing code error:', err);
+    throw err;
+  }
+}
+
+/** Check UnoAPI session status — returns true if connected. */
+export async function getUnoapiSessionStatus(creds: UnoApiCredentials, phone: string): Promise<{ connected: boolean; profileName?: string }> {
+  try {
+    const result = await proxyCall(creds, `/v15.0/${phone}`, 'GET');
+    if (result.ok && result.data) {
+      const status = result.data?.status || '';
+      return { connected: status === 'connected' || status === 'open' || status === 'online', profileName: result.data?.profileName };
+    }
+    return { connected: false };
+  } catch {
+    return { connected: false };
+  }
+}
+
+// ── Shared UnoAPI (fallback for trial users) ──
+export async function loadSharedUnoapiCredentials(): Promise<UnoApiCredentials | null> {
+  try {
+    const response = await api.get('/settings/unoapi/shared');
+    const v = response.data as { baseUrl?: string; token?: string; enabled?: boolean };
+    if (!v || !v.enabled || !v.baseUrl || !v.token) return null;
+    return { baseUrl: v.baseUrl, token: v.token };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveUnoapiCredentials(): Promise<UnoApiCredentials | null> {
+  const own = await loadUnoApiCredentialsWithFallback();
+  if (own?.baseUrl && own?.token) return own;
+  return loadSharedUnoapiCredentials();
+}
+
 // Headers helper
 function getHeaders(token: string) {
   return {

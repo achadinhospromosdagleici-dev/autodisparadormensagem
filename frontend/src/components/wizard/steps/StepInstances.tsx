@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import {
   loadUnoApiCredentials,
   loadUnoApiCredentialsWithFallback,
+  resolveUnoapiCredentials,
   fetchInstances as fetchUnoInstances,
   UnoApiInstance,
 } from '@/services/unoapi';
@@ -34,7 +35,7 @@ import {
 import {
   loadEvolutionGoCredentials,
   loadEvolutionGoCredentialsWithFallback,
-  isEvolutionGoConnected,
+  resolveEvolutionGoCredentials,
   fetchEvolutionGoInstances,
   EvolutionGoInstance,
 } from '@/services/evolutionGo';
@@ -46,6 +47,7 @@ import {
 } from '@/services/chatwoot';
 import {
   loadWuzapiSettings,
+  resolveWuzapiCredentials,
   WuzapiInstanceDb,
 } from '@/services/wuzapi';
 import { useSharedEvolution } from '@/hooks/useSharedEvolution';
@@ -80,9 +82,29 @@ export function StepInstances() {
 
   const [hasEvolution, setHasEvolution] = useState(false);
   const hasSharedEvolution = useSharedEvolution();
+  const [hasSharedEvolutionGo, setHasSharedEvolutionGo] = useState(false);
+  const [hasSharedUnoapi, setHasSharedUnoapi] = useState(false);
+  const [hasSharedWuzapi, setHasSharedWuzapi] = useState(false);
   const [hasEvolutionGo, setHasEvolutionGo] = useState(false);
   const [hasChatwoot, setHasChatwoot] = useState(false);
   const [hasWuzapi, setHasWuzapi] = useState(false);
+
+  async function checkSharedApis() {
+    try {
+      const [evoGoRes, unoRes, wuzRes] = await Promise.all([
+        api.get('/settings/evolution-go/shared'),
+        api.get('/settings/unoapi/shared'),
+        api.get('/settings/wuzapi/shared'),
+      ]);
+      const evoGo = evoGoRes.data as { enabled?: boolean } | undefined;
+      const uno = unoRes.data as { enabled?: boolean } | undefined;
+      const wuz = wuzRes.data as { enabled?: boolean } | undefined;
+      setHasSharedEvolutionGo(!!evoGo?.enabled);
+      setHasSharedUnoapi(!!uno?.enabled);
+      setHasSharedWuzapi(!!wuz?.enabled);
+    } catch { /* ignore */ }
+  }
+
   React.useEffect(() => {
     async function checkApis(checkDb = false) {
       // Evolution
@@ -112,6 +134,9 @@ export function StepInstances() {
       // WuzAPI
       const wuzLocal = await loadWuzapiSettings();
       if (wuzLocal) setHasWuzapi(true);
+
+      // Check shared APIs
+      if (checkDb) await checkSharedApis();
     }
     checkApis(true);
 
@@ -122,7 +147,8 @@ export function StepInstances() {
     return () => clearInterval(interval);
   }, []);
 
-  const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot || hasWuzapi;
+  const hasAnyApi = unoApiConnected || hasEvolution || !!hasSharedEvolution || hasEvolutionGo || hasChatwoot || hasWuzapi
+    || hasSharedEvolutionGo || hasSharedUnoapi || hasSharedWuzapi;
 
   // Fetch user's registered instances (for filtering when using shared Evolution)
   React.useEffect(() => {
@@ -147,18 +173,18 @@ export function StepInstances() {
   // Auto-detect API on first load
   React.useEffect(() => {
     if (!selectedApi && hasLoadedRef.current !== 'done') {
-      if (unoApiConnected) {
+      if (unoApiConnected || hasSharedUnoapi) {
         setSelectedApi('unoapi');
-      } else if (hasEvolutionGo) {
+      } else if (hasEvolutionGo || hasSharedEvolutionGo) {
         setSelectedApi('evolution-go');
       } else if (hasEvolution || hasSharedEvolution) {
         setSelectedApi('evolution');
-      } else if (hasWuzapi) {
+      } else if (hasWuzapi || hasSharedWuzapi) {
         setSelectedApi('wuzapi');
       }
       hasLoadedRef.current = 'done';
     }
-  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo, hasWuzapi]);
+  }, [unoApiConnected, hasEvolution, hasSharedEvolution, hasEvolutionGo, hasEvolutionGo, hasWuzapi, hasSharedEvolutionGo, hasSharedUnoapi, hasSharedWuzapi]);
 
   React.useEffect(() => {
     console.log('[StepInstances] unoApiConnected:', unoApiConnected);
@@ -203,8 +229,8 @@ export function StepInstances() {
     if (showLoading) setLoading(true);
     const promises: Promise<void>[] = [];
 
-    // UnoAPI
-    const unoCreds = await loadUnoApiCredentialsWithFallback();
+    // UnoAPI - try own, then shared
+    const unoCreds = await resolveUnoapiCredentials();
     if (unoCreds) {
       promises.push(
         fetchUnoInstances(unoCreds)
@@ -219,17 +245,8 @@ export function StepInstances() {
       );
     }
 
-    // Evolution - try user's own first, then shared (for trial users)
-    let evoCreds = await resolveEvolutionCredentials();
-    console.log('[StepInstances] Evolution creds (resolved):', evoCreds ? 'found' : 'not found');
-    if (!evoCreds) {
-      // Try loading from database as fallback
-      const credsFromDb = await loadEvolutionCredentialsWithFallback();
-      if (credsFromDb) {
-        console.log('[StepInstances] Evolution creds from DB found, using...');
-        evoCreds = credsFromDb;
-      }
-    }
+    // Evolution - try own, then shared
+    const evoCreds = await resolveEvolutionCredentials();
     if (evoCreds) {
       promises.push(
         fetchEvoInstances(evoCreds)
@@ -244,8 +261,8 @@ export function StepInstances() {
       );
     }
 
-    // Evolution Go
-    const evoGoCreds = await loadEvolutionGoCredentialsWithFallback();
+    // Evolution Go - try own, then shared
+    const evoGoCreds = await resolveEvolutionGoCredentials();
     if (evoGoCreds) {
       promises.push(
         fetchEvolutionGoInstances(evoGoCreds)
@@ -276,8 +293,8 @@ export function StepInstances() {
       );
     }
 
-    // WuzAPI
-    const wuzCreds = await loadWuzapiSettings();
+    // WuzAPI - try own, then shared
+    const wuzCreds = await resolveWuzapiCredentials();
     if (wuzCreds && user?.id) {
       promises.push(
         api.get('/wuzapi-instances')
@@ -334,16 +351,19 @@ export function StepInstances() {
   };
 
 // Merge all sources into unified Instance[]
-  // When using shared Evolution, only show user's own registered instances
-  const shouldFilterByUser = hasSharedEvolution && userInstances.length > 0;
+  // When using shared APIs, only show user's own registered instances
+  const hasAnyShared = hasSharedEvolution || hasSharedEvolutionGo || hasSharedUnoapi || hasSharedWuzapi;
+  const shouldFilterByUser = hasAnyShared && userInstances.length > 0;
   const mergedInstances: Instance[] = [
-    ...(Array.isArray(evoGoInstances) ? evoGoInstances.map((ei) => ({
-      id: `evogo_${ei.instanceName}`,
-      name: ei.profileName || ei.instanceName,
-      status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
-      phoneNumber: ei.phone || undefined,
-      source: 'evolution-go' as const,
-    })) : []),
+    ...(Array.isArray(evoGoInstances) ? evoGoInstances
+      .filter((ei) => !shouldFilterByUser || (Array.isArray(userInstances) && userInstances.includes(ei.instanceName)))
+      .map((ei) => ({
+        id: `evogo_${ei.instanceName}`,
+        name: ei.profileName || ei.instanceName,
+        status: (ei.status === 'open' || ei.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
+        phoneNumber: ei.phone || undefined,
+        source: 'evolution-go' as const,
+      })) : []),
     ...(Array.isArray(evoInstances) ? evoInstances
       .filter((ei) => !shouldFilterByUser || (Array.isArray(userInstances) && userInstances.includes(ei.instanceName)))
       .map((ei) => ({
@@ -353,8 +373,10 @@ export function StepInstances() {
         phoneNumber: ei.phone || undefined,
         source: 'evolution' as const,
       })) : []),
-    ...(unoApiConnected && Array.isArray(unoInstances) && unoInstances.length > 0
-      ? unoInstances.map((ui) => ({
+    ...((unoApiConnected || hasSharedUnoapi) && Array.isArray(unoInstances) && unoInstances.length > 0
+      ? unoInstances
+        .filter((ui) => !shouldFilterByUser || (Array.isArray(userInstances) && userInstances.includes(ui.phone)))
+        .map((ui) => ({
           id: `uno_${ui.phone}`,
           name: ui.name || ui.phone,
           status: (ui.status === 'connected' ? 'active' : 'inactive') as Instance['status'],
@@ -372,7 +394,9 @@ export function StepInstances() {
         }))
       : []),
     ...(Array.isArray(wuzInstances) && wuzInstances.length > 0
-      ? wuzInstances.map((wi) => ({
+      ? wuzInstances
+        .filter((wi) => !shouldFilterByUser || (Array.isArray(userInstances) && (userInstances.includes(wi.name) || userInstances.includes(String(wi.id)))))
+        .map((wi) => ({
           id: `wuz_${wi.id}`,
           name: wi.name,
           status: (wi.status === 'connected' ? 'active' : 'inactive') as Instance['status'],

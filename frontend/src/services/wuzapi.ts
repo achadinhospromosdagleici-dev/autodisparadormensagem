@@ -122,6 +122,24 @@ export async function clearWuzapiSettings(): Promise<void> {
   await api.delete('/settings/wuzapi');
 }
 
+// ── Shared WuzAPI (fallback for trial users) ──
+export async function loadSharedWuzapiCredentials(): Promise<WuzapiCredentials | null> {
+  try {
+    const response = await api.get('/settings/wuzapi/shared');
+    const v = response.data as { baseUrl?: string; adminToken?: string; enabled?: boolean };
+    if (!v || !v.enabled || !v.baseUrl || !v.adminToken) return null;
+    return { baseUrl: v.baseUrl, adminToken: v.adminToken };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveWuzapiCredentials(): Promise<WuzapiCredentials | null> {
+  const own = await loadWuzapiSettings();
+  if (own?.baseUrl && own?.adminToken) return own;
+  return loadSharedWuzapiCredentials();
+}
+
 /**
  * Saves/updates a WuzAPI instance.
  */

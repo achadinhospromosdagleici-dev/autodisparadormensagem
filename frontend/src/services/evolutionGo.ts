@@ -87,6 +87,24 @@ export async function isEvolutionGoConnectedAsync(): Promise<boolean> {
   return !!(creds?.baseUrl && creds?.apiKey);
 }
 
+// ── Shared EvolutionGo (fallback for trial users) ──
+export async function loadSharedEvolutionGoCredentials(): Promise<EvolutionGoCredentials | null> {
+  try {
+    const response = await api.get('/settings/evolution-go/shared');
+    const v = response.data as { baseUrl?: string; apiKey?: string; enabled?: boolean };
+    if (!v || !v.enabled || !v.baseUrl || !v.apiKey) return null;
+    return { baseUrl: v.baseUrl, apiKey: v.apiKey };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveEvolutionGoCredentials(): Promise<EvolutionGoCredentials | null> {
+  const own = await loadEvolutionGoCredentialsWithFallback();
+  if (own?.baseUrl && own?.apiKey) return own;
+  return loadSharedEvolutionGoCredentials();
+}
+
 // ── Generic proxy call ──
 async function evolutionGoCall(payload: Record<string, any>): Promise<any> {
   console.log('[Evolution Go] Calling proxy...');

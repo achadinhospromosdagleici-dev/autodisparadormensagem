@@ -28,5 +28,16 @@ export function adminRoutes(prisma: PrismaClient) {
       const { key, value } = request.body as any;
       return prisma.systemSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
     });
+
+    app.get('/system-settings/:key', async (request) => {
+      const { key } = request.params as any;
+      return prisma.systemSetting.findUnique({ where: { key } });
+    });
+
+    app.put('/system-settings/:key', async (request) => {
+      const { key } = request.params as any;
+      const { value } = request.body as any;
+      return prisma.systemSetting.upsert({ where: { key }, update: { value }, create: { key, value } });
+    });
   };
 }

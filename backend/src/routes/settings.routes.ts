@@ -4,10 +4,15 @@ import { normalizeUrl } from '../lib/url.js';
 
 export function settingsRoutes(prisma: PrismaClient) {
   return async function (app: FastifyInstance) {
-    app.get('/evolution/shared', async () => {
-      const setting = await prisma.systemSetting.findUnique({ where: { key: 'evolution_shared' } });
+    async function getSharedSetting(key: string) {
+      const setting = await prisma.systemSetting.findUnique({ where: { key } });
       return setting?.value || { enabled: false };
-    });
+    }
+
+    app.get('/evolution/shared', async () => getSharedSetting('evolution_shared'));
+    app.get('/evolution-go/shared', async () => getSharedSetting('evolution_go_shared'));
+    app.get('/unoapi/shared', async () => getSharedSetting('unoapi_shared'));
+    app.get('/wuzapi/shared', async () => getSharedSetting('wuzapi_shared'));
 
     app.get('/wuzapi', async (request) => {
       const userId = (request as any).user.sub;
