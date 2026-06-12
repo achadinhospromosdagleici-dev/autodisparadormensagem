@@ -190,7 +190,7 @@ export function StepMessages() {
           addRichMessage({
             content: newMessage.trim(),
             mediaType: 'buttons',
-            buttons: cleanButtons.map(b => ({ ...b, type: 'reply', value: b.label })),
+            buttons: cleanButtons,
             mediaCaption: btnTitle.trim() || undefined,
             mediaFilename: btnFooter.trim() || undefined,
           });
