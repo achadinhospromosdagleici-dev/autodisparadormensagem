@@ -17,57 +17,66 @@ export async function s3UploadRoutes(app: FastifyInstance) {
       const s3Bucket = bucket || process.env.S3_BUCKET || 'uploads';
       const s3Region = region || process.env.S3_REGION || 'us-east-1';
 
+      if (!s3AccessKey || !s3SecretKey) {
+        return reply.status(500).send({ error: 'S3 credentials not configured' });
+      }
+
       const fileName = `${Date.now()}-${data.filename}`;
       const url = `${s3Endpoint}/${s3Bucket}/${fileName}`;
 
-      const { createHash, createHmac } = await import('node:crypto');
+      const crypto = await import('node:crypto');
+      const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
       const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
       const dateStr = amzDate.slice(0, 8);
+      const host = new URL(s3Endpoint).host;
 
       const canonicalRequest = [
         'PUT',
         `/${s3Bucket}/${fileName}`,
         '',
-        `host:${new URL(s3Endpoint).host}`,
-        `x-amz-content-sha256:${createHash('sha256').update(buffer).digest('hex')}`,
+        `host:${host}`,
+        `x-amz-content-sha256:${sha256}`,
         `x-amz-date:${amzDate}`,
         '',
         'host;x-amz-content-sha256;x-amz-date',
-        createHash('sha256').update(buffer).digest('hex'),
+        sha256,
       ].join('\n');
 
       const stringToSign = [
         'AWS4-HMAC-SHA256',
         amzDate,
         `${dateStr}/${s3Region}/s3/aws4_request`,
-        createHash('sha256').update(canonicalRequest).digest('hex'),
+        crypto.createHash('sha256').update(canonicalRequest).digest('hex'),
       ].join('\n');
 
-      const dateKey = createHmac('sha256', `AWS4${s3SecretKey}`).update(dateStr).digest();
-      const regionKey = createHmac('sha256', dateKey).update(s3Region).digest();
-      const serviceKey = createHmac('sha256', regionKey).update('s3').digest();
-      const signingKey = createHmac('sha256', serviceKey).update('aws4_request').digest();
-      const signature = createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+      const dateKey = crypto.createHmac('sha256', `AWS4${s3SecretKey}`).update(dateStr).digest();
+      const regionKey = crypto.createHmac('sha256', dateKey).update(s3Region).digest();
+      const serviceKey = crypto.createHmac('sha256', regionKey).update('s3').digest();
+      const signingKey = crypto.createHmac('sha256', serviceKey).update('aws4_request').digest();
+      const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
 
       const authorization = `AWS4-HMAC-SHA256 Credential=${s3AccessKey}/${dateStr}/${s3Region}/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=${signature}`;
 
       const uploadRes = await fetch(url, {
         method: 'PUT',
         headers: {
-          'x-amz-content-sha256': createHash('sha256').update(buffer).digest('hex'),
+          'x-amz-content-sha256': sha256,
           'x-amz-date': amzDate,
-          'Authorization': authorization,
-          'Content-Length': buffer.length.toString(),
+          Authorization: authorization,
+          'Content-Type': data.mimetype || 'application/octet-stream',
         },
-        body: new Blob([new Uint8Array(buffer)]),
+        body: new Uint8Array(buffer),
       });
 
       if (!uploadRes.ok) {
-        return reply.status(502).send({ error: 'Upload failed', status: uploadRes.status });
+        const errText = await uploadRes.text().catch(() => '');
+        console.error(`[s3-upload] PUT ${url} → ${uploadRes.status}: ${errText}`);
+        return reply.status(502).send({ error: 'Upload failed', status: uploadRes.status, body: errText.slice(0, 300) });
       }
 
       return { url, path: fileName, fileName: data.filename };
     } catch (error: any) {
+      console.error(`[s3-upload] error:`, error);
       return reply.status(500).send({ error: error.message });
     }
   });
