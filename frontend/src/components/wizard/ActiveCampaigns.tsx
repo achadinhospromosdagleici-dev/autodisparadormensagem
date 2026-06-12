@@ -59,9 +59,9 @@ interface ActiveCampaignsProps {
 
 export function ActiveCampaigns({
   campaigns,
-  onPause: _onPause,
-  onResume: _onResume,
-  onCancel: _onCancel,
+  onPause,
+  onResume,
+  onCancel,
   onResend,
   onNewCampaign,
 }: ActiveCampaignsProps) {
@@ -82,15 +82,15 @@ export function ActiveCampaigns({
   }
 
   const handlePause = async (id: string) => {
-    try { await campaignService.pause(id); await loadServerCampaigns(); } catch { }
+    try { await onPause(id); await loadServerCampaigns(); } catch { }
   };
 
   const handleResume = async (id: string) => {
-    try { await campaignService.resume(id); await loadServerCampaigns(); } catch { }
+    try { await onResume(id); await loadServerCampaigns(); } catch { }
   };
 
   const handleCancel = async (id: string) => {
-    try { await campaignService.cancel(id); await loadServerCampaigns(); } catch { }
+    try { await onCancel(id); await loadServerCampaigns(); } catch { }
   };
 
   const mergedCampaigns = [

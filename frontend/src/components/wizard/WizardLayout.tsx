@@ -22,6 +22,7 @@ import { GroupScraper } from './GroupScraper';
 import { ChipMaturer } from './ChipMaturer';
 import { BusinessSearch } from './BusinessSearch';
 import { resendCampaign } from '@/services/campaignSender';
+import { campaignService } from '@/services/campaignService';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Crown, Clock } from 'lucide-react';
@@ -117,9 +118,9 @@ export function WizardLayout() {
           <div className="space-y-6">
             <ActiveCampaigns
               campaigns={activeCampaigns}
-              onPause={(id) => updateActiveCampaign(id, { status: 'paused' })}
-              onResume={(id) => updateActiveCampaign(id, { status: 'running' })}
-              onCancel={(id) => updateActiveCampaign(id, { status: 'cancelled' })}
+              onPause={async (id) => { try { await campaignService.pause(id); updateActiveCampaign(id, { status: 'paused' }); } catch {} }}
+              onResume={async (id) => { try { await campaignService.resume(id); updateActiveCampaign(id, { status: 'running' }); } catch {} }}
+              onCancel={async (id) => { try { await campaignService.cancel(id); updateActiveCampaign(id, { status: 'cancelled' }); } catch {} }}
                onResend={(id) => {
                  const campaign = activeCampaigns.find(c => c.id === id);
                  if (!campaign?.snapshot) {

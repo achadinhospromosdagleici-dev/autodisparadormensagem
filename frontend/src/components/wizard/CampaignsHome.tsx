@@ -12,6 +12,7 @@ import {
   History
 } from 'lucide-react';
 import { useWizard } from '@/contexts/WizardContext';
+import { campaignService } from '@/services/campaignService';
 
 export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () => void; onResume: () => void }) {
   const { 
@@ -165,18 +166,33 @@ export function CampaignsHome({ onNewCampaign, onResume }: { onNewCampaign: () =
                     </td>
                     <td className="px-6 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {campaign.status === 'running' || campaign.status === 'paused' ? (
+                        {campaign.status === 'running' ? (
                           <button 
-                            onClick={() => updateActiveCampaign(campaign.id, { status: campaign.status === 'running' ? 'paused' : 'running' })}
-                            className={`p-2.5 rounded-xl transition-all hover:scale-110 ${
-                              campaign.status === 'running' ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground'
-                            }`}
+                            onClick={async () => {
+                              try { await campaignService.pause(campaign.id); updateActiveCampaign(campaign.id, { status: 'paused' }); } catch {}
+                            }}
+                            className="p-2.5 rounded-xl bg-warning text-warning-foreground transition-all hover:scale-110"
                           >
-                            {campaign.status === 'running' ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+                            <Pause className="w-4 h-4 fill-current" />
+                          </button>
+                        ) : null}
+                        {campaign.status === 'paused' ? (
+                          <button 
+                            onClick={async () => {
+                              try { await campaignService.resume(campaign.id); updateActiveCampaign(campaign.id, { status: 'running' }); } catch {}
+                            }}
+                            className="p-2.5 rounded-xl bg-success text-success-foreground transition-all hover:scale-110"
+                          >
+                            <Play className="w-4 h-4 fill-current" />
                           </button>
                         ) : null}
                         <button 
-                          onClick={() => removeActiveCampaign(campaign.id)}
+                          onClick={async () => {
+                            if (confirm('Deseja realmente cancelar esta campanha?')) {
+                              try { await campaignService.cancel(campaign.id); } catch {}
+                              removeActiveCampaign(campaign.id);
+                            }
+                          }}
                           className="p-2.5 rounded-xl bg-muted/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
                         >
                           <X className="w-4 h-4" />
